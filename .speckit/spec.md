@@ -1,230 +1,181 @@
-# Option Sentinel — Product Specification
+# Feature Specification: Option Sentinel
 
-**Version:** 0.1  
-**Date:** 2026-04-28  
-**Status:** Draft
+**Feature Branch**: `001-option-sentinel-monitor`  
+**Created**: 2026-04-28  
+**Status**: Draft  
+**Input**: User description: "Personal options position monitor that connects to the Schwab API, automatically tracks open positions, fires alerts when pre-defined trading rules trigger, and displays a live dashboard."
 
----
+## User Scenarios & Testing *(mandatory)*
 
-## 1. Overview
+### User Story 1 - Live Position Dashboard (Priority: P1)
 
-Option Sentinel is a personal options position monitor for a single user. It connects to the Charles Schwab public API, polls open positions during market hours, evaluates each position against a set of pre-defined trading rules, and delivers alerts when those rules fire. A live React dashboard provides at-a-glance status of all positions, rule states, and alert history.
+A trader opens the Option Sentinel dashboard and immediately sees all of their current open options positions. Each position displays its current market value, unrealised P&L, days to expiry, and thesis alignment status. The data reflects the latest available market prices, refreshed automatically during trading hours.
 
----
+**Why this priority**: Without a clear view of open positions, none of the alerting or management features have context. This is the foundational view the trader relies on throughout the trading day.
 
-## 2. Goals
+**Independent Test**: Can be tested by connecting to a brokerage account with at least one open position, opening the dashboard, and verifying that the position appears with accurate data fields. Delivers standalone value as a position viewer even before any alert rules are active.
 
-- Automatically track open options positions without manual data entry.
-- Surface actionable alerts (close, expiry, exit, thesis) so no opportunity or risk is missed.
-- Keep all position data local; never transmit it to external services.
-- Provide a foundation that can be extended to more complex rule sets and larger storage backends.
+**Acceptance Scenarios**:
 
-## 3. Non-Goals
-
-- **No automated trade execution** — alerts are informational only.
-- **No multi-user support** — single-user deployment only.
-- **No mobile app** — desktop/browser dashboard only.
+1. **Given** the trader has open options positions in their brokerage account, **When** they open the dashboard, **Then** all open positions are displayed with symbol, option type, strike, expiry date, quantity, current mark price, unrealised P&L, days to expiry, and thesis alignment tag.
+2. **Given** the dashboard is open during market hours, **When** the data refresh interval elapses, **Then** position values update to reflect current market prices without a manual page reload.
+3. **Given** the market is closed, **When** the trader opens the dashboard, **Then** positions are still visible with the last known values and a clear indication that live prices are unavailable.
 
 ---
 
-## 4. Core Features
+### User Story 2 - Credit Spread Profit Target Alert (Priority: P2)
 
-### 4.1 Schwab API Integration
+When one of the trader's credit spread positions reaches 50% of its maximum possible profit, the system sends an alert prompting the trader to consider closing the position. The trader receives this notification via email so they can act promptly even when away from the dashboard.
 
-| Aspect | Detail |
-|---|---|
-| API surface | Schwab public API only; no internal or undocumented endpoints |
-| Auth flow | OAuth 2.0; user completes initial browser-based consent once |
-| Access token TTL | 30 minutes — refreshed automatically by the backend |
-| Refresh token TTL | 7 days — expiry must surface a clear re-authentication prompt to the user |
-| Token storage | Stored locally in the SQLite database; never logged or transmitted |
+**Why this priority**: The 50% profit target close is the trader's primary management rule. Missing this trigger can result in giving back gains, making reliable alerting critical to the trading strategy.
 
-**Token lifecycle rules:**
+**Independent Test**: Can be tested by entering a credit spread position with a known maximum profit and adjusting its current mark to cross the 50% threshold; the system should generate and deliver an email alert.
 
-1. Before every API call, the backend checks whether the access token expires within 60 seconds; if so, it refreshes automatically using the stored refresh token.
-2. If the refresh token has expired (or is within 1 hour of expiry), the backend sets a `reauth_required` flag in the database and emits a high-priority in-dashboard banner and email notification instructing the user to re-authenticate.
-3. All token operations are atomic — a failed refresh must not leave a partially-updated token record.
+**Acceptance Scenarios**:
 
-### 4.2 Position Polling
-
-- Polling runs every **5 minutes during market hours** (Mon–Fri 09:30–16:00 US Eastern, excluding market holidays).
-- Each poll fetches all open options positions from the Schwab account.
-- Positions are upserted into the local database by a composite key of `(symbol, expiration_date, strike, option_type, open_date)`.
-- Polling is suspended outside market hours and on holidays (holiday calendar embedded in the app, updated annually).
-- A "last polled" timestamp and poll status (success / error) are stored and shown in the dashboard.
-
-### 4.3 Trading Rules Engine
-
-Each rule is evaluated after every successful poll. Rules produce zero or more **alerts**.
-
-#### Rule 1 — Credit Spread Close Trigger
-
-**Condition:** The current mark value of a credit spread position has declined to ≤ 50% of the maximum profit (i.e., the net credit received at open).
-
-**Calculation:**
-
-```
-max_profit        = net_credit_received          (stored at position open)
-current_value     = current_mark_of_spread       (fetched each poll)
-profit_captured   = max_profit - current_value
-trigger           = profit_captured >= 0.50 * max_profit
-```
-
-**Alert payload:**
-
-- Position identifier (symbol, expiry, strikes)
-- Current value, max profit, % captured
-- Suggested action: "Consider closing — 50% max profit reached"
-
-**Deduplication:** Alert fires once per position. If the position re-enters the trigger range after a manual reset, it fires again.
-
-#### Rule 2 — Expiry Escalating Warnings
-
-**Condition:** Days to expiration (DTE) crosses a threshold.
-
-| Threshold | Severity |
-|---|---|
-| DTE ≤ 14 | `INFO` |
-| DTE ≤ 7 | `WARNING` |
-| DTE ≤ 3 | `CRITICAL` |
-
-- Each threshold fires exactly once per position (not every poll once crossed).
-- DTE is calculated as calendar days from today's date to the expiration date.
-- Alert payload includes position identifier, DTE, and severity level.
-
-#### Rule 3 — Binary Event Exit
-
-**Trigger:** User manually sets a `binary_event_active` flag (via dashboard toggle or API endpoint).
-
-**Effect:** Immediately fires a `CRITICAL` alert for **every open position** instructing full exit.
-
-- The flag persists until manually cleared by the user.
-- While the flag is active, re-polling does not generate duplicate binary-event alerts for the same position (deduped by position + flag activation timestamp).
-- Alert payload: "Binary event active — consider full exit" with list of all open positions.
-
-#### Rule 4 — Thesis Alignment
-
-**Model:** Each position carries a `thesis_alignment` field set manually by the user: `aligned | misaligned | unset`.
-
-- `misaligned` positions render with a visual warning badge on the dashboard.
-- No automated alert fires for misalignment alone — it is a visual cue only.
-- The user sets/changes alignment via the dashboard or REST API.
-- Thesis alignment state is stored in the local database and survives position re-polls (keyed to the position, not overwritten by poll updates).
-
-### 4.4 Alert System
-
-**Delivery — Phase 1 (required):**
-- Email via SMTP (configurable provider; credentials stored in local `.env`).
-- In-dashboard alert feed (persisted in SQLite, shown in reverse-chronological order).
-
-**Delivery — Phase 2 (stretch):**
-- SMS via Twilio (opt-in; Twilio credentials in `.env`).
-
-**Alert record schema:**
-
-```
-id, position_id, rule_name, severity, message, fired_at, acknowledged_at, delivery_status
-```
-
-- Users can acknowledge alerts from the dashboard (sets `acknowledged_at`).
-- Unacknowledged `CRITICAL` alerts are visually prominent until dismissed.
-
-### 4.5 Dashboard
-
-Single-page React application served by the FastAPI backend.
-
-**Panels:**
-
-| Panel | Content |
-|---|---|
-| Positions table | All open positions with columns: symbol, type, strikes, expiry, DTE, max profit, current value, % captured, thesis alignment badge, active alerts |
-| Alert feed | Recent alerts with severity, message, timestamp, acknowledge button |
-| System status | Last poll time, poll result, token expiry countdown, reauth banner (when needed) |
-| Binary event toggle | On/Off toggle with confirmation dialog; current state shown prominently |
-
-**Refresh:** Dashboard polls the backend `/api/status` endpoint every 30 seconds for live updates (no WebSocket required in v1).
+1. **Given** an open credit spread position with a defined maximum profit, **When** the current mark-to-market value indicates 50% or more of that profit has been captured, **Then** the trader receives an email alert identifying the position, the current P&L percentage, and a suggested action to close.
+2. **Given** the alert has already fired for a position in the current trigger event, **When** subsequent polls continue to show the threshold is met, **Then** the alert does not re-fire until the position has reset below the threshold and re-triggered.
+3. **Given** the position is closed or has expired, **When** the next refresh occurs, **Then** no further profit-target alerts are generated for that position.
 
 ---
 
-## 5. Technical Architecture
+### User Story 3 - Expiry Warning Escalation (Priority: P2)
 
-### 5.1 Stack
+As an options position approaches its expiration date, the trader receives a series of escalating warnings: at 14 days out, at 7 days, and at 3 days. Each warning clearly states the position, expiry date, and which tier has been reached, helping the trader plan and act before time value decays further or the position expires worthless.
 
-| Layer | Technology |
-|---|---|
-| Backend | Python 3.12+, FastAPI |
-| Frontend | React 18+, served as static build from FastAPI |
-| Database | SQLite (production), abstracted via SQLAlchemy ORM for Postgres migration |
-| Task scheduler | APScheduler (in-process) for polling and token refresh |
-| HTTP client | `httpx` (async) for Schwab API calls |
-| Email | Python `smtplib` / `aiosmtplib` |
-| SMS (stretch) | Twilio Python SDK |
+**Why this priority**: Time decay and assignment risk accelerate near expiry. Missing these windows can result in maximum loss. Escalating alerts give the trader structured decision points.
 
-### 5.2 Database Schema (key tables)
+**Independent Test**: Can be tested by setting a position's expiry to 14 days away and confirming the first-tier alert fires; repeat for 7-day and 3-day thresholds independently.
 
-```
-tokens          (id, access_token, refresh_token, access_expires_at, refresh_expires_at, updated_at)
-positions       (id, symbol, expiration_date, strike_low, strike_high, option_type, open_date,
-                 net_credit, current_mark, thesis_alignment, is_open, last_updated_at)
-alerts          (id, position_id, rule_name, severity, message, fired_at, acknowledged_at, delivery_status)
-settings        (key, value)   -- binary_event_active, last_poll_at, last_poll_status, etc.
-```
+**Acceptance Scenarios**:
 
-### 5.3 Postgres Migration Path
-
-- All database access goes through SQLAlchemy; no raw SQL with SQLite-specific syntax.
-- Migration scripts managed with Alembic.
-- Switching to Postgres requires only changing the `DATABASE_URL` env var and running `alembic upgrade head`.
-
-### 5.4 Configuration
-
-All secrets and environment-specific values in `.env` (never committed):
-
-```
-SCHWAB_CLIENT_ID
-SCHWAB_CLIENT_SECRET
-SCHWAB_REDIRECT_URI
-SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD
-ALERT_EMAIL_TO
-TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM, TWILIO_TO  # stretch
-DATABASE_URL   # defaults to sqlite:///./option_sentinel.db
-```
+1. **Given** an open position reaches 14 calendar days to expiry, **When** the daily expiry check runs, **Then** the trader receives a 14-day expiry warning email for that position.
+2. **Given** an open position reaches 7 calendar days to expiry, **When** the daily expiry check runs, **Then** the trader receives a 7-day expiry warning email, distinct from the prior 14-day warning.
+3. **Given** an open position reaches 3 calendar days to expiry, **When** the daily expiry check runs, **Then** the trader receives an urgent 3-day expiry warning email.
+4. **Given** a warning tier has already been sent for a position, **When** subsequent checks occur while still at the same tier, **Then** the warning does not repeat.
 
 ---
 
-## 6. API Endpoints (Backend)
+### User Story 4 - Binary Event Exit Protocol (Priority: P2)
 
-| Method | Path | Description |
-|---|---|---|
-| `GET` | `/api/positions` | List all open positions with current rule states |
-| `PATCH` | `/api/positions/{id}/thesis` | Set thesis alignment for a position |
-| `GET` | `/api/alerts` | List alerts (filter: unacknowledged, severity, date range) |
-| `POST` | `/api/alerts/{id}/acknowledge` | Acknowledge an alert |
-| `GET` | `/api/status` | System status: last poll, token expiry, binary event flag |
-| `POST` | `/api/binary-event` | Set binary event flag `{ "active": true/false }` |
-| `POST` | `/api/auth/start` | Begin Schwab OAuth flow (returns redirect URL) |
-| `GET` | `/api/auth/callback` | Schwab OAuth callback; exchanges code for tokens |
-| `POST` | `/api/poll` | Manually trigger an immediate position poll |
+Before a major scheduled event (earnings, FOMC, etc.), the trader manually raises a "binary event" flag in the dashboard. This immediately triggers a full-exit alert covering every open position, prompting the trader to close all exposure before the event. The flag stays active and visible until the trader explicitly clears it.
 
----
+**Why this priority**: Binary events can gap positions beyond recovery. A single-action full-portfolio exit prompt prevents the trader from missing any position during a high-stress, time-limited window.
 
-## 7. Data Privacy
+**Independent Test**: Can be tested by setting the binary event flag with two or more open positions active; all positions should appear in a single consolidated exit alert email within one minute.
 
-- All position data is written only to the local SQLite file.
-- No position, token, or alert data is transmitted to any external service other than:
-  - Schwab API (to fetch positions and refresh tokens)
-  - SMTP relay (alert email body; contains position details — user is responsible for choosing a trusted relay)
-  - Twilio (stretch; SMS body contains minimal alert text)
-- The application does not include analytics, telemetry, or crash-reporting that would transmit data externally.
+**Acceptance Scenarios**:
+
+1. **Given** the trader raises the binary event flag, **When** the flag is saved, **Then** an immediate email alert is sent listing every open position with a clear instruction to close all positions.
+2. **Given** the binary event flag is active, **When** the dashboard is opened, **Then** a prominent visual indicator shows the flag is in effect.
+3. **Given** the flag is active and a new position is opened, **When** the next data refresh occurs, **Then** the new position is included in the active exit alert state and shown in the dashboard banner.
+4. **Given** the trader clears the binary event flag, **When** the flag is removed, **Then** the dashboard returns to normal state and no further binary-event alerts fire.
 
 ---
 
-## 8. Out-of-Scope / Future Considerations
+### User Story 5 - Thesis Alignment Tagging (Priority: P3)
 
-- Automated trade execution (explicitly excluded)
-- Multi-account or multi-user support
-- Mobile or native app
-- Real-time streaming (WebSocket feed from Schwab)
-- Strategy-level P&L aggregation across multiple legs
-- Greeks monitoring (delta, theta, vega alerts)
-- Backtesting or paper-trading modes
+The trader assigns each open position a thesis alignment status — aligned or misaligned with their current market thesis. This tag is visible on the dashboard, allowing the trader to quickly identify positions they may want to re-evaluate as the market environment changes.
+
+**Why this priority**: Thesis alignment is a qualitative risk management tool. It adds context to each position but does not drive automated alerts, making it lower priority than the core alerting rules.
+
+**Independent Test**: Can be tested by opening a position, assigning "aligned" and "misaligned" tags, and confirming the correct label persists on the dashboard after a page refresh.
+
+**Acceptance Scenarios**:
+
+1. **Given** an open position is displayed on the dashboard, **When** the trader sets its thesis alignment to "aligned" or "misaligned", **Then** the updated tag is immediately visible on the position row.
+2. **Given** a position has a thesis alignment tag, **When** the trader changes it, **Then** the new tag is persisted and survives a page refresh.
+3. **Given** a position has no tag set, **When** it is displayed on the dashboard, **Then** it shows a neutral untagged state rather than defaulting to either alignment.
+
+---
+
+### Edge Cases
+
+- What happens when the brokerage account has no open positions? Dashboard shows an empty state with a clear message rather than an error.
+- What happens when the access token expires mid-poll? System silently refreshes the token and retries the poll; the user sees no interruption.
+- What happens when the refresh token expires (7-day window)? The system surfaces a prominent re-authentication prompt and pauses polling until the user re-authenticates.
+- What happens when a position simultaneously triggers both a profit-target alert and a 3-day expiry alert? Both alerts are delivered independently.
+- What happens when a position is partially closed at the brokerage? Position data reflects the current remaining quantity; alerts recalculate against the updated figures.
+- What happens when the market is closed and the binary event flag is raised? The full-exit alert fires immediately regardless of market hours; polling suspension does not block this alert.
+- What happens if email delivery fails? The alert is logged locally and retried on the next poll cycle up to 3 attempts before being marked failed.
+
+## Requirements *(mandatory)*
+
+### Functional Requirements
+
+**Position Tracking**
+
+- **FR-001**: The system MUST connect to the trader's brokerage account and retrieve all open options positions automatically.
+- **FR-002**: The system MUST refresh position data every 5 minutes while the market is open (US equity market hours: 9:30 AM – 4:00 PM ET, Monday–Friday, excluding US market holidays).
+- **FR-003**: All position data MUST be stored locally and MUST NOT be transmitted to any external service other than the brokerage API.
+- **FR-004**: The system MUST handle brokerage access token expiry transparently, refreshing tokens automatically without user intervention.
+- **FR-005**: The system MUST detect when the brokerage refresh token is nearing its 7-day expiry and display a clear re-authentication prompt to the trader before polling is interrupted.
+
+**Dashboard**
+
+- **FR-006**: The dashboard MUST display all open positions with: underlying symbol, option type, strike, expiry date, quantity, current mark price, unrealised P&L, days to expiry, and thesis alignment status.
+- **FR-007**: The dashboard MUST show when the last successful data refresh occurred and the current polling status.
+- **FR-008**: The dashboard MUST display a visible banner or indicator when the binary event flag is active.
+- **FR-009**: The dashboard MUST allow the trader to raise and clear the binary event flag.
+- **FR-010**: The dashboard MUST allow the trader to set and change the thesis alignment tag (aligned / misaligned / untagged) for any open position.
+
+**Alerting — Close Trigger**
+
+- **FR-011**: The system MUST calculate the maximum profit for each credit spread based on the net credit received at open.
+- **FR-012**: The system MUST fire an email alert when a credit spread position's mark indicates that 50% or more of its maximum profit has been captured.
+- **FR-013**: The close-trigger alert MUST NOT repeat for the same position within the same trigger event; it re-arms only after the position drops below the threshold and re-crosses it.
+
+**Alerting — Expiry Warnings**
+
+- **FR-014**: The system MUST send an email alert when an open position reaches 14 calendar days to expiry.
+- **FR-015**: The system MUST send an email alert when an open position reaches 7 calendar days to expiry.
+- **FR-016**: The system MUST send an email alert when an open position reaches 3 calendar days to expiry.
+- **FR-017**: Each expiry warning tier MUST fire only once per position per threshold crossing.
+
+**Alerting — Binary Event Exit**
+
+- **FR-018**: When the trader raises the binary event flag, the system MUST immediately send a single consolidated email listing all open positions with an instruction to exit all positions.
+- **FR-019**: The binary event alert MUST fire once per flag-raise event; re-raising the flag after it has been cleared triggers a new alert.
+
+**Alerting — Delivery**
+
+- **FR-020**: The system MUST deliver alerts via email as the primary notification channel.
+- **FR-021**: The system MUST log all alert events locally with timestamp, alert type, position reference, and delivery status.
+- **FR-022**: Failed alert deliveries MUST be retried up to 3 times before being marked as permanently failed in the local log.
+
+### Key Entities
+
+- **Position**: A single open options leg or spread. Key attributes: underlying symbol, option type, strike, expiry date, quantity, opening credit/debit, current mark value, thesis alignment tag, open/closed status.
+- **Spread**: Groups related position legs into a named strategy (e.g., credit spread). Key attributes: strategy type, maximum profit, maximum loss, net credit received, member legs.
+- **Alert**: A triggered notification event. Key attributes: alert type, position or spread reference, severity, trigger timestamp, delivery status, retry count, acknowledged timestamp.
+- **AuthToken**: Brokerage OAuth token state. Key attributes: access token, access expiry, refresh token, refresh expiry, re-auth required flag.
+- **BinaryEventFlag**: The trader's manual full-exit signal. Key attributes: active state, activated timestamp, cleared timestamp.
+- **ThesisTag**: The alignment label on a position. Values: `aligned`, `misaligned`, `untagged`.
+
+## Success Criteria *(mandatory)*
+
+### Measurable Outcomes
+
+- **SC-001**: All open positions are visible on the dashboard within 10 minutes of being opened at the brokerage (at most two poll cycles).
+- **SC-002**: Alert notifications are delivered within 5 minutes of the triggering condition being detected during a poll.
+- **SC-003**: The binary event exit alert is delivered within 60 seconds of the trader raising the flag.
+- **SC-004**: The trader can tag or re-tag any position's thesis alignment in under 30 seconds from the dashboard.
+- **SC-005**: The system operates continuously during market hours with zero unplanned polling interruptions caused by token expiry.
+- **SC-006**: No position data is transmitted to any destination other than the brokerage API (verifiable by network inspection).
+- **SC-007**: 100% of triggered alerts for the 3-day expiry threshold and the close-trigger rule result in a delivered or logged-retry notification.
+- **SC-008**: The re-authentication prompt appears at least 24 hours before the refresh token expires.
+
+## Assumptions
+
+- The trader operates a single brokerage account; multi-account support is out of scope.
+- "Market hours" means US equity market hours: 9:30 AM – 4:00 PM ET, Monday through Friday, excluding US market holidays. The holiday calendar is embedded in the application and updated annually.
+- The trader's brokerage (Charles Schwab) provides a publicly accessible OAuth2 API supporting position retrieval. No internal or institutional API access is assumed.
+- The net credit received for each spread is either returned by the brokerage API as cost-basis data or entered manually by the trader at position open, as the API may not expose this value in a directly usable format.
+- Expiry warning thresholds (14, 7, 3 days) are checked once per trading day at the start of the session, not on every 5-minute poll.
+- Email notifications use an SMTP-compatible service configured by the trader (e.g., Gmail, SendGrid). Credentials are stored locally and never transmitted externally.
+- SMS via Twilio is a stretch goal and not required for initial delivery.
+- All persistent data (positions, alerts, tokens) is stored on the trader's local machine. No cloud sync or remote backup is in scope.
+- The local database is designed so that switching to a hosted Postgres database requires only a configuration change and a schema migration, with no application logic changes.
+- Automated trade execution is explicitly out of scope.
+- Multi-user support is explicitly out of scope.
+- Mobile app support is explicitly out of scope.
