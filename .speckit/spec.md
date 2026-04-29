@@ -178,4 +178,4 @@ The trader assigns each open position a thesis alignment status — aligned or m
 - The local database is designed so that switching to a hosted Postgres database requires only a configuration change and a schema migration, with no application logic changes.
 - Automated trade execution is explicitly out of scope.
 - Multi-user support is explicitly out of scope.
-- Mobile app support is explicitly out of scope.
+- A native mobile app is explicitly out of scope. The web dashboard MUST be responsive and fully functional on mobile viewports.
