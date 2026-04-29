@@ -1,50 +1,95 @@
-# [PROJECT_NAME] Constitution
-<!-- Example: Spec Constitution, TaskFlow Constitution, etc. -->
+<!--
+SYNC IMPACT REPORT
+==================
+Version change: 1.0.0 → 1.1.0
+Modified principles: V. Simplicity Boundary — removed "mobile apps" from out-of-scope list
+  (native mobile app remains out of scope; responsive web dashboard is now in scope)
+Added sections: VI. Visual & Responsive UI
+Removed sections: N/A
+Templates reviewed:
+  ✅ .specify/templates/plan-template.md — no changes needed
+  ✅ .specify/templates/spec-template.md — no changes needed
+  ✅ .specify/templates/tasks-template.md — no changes needed
+  ✅ .speckit/spec.md — Assumptions updated: "Mobile app support is explicitly out of scope"
+  clarified to "Native mobile app is out of scope; the web dashboard MUST be mobile-responsive"
+Follow-up TODOs: None
+-->
+
+# Option Sentinel Constitution
 
 ## Core Principles
 
-### [PRINCIPLE_1_NAME]
-<!-- Example: I. Library-First -->
-[PRINCIPLE_1_DESCRIPTION]
-<!-- Example: Every feature starts as a standalone library; Libraries must be self-contained, independently testable, documented; Clear purpose required - no organizational-only libraries -->
+### I. Local-First Privacy
 
-### [PRINCIPLE_2_NAME]
-<!-- Example: II. CLI Interface -->
-[PRINCIPLE_2_DESCRIPTION]
-<!-- Example: Every library exposes functionality via CLI; Text in/out protocol: stdin/args → stdout, errors → stderr; Support JSON + human-readable formats -->
+All position data MUST remain on the trader's machine. The only permitted outbound
+destination is the Charles Schwab OAuth2 API. No cloud sync, no external logging
+services, and no third-party analytics are permitted. Compliance is verifiable by
+network inspection (SC-006).
 
-### [PRINCIPLE_3_NAME]
-<!-- Example: III. Test-First (NON-NEGOTIABLE) -->
-[PRINCIPLE_3_DESCRIPTION]
-<!-- Example: TDD mandatory: Tests written → User approved → Tests fail → Then implement; Red-Green-Refactor cycle strictly enforced -->
+### II. Spec-Before-Code
 
-### [PRINCIPLE_4_NAME]
-<!-- Example: IV. Integration Testing -->
-[PRINCIPLE_4_DESCRIPTION]
-<!-- Example: Focus areas requiring integration tests: New library contract tests, Contract changes, Inter-service communication, Shared schemas -->
+The spec defines behavior before implementation begins. Spec file changes MUST be
+committed before corresponding `src/`, `frontend/`, or `tests/` changes in every
+session. No implementation task begins without a traceable requirement in
+`.speckit/spec.md`.
 
-### [PRINCIPLE_5_NAME]
-<!-- Example: V. Observability, VI. Versioning & Breaking Changes, VII. Simplicity -->
-[PRINCIPLE_5_DESCRIPTION]
-<!-- Example: Text I/O ensures debuggability; Structured logging required; Or: MAJOR.MINOR.BUILD format; Or: Start simple, YAGNI principles -->
+### III. Test-First (NON-NEGOTIABLE)
 
-## [SECTION_2_NAME]
-<!-- Example: Additional Constraints, Security Requirements, Performance Standards, etc. -->
+Acceptance scenarios in `spec.md` drive tests. Tests MUST be written and confirmed
+failing before implementation begins. The Red-Green-Refactor cycle is strictly
+enforced. Skipping this step for any user story is not permitted.
 
-[SECTION_2_CONTENT]
-<!-- Example: Technology stack requirements, compliance standards, deployment policies, etc. -->
+### IV. Alert Reliability
 
-## [SECTION_3_NAME]
-<!-- Example: Development Workflow, Review Process, Quality Gates, etc. -->
+Every triggered alert MUST result in delivery or a logged retry entry. Alert logic
+MUST be idempotent — no double-firing within the same trigger event. Failed
+deliveries MUST be retried up to 3 times before being marked permanently failed
+(FR-021, FR-022, SC-007).
 
-[SECTION_3_CONTENT]
-<!-- Example: Code review requirements, testing gates, deployment approval process, etc. -->
+### V. Simplicity Boundary
+
+Option Sentinel serves a single trader, a single brokerage account, on a local
+machine. Multi-user support, cloud sync, native mobile apps, and automated trading
+are explicitly out of scope. Every abstraction added beyond the stated requirements
+MUST be justified in the plan.md Complexity Tracking table.
+
+### VI. Visual & Responsive UI
+
+The dashboard MUST be visual-first and data-dense without being text-heavy.
+Positions, P&L, and alert states MUST be communicated through layout, colour,
+and visual hierarchy rather than prose. The web dashboard MUST render correctly
+on mobile viewports — a trader checking positions on a phone MUST see a fully
+functional, legible interface. No native mobile app is required; a responsive
+web layout is sufficient.
+
+## Technology Constraints
+
+- **Language**: Python 3.11+
+- **Brokerage**: Charles Schwab OAuth2 API (position retrieval only; no trade execution)
+- **Storage**: SQLite by default; switchable to Postgres via a configuration change
+  and schema migration only — no application logic changes permitted for this switch
+- **Notifications**: SMTP-compatible email; credentials stored locally and MUST NOT
+  be transmitted to any external service; Twilio SMS is a stretch goal, not required
+- **Frontend**: Local web dashboard only; no remote hosting; no native mobile app;
+  responsive layout required for mobile viewports
+- **Dependencies**: All declared in `requirements.txt`
+
+## Development Workflow
+
+Follow the Speckit sequence: specify → clarify → plan → tasks → implement.
+Spec commits MUST precede app commits in every session (Principle II).
+Each user story MUST be implemented, tested, and validated independently before
+the next story begins. Every implementation task MUST trace to a requirement in
+`.speckit/spec.md`.
 
 ## Governance
-<!-- Example: Constitution supersedes all other practices; Amendments require documentation, approval, migration plan -->
 
-[GOVERNANCE_RULES]
-<!-- Example: All PRs/reviews must verify compliance; Complexity must be justified; Use [GUIDANCE_FILE] for runtime development guidance -->
+This constitution supersedes all other project practices. Conflicts resolve in
+favor of the constitution. Amendments require: updating this file, incrementing
+the version following semantic versioning (MAJOR: governance/principle removals
+or redefinitions; MINOR: new principle or section added; PATCH: clarifications
+and wording), and propagating changes to affected templates. All PRs MUST verify
+principle compliance before merge. Complexity violations MUST be documented in
+plan.md's Complexity Tracking table before implementation proceeds.
 
-**Version**: [CONSTITUTION_VERSION] | **Ratified**: [RATIFICATION_DATE] | **Last Amended**: [LAST_AMENDED_DATE]
-<!-- Example: Version: 2.1.1 | Ratified: 2025-06-13 | Last Amended: 2025-07-16 -->
+**Version**: 1.1.0 | **Ratified**: 2026-04-28 | **Last Amended**: 2026-04-29
