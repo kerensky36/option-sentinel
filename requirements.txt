@@ -1,0 +1,7 @@
+schwab-py
+fastapi
+uvicorn
+python-dotenv
+sqlite3
+httpx
+pytest
