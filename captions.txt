@@ -1,0 +1,8 @@
+1777425336|Initial commit
+1777429647|Add CLAUDE.md
+1777429972|init: project scaffold
+1777430540|chore: add gource config
+1777430660|init: add Gource config
+1777432714|spec: initial Option Sentinel spec
+1777434044|spec: initial Option Sentinel spec
+1777464766|docs: ratify constitution v1.1.0
