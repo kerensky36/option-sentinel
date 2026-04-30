@@ -24,10 +24,10 @@ Tests MUST be written and confirmed failing before implementation.
 
 **Purpose**: Project skeleton and configuration
 
-- [ ] T001 Create directory structure: `src/api/routes/`, `src/auth/`, `src/data/migrations/`, `src/notifications/templates/`, `src/rules/`, `src/services/`, `frontend/templates/partials/`, `frontend/static/`, `tests/unit/`, `tests/integration/`, `tests/contract/`
-- [ ] T002 Populate `requirements.txt` with pinned versions: fastapi, uvicorn[standard], jinja2, sqlalchemy[asyncio], aiosqlite, alembic, apscheduler, aiosmtplib, schwab-py, httpx, scipy, numpy, pytest, pytest-asyncio
-- [ ] T003 [P] Configure `pytest.ini` (asyncio_mode=auto) and `tests/conftest.py` with async SQLite test DB fixture
-- [ ] T004 [P] Populate `.env.example` per `.speckit/quickstart.md` with all required variables
+- [X] T001 Create directory structure: `src/api/routes/`, `src/auth/`, `src/data/migrations/`, `src/notifications/templates/`, `src/rules/`, `src/services/`, `frontend/templates/partials/`, `frontend/static/`, `tests/unit/`, `tests/integration/`, `tests/contract/`
+- [X] T002 Populate `requirements.txt` with pinned versions: fastapi, uvicorn[standard], jinja2, sqlalchemy[asyncio], aiosqlite, alembic, apscheduler, aiosmtplib, schwab-py, httpx, scipy, numpy, pytest, pytest-asyncio
+- [X] T003 [P] Configure `pytest.ini` (asyncio_mode=auto) and `tests/conftest.py` with async SQLite test DB fixture
+- [X] T004 [P] Populate `.env.example` per `.speckit/quickstart.md` with all required variables
 - [ ] T005 Initialise Alembic: `alembic init src/data/migrations`, configure `src/data/migrations/env.py` to read `DATABASE_URL` from env
 
 ---
