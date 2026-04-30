@@ -78,29 +78,38 @@ async def _fetch_greeks(symbols: list[str], client=None) -> dict[str, dict]:
         from src.auth.schwab_oauth import get_schwab_client
         client = await get_schwab_client()
 
-    greeks_by_symbol: dict[str, dict] = {}
+    # Deduplicate by underlying so we make one chain call per underlying
+    underlying_to_symbols: dict[str, list[str]] = {}
     for symbol in symbols:
+        underlying = symbol[:6].strip()
+        underlying_to_symbols.setdefault(underlying, []).append(symbol)
+
+    greeks_by_symbol: dict[str, dict] = {}
+    for underlying, sym_list in underlying_to_symbols.items():
         try:
-            # Extract underlying + option details from OCC symbol
-            underlying = symbol[:6].strip()
             resp = await client.get_option_chain(
                 symbol=underlying,
                 contract_type=client.Options.ContractType.ALL,
-                include_underlying_quote=False,
+                include_underlying_quote=True,
             )
             data = resp.json()
+            underlying_price = data.get("underlyingPrice") or data.get("underlying", {}).get("last")
             for side in ("callExpDateMap", "putExpDateMap"):
                 for exp_strikes in data.get(side, {}).values():
                     for strike_opts in exp_strikes.values():
                         for opt in strike_opts:
-                            if opt.get("symbol") == symbol:
-                                greeks_by_symbol[symbol] = {
-                                    "delta": opt.get("delta"),
-                                    "gamma": opt.get("gamma"),
-                                    "theta": opt.get("theta"),
-                                    "vega": opt.get("vega"),
-                                    "implied_volatility": opt.get("volatility"),
-                                }
+                            opt_symbol = opt.get("symbol", "").strip()
+                            # Match against each requested symbol (strip both for robustness)
+                            for req_sym in sym_list:
+                                if opt_symbol == req_sym.strip():
+                                    greeks_by_symbol[req_sym] = {
+                                        "delta": opt.get("delta"),
+                                        "gamma": opt.get("gamma"),
+                                        "theta": opt.get("theta"),
+                                        "vega": opt.get("vega"),
+                                        "implied_volatility": opt.get("volatility"),
+                                        "underlying_price": underlying_price,
+                                    }
         except Exception:
             pass
     return greeks_by_symbol

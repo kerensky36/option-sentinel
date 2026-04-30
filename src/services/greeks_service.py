@@ -10,10 +10,10 @@ RISK_FREE_RATE = float(os.getenv("RISK_FREE_RATE", "0.045"))
 def build_greeks(position: Position, raw: dict) -> dict:
     dte = position.days_to_expiry or 0
     T = dte / 365.0
-    S = float(position.current_mark or 0)
     K = float(position.strike)
     option_type = position.option_type.value if hasattr(position.option_type, "value") else position.option_type
-    underlying_price = S  # fallback; ideally passed separately
+    # Use underlying price from chain response; fall back to strike as last resort
+    underlying_price = float(raw.get("underlying_price") or 0) or K
 
     def _src(val) -> SourceEnum:
         return SourceEnum.api if val is not None else SourceEnum.unavailable
@@ -43,7 +43,7 @@ def build_greeks(position: Position, raw: dict) -> dict:
 
     # Fill missing fields via Black-Scholes if we have enough data
     missing = not all([delta, gamma, theta, vega])
-    if missing and T > 0 and K > 0 and S > 0:
+    if missing and T > 0 and K > 0 and underlying_price > 0:
         sigma = iv_raw or 0.25  # use IV if available, else assume 25%
         try:
             bs = bs_greeks(S=underlying_price, K=K, T=T, r=RISK_FREE_RATE, sigma=sigma, option_type=option_type)
