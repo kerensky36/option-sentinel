@@ -22,6 +22,8 @@ Option Sentinel connects to your Charles Schwab account and gives you a **live, 
 | **Alerts** | Email when a spread hits 50% profit, at 14/7/3 DTE, or on binary event flag |
 | **Mobile-ready** | Visual-first responsive dashboard — readable on your phone mid-session |
 
+<img width="1284" height="535" alt="image" src="https://github.com/user-attachments/assets/2bcfa959-d30a-4996-aa1b-130d7a3069a9" />
+
 ---
 
 ## Architecture at a glance
