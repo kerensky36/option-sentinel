@@ -115,6 +115,28 @@
     </div>
     {% endif %}
 
+    {# Thesis selector #}
+    {% set group_ids = group.positions | map(attribute='id') | map('string') | join(',') %}
+    {% set current_thesis = group.positions[0].thesis if group.positions[0].thesis else none %}
+    <form
+      hx-post="/partials/assign-thesis"
+      hx-target="#positions-table"
+      hx-swap="innerHTML"
+      class="flex items-center gap-1.5 flex-shrink-0"
+      onclick="event.stopPropagation()">
+      <input type="hidden" name="position_ids" value="{{ group_ids }}">
+      <select name="thesis_id"
+        onchange="this.form.requestSubmit()"
+        class="text-xs bg-gray-800 border border-gray-700 text-gray-300 rounded px-1.5 py-0.5 cursor-pointer hover:border-gray-500 focus:outline-none focus:border-indigo-500 max-w-[140px]">
+        <option value="__none__" {% if not current_thesis %}selected{% endif %}>— no thesis —</option>
+        {% for t in theses %}
+        <option value="{{ t.id }}" {% if current_thesis and current_thesis.id == t.id %}selected{% endif %}>
+          {{ t.name }}
+        </option>
+        {% endfor %}
+      </select>
+    </form>
+
   </div>
   </summary>
 

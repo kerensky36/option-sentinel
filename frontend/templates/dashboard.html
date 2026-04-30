@@ -14,6 +14,56 @@
 {% block content %}
 <div hx-ext="sse" sse-connect="/sse">
 
+  {# ── Create thesis panel ── #}
+  <details class="mb-4 rounded-xl border border-gray-800 bg-gray-900 overflow-hidden">
+    <summary class="list-none cursor-pointer select-none px-4 py-2.5 flex items-center gap-2 text-sm text-gray-400 hover:bg-gray-800 transition-colors">
+      <span class="text-xs">▶</span>
+      <span class="font-medium">Theses</span>
+      {% if theses %}
+        <span class="text-xs text-gray-600">({{ theses | length }} defined)</span>
+      {% endif %}
+    </summary>
+    <div class="border-t border-gray-800 px-4 py-3 space-y-3">
+      {% if theses %}
+      <div class="flex flex-wrap gap-2">
+        {% for t in theses %}
+        <span class="text-xs px-2 py-1 rounded-md bg-indigo-900/50 text-indigo-300 border border-indigo-800">
+          {{ t.name }}
+          <span class="text-indigo-500 ml-1">{{ t.template_type.value.replace('_', ' ') }}</span>
+        </span>
+        {% endfor %}
+      </div>
+      {% endif %}
+      <form method="post" action="/thesis" class="flex flex-wrap items-end gap-2">
+        <div class="flex flex-col gap-1">
+          <label class="text-[10px] text-gray-500 uppercase tracking-wider">Name</label>
+          <input type="text" name="name" required placeholder="e.g. QQQ IV crush"
+            class="text-sm bg-gray-800 border border-gray-700 text-gray-200 rounded px-2 py-1 focus:outline-none focus:border-indigo-500 w-44">
+        </div>
+        <div class="flex flex-col gap-1">
+          <label class="text-[10px] text-gray-500 uppercase tracking-wider">Type</label>
+          <select name="template_type"
+            class="text-sm bg-gray-800 border border-gray-700 text-gray-200 rounded px-2 py-1 focus:outline-none focus:border-indigo-500">
+            <option value="iv_crush">IV Crush</option>
+            <option value="earnings_fade">Earnings Fade</option>
+            <option value="directional_momentum">Directional Momentum</option>
+            <option value="mean_reversion">Mean Reversion</option>
+            <option value="custom">Custom</option>
+          </select>
+        </div>
+        <div class="flex flex-col gap-1">
+          <label class="text-[10px] text-gray-500 uppercase tracking-wider">Notes (optional)</label>
+          <input type="text" name="description" placeholder="Short description"
+            class="text-sm bg-gray-800 border border-gray-700 text-gray-200 rounded px-2 py-1 focus:outline-none focus:border-indigo-500 w-56">
+        </div>
+        <button type="submit"
+          class="text-sm bg-indigo-700 hover:bg-indigo-600 text-white font-medium px-3 py-1 rounded transition-colors">
+          + Add thesis
+        </button>
+      </form>
+    </div>
+  </details>
+
   <div class="flex items-center justify-between mb-4">
     <h1 class="text-xl font-semibold">Open Positions</h1>
     <div class="flex items-center gap-3">
