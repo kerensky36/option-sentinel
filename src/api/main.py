@@ -26,7 +26,8 @@ def create_app() -> FastAPI:
     if os.path.isdir(STATIC_DIR):
         app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
-    from src.api.routes import dashboard, partials, sse, thesis, positions, binary
+    from src.api.routes import admin, dashboard, partials, sse, thesis, positions, binary
+    app.include_router(admin.router)
     app.include_router(dashboard.router)
     app.include_router(partials.router)
     app.include_router(sse.router)

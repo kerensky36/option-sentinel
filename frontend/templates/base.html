@@ -24,6 +24,14 @@
     </div>
     <div class="flex items-center gap-4 text-sm text-gray-400">
       <span id="poll-status">Waiting for data…</span>
+      <button
+        hx-post="/admin/poll"
+        hx-swap="none"
+        hx-indicator="#poll-spinner"
+        class="flex items-center gap-1.5 text-xs bg-gray-800 hover:bg-gray-700 text-gray-300 px-2.5 py-1 rounded transition-colors">
+        <span id="poll-spinner" class="htmx-indicator animate-spin">↻</span>
+        <span>Refresh</span>
+      </button>
     </div>
   </nav>
 
