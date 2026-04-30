@@ -1,0 +1,99 @@
+{% macro source_badge(source) %}
+  {% if source and source.value == 'api' %}
+    <span class="ml-1 text-xs px-1 py-0.5 rounded bg-blue-900 text-blue-300">api</span>
+  {% elif source and source.value == 'calculated' %}
+    <span class="ml-1 text-xs px-1 py-0.5 rounded bg-amber-900 text-amber-300">calc</span>
+  {% else %}
+    <span class="ml-1 text-xs px-1 py-0.5 rounded bg-gray-800 text-gray-500">—</span>
+  {% endif %}
+{% endmacro %}
+
+{% if positions %}
+<div class="overflow-x-auto rounded-lg border border-gray-800">
+  <table class="min-w-full text-sm divide-y divide-gray-800">
+    <thead class="bg-gray-900 text-gray-400 text-xs uppercase tracking-wider">
+      <tr>
+        <th class="px-3 py-2 text-left">Symbol</th>
+        <th class="px-3 py-2 text-left">Type</th>
+        <th class="px-3 py-2 text-right">Strike</th>
+        <th class="px-3 py-2 text-left">Expiry</th>
+        <th class="px-3 py-2 text-right">Qty</th>
+        <th class="px-3 py-2 text-right">Mark</th>
+        <th class="px-3 py-2 text-right">P&amp;L</th>
+        <th class="px-3 py-2 text-right">DTE</th>
+        <th class="px-3 py-2 text-right">Delta</th>
+        <th class="px-3 py-2 text-right">Gamma</th>
+        <th class="px-3 py-2 text-right">Theta</th>
+        <th class="px-3 py-2 text-right">Vega</th>
+        <th class="px-3 py-2 text-right">IV</th>
+        <th class="px-3 py-2 text-left">Thesis</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-gray-800 bg-gray-950">
+      {% for pos in positions %}
+      {% set g = pos.greeks %}
+      <tr class="hover:bg-gray-900 transition-colors">
+        <td class="px-3 py-2 font-mono text-xs text-gray-200 whitespace-nowrap">{{ pos.underlying_symbol }}</td>
+        <td class="px-3 py-2">
+          {% if pos.option_type.value == 'call' %}
+            <span class="text-green-400 font-medium">C</span>
+          {% else %}
+            <span class="text-red-400 font-medium">P</span>
+          {% endif %}
+        </td>
+        <td class="px-3 py-2 text-right font-mono">${{ "%.2f"|format(pos.strike) }}</td>
+        <td class="px-3 py-2 whitespace-nowrap text-gray-300">{{ pos.expiry_date.strftime('%m/%d/%y') }}</td>
+        <td class="px-3 py-2 text-right {% if pos.quantity < 0 %}text-red-400{% else %}text-green-400{% endif %}">
+          {{ pos.quantity }}
+        </td>
+        <td class="px-3 py-2 text-right font-mono">
+          {% if pos.current_mark is not none %}${{ "%.2f"|format(pos.current_mark) }}{% else %}—{% endif %}
+        </td>
+        <td class="px-3 py-2 text-right font-mono font-semibold
+          {% if pos.unrealised_pnl is not none and pos.unrealised_pnl > 0 %}text-green-400
+          {% elif pos.unrealised_pnl is not none and pos.unrealised_pnl < 0 %}text-red-400
+          {% else %}text-gray-400{% endif %}">
+          {% if pos.unrealised_pnl is not none %}
+            {% if pos.unrealised_pnl > 0 %}+{% endif %}${{ "%.2f"|format(pos.unrealised_pnl) }}
+          {% else %}—{% endif %}
+        </td>
+        <td class="px-3 py-2 text-right
+          {% if pos.days_to_expiry is not none and pos.days_to_expiry <= 3 %}text-red-400 font-semibold
+          {% elif pos.days_to_expiry is not none and pos.days_to_expiry <= 7 %}text-amber-400
+          {% else %}text-gray-300{% endif %}">
+          {{ pos.days_to_expiry if pos.days_to_expiry is not none else '—' }}
+        </td>
+        <!-- Delta -->
+        <td class="px-3 py-2 text-right font-mono whitespace-nowrap">
+          {% if g and g.delta is not none %}{{ "%.3f"|format(g.delta) }}{{ source_badge(g.delta_source) }}{% else %}—{% endif %}
+        </td>
+        <!-- Gamma -->
+        <td class="px-3 py-2 text-right font-mono whitespace-nowrap">
+          {% if g and g.gamma is not none %}{{ "%.4f"|format(g.gamma) }}{{ source_badge(g.gamma_source) }}{% else %}—{% endif %}
+        </td>
+        <!-- Theta -->
+        <td class="px-3 py-2 text-right font-mono whitespace-nowrap text-red-300">
+          {% if g and g.theta is not none %}{{ "%.3f"|format(g.theta) }}{{ source_badge(g.theta_source) }}{% else %}—{% endif %}
+        </td>
+        <!-- Vega -->
+        <td class="px-3 py-2 text-right font-mono whitespace-nowrap">
+          {% if g and g.vega is not none %}{{ "%.3f"|format(g.vega) }}{{ source_badge(g.vega_source) }}{% else %}—{% endif %}
+        </td>
+        <!-- IV -->
+        <td class="px-3 py-2 text-right font-mono whitespace-nowrap">
+          {% if g and g.implied_volatility is not none %}{{ "%.1f"|format(g.implied_volatility * 100) }}%{{ source_badge(g.iv_source) }}{% else %}—{% endif %}
+        </td>
+        <td class="px-3 py-2 text-gray-400 text-xs">
+          {{ pos.thesis.name if pos.thesis else '—' }}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="text-center py-16 text-gray-500">
+  <p class="text-lg">No open positions</p>
+  <p class="text-sm mt-1">Data refreshes every 5 minutes during market hours.</p>
+</div>
+{% endif %}

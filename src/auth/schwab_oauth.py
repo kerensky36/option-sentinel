@@ -41,3 +41,23 @@ async def get_schwab_client() -> schwab.client.AsyncClient:
 def reset_client() -> None:
     global _client
     _client = None
+
+
+if __name__ == "__main__":
+    from dotenv import load_dotenv
+    load_dotenv()
+    # Re-read env after load_dotenv
+    APP_KEY = os.getenv("SCHWAB_APP_KEY", "")
+    APP_SECRET = os.getenv("SCHWAB_APP_SECRET", "")
+    CALLBACK_URL = os.getenv("SCHWAB_CALLBACK_URL", "https://127.0.0.1")
+    TOKEN_PATH = Path(os.getenv("SCHWAB_TOKEN_PATH", "./schwab_token.json"))
+
+    print("Starting Schwab OAuth flow...")
+    client = schwab_auth.client_from_manual_flow(
+        api_key=APP_KEY,
+        app_secret=APP_SECRET,
+        callback_url=CALLBACK_URL,
+        token_path=str(TOKEN_PATH),
+        asyncio=True,
+    )
+    print(f"Authentication successful. Token saved to {TOKEN_PATH}")
