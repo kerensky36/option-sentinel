@@ -214,4 +214,12 @@ async def sync_positions_and_greeks(session: AsyncSession, schwab_client=None) -
                 pos.status = PositionStatus.closed
                 pos.last_updated = now
 
+    # Update thesis health snapshots for all open positions with a thesis
+    from src.services.thesis_health import upsert_snapshot
+    open_result = await session.execute(
+        select(Position).where(Position.status == PositionStatus.open, Position.thesis_id.isnot(None))
+    )
+    for pos in open_result.scalars().all():
+        await upsert_snapshot(session, pos)
+
     await session.commit()

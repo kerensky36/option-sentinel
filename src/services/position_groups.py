@@ -23,9 +23,10 @@ class PositionGroup:
     theta_dollar_day: float | None
     payoff_svg: str = ""
     svg_id: str = ""
+    thesis_gauge_svg: str = ""
 
 
-def group_positions(positions: list) -> list["PositionGroup"]:
+def group_positions(positions: list, snapshots: dict | None = None) -> list["PositionGroup"]:
     from collections import defaultdict
     buckets: dict[tuple, list] = defaultdict(list)
     for p in positions:
@@ -63,7 +64,10 @@ def group_positions(positions: list) -> list["PositionGroup"]:
                 theta_dollar_day = (theta_dollar_day or 0.0) + contrib
 
         svg_id = str(pos_list[0].id).replace("-", "")[:10]
-        payoff_svg = _compute_payoff_svg(pos_list, svg_id) if is_spread else _compute_payoff_svg(pos_list, svg_id)
+        payoff_svg = _compute_payoff_svg(pos_list, svg_id)
+
+        from src.services.thesis_health import compute_group_gauge_svg
+        thesis_gauge_svg = compute_group_gauge_svg(pos_list, snapshots or {})
 
         groups.append(PositionGroup(
             underlying_symbol=underlying,
@@ -83,6 +87,7 @@ def group_positions(positions: list) -> list["PositionGroup"]:
             theta_dollar_day=theta_dollar_day,
             payoff_svg=payoff_svg,
             svg_id=svg_id,
+            thesis_gauge_svg=thesis_gauge_svg,
         ))
 
     return sorted(groups, key=lambda g: (g.underlying_symbol, str(g.expiry_date)))

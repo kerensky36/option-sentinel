@@ -3,9 +3,11 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.api._group_helpers import load_groups_and_theses
 from src.api.deps import get_session
 from src.api.main import templates
-from src.data.models import Position, PositionStatus, Thesis, ThesisTemplateType
+from src.data.models import Position, Thesis, ThesisTemplateType
+from src.services.thesis_health import upsert_snapshot
 
 router = APIRouter()
 
@@ -35,7 +37,6 @@ async def assign_thesis(
     thesis_id: str = Form(...),
     session: AsyncSession = Depends(get_session),
 ):
-    """Assign a thesis to all legs in a group (comma-separated position IDs)."""
     ids = [pid.strip() for pid in position_ids.split(",") if pid.strip()]
     tid = thesis_id if thesis_id != "__none__" else None
 
@@ -44,29 +45,15 @@ async def assign_thesis(
         pos = result.scalar_one_or_none()
         if pos:
             pos.thesis_id = tid
+            await session.flush()
+            if tid:
+                await upsert_snapshot(session, pos)
+
     await session.commit()
 
-    # Return refreshed positions partial
-    from src.services.position_groups import group_positions
-    from src.data.models import PositionStatus
-    from sqlalchemy.orm import selectinload
-
-    result = await session.execute(
-        select(Position)
-        .where(Position.status == PositionStatus.open)
-        .options(
-            selectinload(Position.greeks),
-            selectinload(Position.exit_goal),
-            selectinload(Position.thesis),
-        )
-        .order_by(Position.created_at)
-    )
-    positions = list(result.scalars().all())
-    theses_result = await session.execute(select(Thesis).order_by(Thesis.name))
-    theses = list(theses_result.scalars().all())
-
+    groups, theses = await load_groups_and_theses(session)
     return templates.TemplateResponse(
         request,
         "partials/positions_table.html",
-        {"groups": group_positions(positions), "theses": theses},
+        {"groups": groups, "theses": theses},
     )

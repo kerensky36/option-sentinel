@@ -39,6 +39,7 @@
 <div class="space-y-3">
 
 {% for group in groups %}
+{% set current_thesis = group.positions[0].thesis if group.positions[0].thesis else none %}
 <details class="group/card rounded-xl border border-gray-800 bg-gray-900 overflow-hidden" {% if not group.is_spread %}open{% endif %}>
 
   {# ── Summary / header ── #}
@@ -115,9 +116,8 @@
     </div>
     {% endif %}
 
-    {# Thesis selector #}
+    {# Thesis selector — inline on card, stop click propagating to <details> toggle #}
     {% set group_ids = group.positions | map(attribute='id') | map('string') | join(',') %}
-    {% set current_thesis = group.positions[0].thesis if group.positions[0].thesis else none %}
     <form
       hx-post="/partials/assign-thesis"
       hx-target="#positions-table"
@@ -127,8 +127,8 @@
       <input type="hidden" name="position_ids" value="{{ group_ids }}">
       <select name="thesis_id"
         onchange="this.form.requestSubmit()"
-        class="text-xs bg-gray-800 border border-gray-700 text-gray-300 rounded px-1.5 py-0.5 cursor-pointer hover:border-gray-500 focus:outline-none focus:border-indigo-500 max-w-[140px]">
-        <option value="__none__" {% if not current_thesis %}selected{% endif %}>— no thesis —</option>
+        class="text-xs bg-gray-800 border border-gray-700 text-gray-300 rounded px-1.5 py-0.5 cursor-pointer hover:border-gray-500 focus:outline-none focus:border-indigo-500 max-w-[150px]">
+        <option value="__none__" {% if not current_thesis %}selected{% endif %}>— thesis —</option>
         {% for t in theses %}
         <option value="{{ t.id }}" {% if current_thesis and current_thesis.id == t.id %}selected{% endif %}>
           {{ t.name }}
@@ -139,6 +139,73 @@
 
   </div>
   </summary>
+
+  {# ── Thesis health panel (expanded, thesis assigned) ── #}
+  {% if group.thesis_gauge_svg and current_thesis %}
+  <div class="border-t border-gray-800 bg-gray-950/90">
+    <div class="flex flex-col lg:flex-row">
+
+      {# Gauge — left column #}
+      <div class="flex items-center justify-center p-8 lg:w-80 xl:w-96 flex-shrink-0 lg:border-r border-gray-800/60">
+        <div class="w-full max-w-[320px]">
+          {{ group.thesis_gauge_svg | safe }}
+        </div>
+      </div>
+
+      {# Info — right column #}
+      <div class="flex-1 p-6 lg:p-8 flex flex-col justify-center gap-5">
+
+        {# Thesis name + type #}
+        <div>
+          <h3 class="text-2xl font-bold text-white tracking-tight">{{ current_thesis.name }}</h3>
+          <div class="flex items-center gap-2 mt-1.5">
+            <span class="text-xs px-2 py-0.5 rounded-md font-medium bg-indigo-900/60 text-indigo-300 border border-indigo-800">
+              {{ current_thesis.template_type.value.replace('_', ' ').title() }}
+            </span>
+            <span class="text-xs text-gray-500 uppercase tracking-wider">{{ current_thesis.status.value }}</span>
+          </div>
+          {% if current_thesis.description %}
+          <p class="text-sm text-gray-400 mt-2 leading-relaxed">{{ current_thesis.description }}</p>
+          {% endif %}
+        </div>
+
+        {# Metric tiles #}
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+
+          <div class="rounded-xl bg-gray-900 border border-gray-800 p-4">
+            <div class="text-[10px] text-gray-500 uppercase tracking-widest mb-2">P&amp;L</div>
+            <div class="font-mono font-bold text-xl {{ pnl_class(group.net_pnl) }}">
+              {{ pnl_fmt(group.net_pnl) }}
+            </div>
+          </div>
+
+          <div class="rounded-xl bg-gray-900 border border-gray-800 p-4">
+            <div class="text-[10px] text-gray-500 uppercase tracking-widest mb-2">Theta / Day</div>
+            <div class="font-mono font-bold text-xl {{ 'text-green-400' if group.theta_dollar_day and group.theta_dollar_day > 0 else 'text-red-400' if group.theta_dollar_day else 'text-gray-400' }}">
+              {% if group.theta_dollar_day %}{{ '+' if group.theta_dollar_day > 0 else '' }}${{ "%.2f"|format(group.theta_dollar_day) }}{% else %}—{% endif %}
+            </div>
+          </div>
+
+          <div class="rounded-xl bg-gray-900 border border-gray-800 p-4">
+            <div class="text-[10px] text-gray-500 uppercase tracking-widest mb-2">DTE</div>
+            <div class="font-mono font-bold text-xl {% if group.dte is not none and group.dte <= 7 %}text-red-400{% elif group.dte is not none and group.dte <= 21 %}text-amber-400{% else %}text-gray-100{% endif %}">
+              {% if group.dte is not none %}{{ group.dte }}d{% else %}—{% endif %}
+            </div>
+          </div>
+
+          <div class="rounded-xl bg-gray-900 border border-gray-800 p-4">
+            <div class="text-[10px] text-gray-500 uppercase tracking-widest mb-2">Net IV</div>
+            <div class="font-mono font-bold text-xl text-gray-100">
+              {% if group.net_iv is not none %}{{ "%.1f"|format(group.net_iv * 100) }}%{% else %}—{% endif %}
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+    </div>
+  </div>
+  {% endif %}
 
   {# ── Expanded legs ── #}
   <div class="border-t border-gray-800">
@@ -157,7 +224,6 @@
           <th class="px-2 py-1.5 text-right">Theta</th>
           <th class="px-2 py-1.5 text-right">Vega</th>
           <th class="px-2 py-1.5 text-right hidden lg:table-cell">IV</th>
-          <th class="px-2 py-1.5 text-left hidden xl:table-cell">Thesis</th>
         </tr>
       </thead>
       <tbody class="divide-y divide-gray-800/40 bg-gray-950/40">
@@ -218,9 +284,6 @@
         <td class="px-2 py-2 text-right font-mono text-gray-400 hidden lg:table-cell">
           {% if g and g.implied_volatility is not none %}{{ "%.1f"|format(g.implied_volatility * 100) }}%{% else %}—{% endif %}
         </td>
-        <td class="px-2 py-2 text-gray-500 hidden xl:table-cell">
-          {{ pos.thesis.name if pos.thesis else '—' }}
-        </td>
       </tr>
       {% endfor %}
 
@@ -250,7 +313,6 @@
           {% if group.net_vega is not none %}{{ "%.3f"|format(group.net_vega) }}{% else %}—{% endif %}
         </td>
         <td class="px-2 py-2 hidden lg:table-cell"></td>
-        <td class="px-2 py-2 hidden xl:table-cell"></td>
       </tr>
       {% endif %}
 

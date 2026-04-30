@@ -179,6 +179,9 @@ class Position(Base):
     greeks: Mapped["Greeks | None"] = relationship("Greeks", back_populates="position", uselist=False)
     exit_goal: Mapped["ExitGoal | None"] = relationship("ExitGoal", back_populates="position", uselist=False)
     alerts: Mapped[list["Alert"]] = relationship("Alert", back_populates="position")
+    health_snapshots: Mapped[list["ThesisHealthSnapshot"]] = relationship(
+        "ThesisHealthSnapshot", back_populates="position", order_by="ThesisHealthSnapshot.snapshot_date"
+    )
 
 
 class Greeks(Base):
@@ -238,6 +241,20 @@ class Alert(Base):
 
     position: Mapped["Position | None"] = relationship("Position", back_populates="alerts")
     spread: Mapped["Spread | None"] = relationship("Spread", back_populates="alerts")
+
+
+class ThesisHealthSnapshot(Base):
+    __tablename__ = "thesis_health_snapshot"
+    __table_args__ = (
+        UniqueConstraint("position_id", "snapshot_date", name="uq_thesis_snapshot_pos_date"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    position_id: Mapped[str] = mapped_column(String(36), ForeignKey("position.id", ondelete="CASCADE"), nullable=False)
+    snapshot_date: Mapped[date] = mapped_column(Date, nullable=False)
+    score: Mapped[float] = mapped_column(Float, nullable=False)
+
+    position: Mapped["Position"] = relationship("Position", back_populates="health_snapshots")
 
 
 class AuthToken(Base):
