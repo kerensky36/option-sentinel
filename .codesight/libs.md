@@ -1,0 +1,35 @@
+# Libraries
+
+- `src/api/deps.py` — function get_session: () -> AsyncGenerator[AsyncSession, None]
+- `src/api/main.py` — function create_app: () -> FastAPI, function lifespan: (app)
+- `src/auth/schwab_oauth.py` — function reset_client: () -> None, function get_schwab_client: () -> schwab.client.AsyncClient
+- `src/auth/token_store.py`
+  - function get_auth_token: (session) -> AuthToken | None
+  - function save_auth_token: (session, access_token, access_expiry, refresh_token, refresh_expiry) -> AuthToken
+  - function get_decrypted_tokens: (session) -> tuple[str, str] | None
+  - function check_and_update_re_auth: (session) -> bool
+- `src/data/database.py` — function get_db: () -> AsyncGenerator[AsyncSession, None]
+- `src/data/migrations/env.py`
+  - function run_migrations_offline: () -> None
+  - function do_run_migrations: (connection) -> None
+  - function run_migrations_online: () -> None
+  - function run_async_migrations: () -> None
+- `src/data/migrations/versions/5f53c99463d7_initial_schema.py` — function upgrade: () -> None, function downgrade: () -> None
+- `src/data/models.py`
+  - class Base
+  - class OptionType
+  - class PositionStatus
+  - class SourceEnum
+  - class PriceTargetDirection
+  - class ThesisTemplateType
+  - _...14 more_
+- `src/services/bs_calculator.py`
+  - function bs_greeks: (S, K, T, r, sigma, option_type) -> BSGreeks
+  - function implied_volatility: (S, K, T, r, option_price, option_type) -> float | None
+  - class BSGreeks
+- `src/services/greeks_service.py` — function build_greeks: (position, raw) -> dict
+- `src/services/poll_scheduler.py`
+  - function get_scheduler: () -> AsyncIOScheduler | None
+  - function start_scheduler: () -> None
+  - function stop_scheduler: () -> None
+- `src/services/schwab_client.py` — function sync_positions_and_greeks: (session, schwab_client) -> None
