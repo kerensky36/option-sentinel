@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+
+{% block binary_banner %}
+{% if binary_flag and binary_flag.is_active %}
+<div class="bg-red-600 text-white text-center px-4 py-2 text-sm font-semibold">
+  ⚠ Binary Event Active — Exit all positions immediately.
+  <form method="post" action="/binary-event/clear" class="inline ml-4">
+    <button class="underline hover:no-underline">Clear flag</button>
+  </form>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+<div hx-ext="sse" sse-connect="/sse">
+
+  <div class="flex items-center justify-between mb-4">
+    <h1 class="text-xl font-semibold">Open Positions</h1>
+    <div class="flex items-center gap-3">
+      <span class="text-sm text-gray-400">
+        {% if last_poll_at %}Last updated {{ last_poll_at.strftime('%H:%M:%S') }} UTC{% else %}Waiting for first poll…{% endif %}
+      </span>
+      {% if not binary_flag or not binary_flag.is_active %}
+      <form method="post" action="/binary-event/raise">
+        <button class="bg-red-700 hover:bg-red-600 text-white text-xs font-semibold px-3 py-1.5 rounded">
+          Raise Binary Event
+        </button>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+
+  <div
+    id="positions-table"
+    hx-get="/partials/positions"
+    hx-trigger="sse:refresh"
+    hx-swap="innerHTML"
+  >
+    {% include "partials/positions_table.html" %}
+  </div>
+
+</div>
+{% endblock %}
