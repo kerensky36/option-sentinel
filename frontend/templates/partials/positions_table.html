@@ -1,99 +1,248 @@
 {% macro source_badge(source) %}
-  {% if source and source.value == 'api' %}
-    <span class="ml-1 text-xs px-1 py-0.5 rounded bg-blue-900 text-blue-300">api</span>
-  {% elif source and source.value == 'calculated' %}
-    <span class="ml-1 text-xs px-1 py-0.5 rounded bg-amber-900 text-amber-300">calc</span>
-  {% else %}
-    <span class="ml-1 text-xs px-1 py-0.5 rounded bg-gray-800 text-gray-500">—</span>
-  {% endif %}
+  {%- if source and source.value == 'api' -%}
+    <span class="text-xs px-1 py-0.5 rounded bg-blue-900 text-blue-300">api</span>
+  {%- elif source and source.value == 'calculated' -%}
+    <span class="text-xs px-1 py-0.5 rounded bg-amber-900 text-amber-300">calc</span>
+  {%- else -%}
+    <span class="text-xs px-1 py-0.5 rounded bg-gray-800 text-gray-600">—</span>
+  {%- endif %}
+{%- endmacro %}
+
+{% macro pnl_class(val) %}{% if val is not none and val > 0 %}text-green-400{% elif val is not none and val < 0 %}text-red-400{% else %}text-gray-400{% endif %}{% endmacro %}
+
+{% macro pnl_fmt(val) %}
+  {%- if val is not none -%}
+    {%- if val > 0 %}+{%- endif %}${{ "%.2f"|format(val) }}
+  {%- else %}—{%- endif %}
+{%- endmacro %}
+
+{# Delta bar — centred at 0, left=bearish, right=bullish #}
+{% macro delta_bar(pct, direction, label) %}
+<div class="flex items-center gap-2 min-w-[140px]">
+  <div class="relative w-24 h-1.5 bg-gray-800 rounded-full overflow-visible flex-shrink-0">
+    <div class="absolute top-0 left-1/2 w-px h-full bg-gray-600 z-10"></div>
+    {% if direction == 'left' %}
+      <div class="absolute top-0 right-1/2 h-full rounded-l-full bg-red-500 opacity-80"
+           style="width:{{ pct }}%"></div>
+    {% elif direction == 'right' %}
+      <div class="absolute top-0 left-1/2 h-full rounded-r-full bg-green-500 opacity-80"
+           style="width:{{ pct }}%"></div>
+    {% endif %}
+  </div>
+  <span class="text-xs font-mono {{ 'text-red-400' if direction == 'left' else 'text-green-400' if direction == 'right' else 'text-gray-500' }}">
+    {{ label }}
+  </span>
+</div>
 {% endmacro %}
 
-{% if positions %}
-<div class="overflow-x-auto rounded-lg border border-gray-800">
-  <table class="min-w-full text-sm divide-y divide-gray-800">
-    <thead class="bg-gray-900 text-gray-400 text-xs uppercase tracking-wider">
-      <tr>
-        <th class="px-3 py-2 text-left">Symbol</th>
-        <th class="px-3 py-2 text-left">Type</th>
-        <th class="px-3 py-2 text-right">Strike</th>
-        <th class="px-3 py-2 text-left">Expiry</th>
-        <th class="px-3 py-2 text-right">Qty</th>
-        <th class="px-3 py-2 text-right">Mark</th>
-        <th class="px-3 py-2 text-right">P&amp;L</th>
-        <th class="px-3 py-2 text-right">DTE</th>
-        <th class="px-3 py-2 text-right">Delta</th>
-        <th class="px-3 py-2 text-right">Gamma</th>
-        <th class="px-3 py-2 text-right">Theta</th>
-        <th class="px-3 py-2 text-right">Vega</th>
-        <th class="px-3 py-2 text-right">IV</th>
-        <th class="px-3 py-2 text-left">Thesis</th>
-      </tr>
-    </thead>
-    <tbody class="divide-y divide-gray-800 bg-gray-950">
-      {% for pos in positions %}
+{% if groups %}
+<div class="space-y-3">
+
+{% for group in groups %}
+<details class="group/card rounded-xl border border-gray-800 bg-gray-900 overflow-hidden" {% if not group.is_spread %}open{% endif %}>
+
+  {# ── Summary / header ── #}
+  <summary class="list-none cursor-pointer select-none">
+  <div class="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 hover:bg-gray-800 transition-colors">
+
+    {# Expand chevron #}
+    <span class="text-gray-500 group-open/card:rotate-90 transition-transform duration-150 text-xs">▶</span>
+
+    {# Underlying + strategy badge #}
+    <div class="flex items-center gap-2 min-w-[160px]">
+      <span class="text-base font-bold text-white tracking-tight">{{ group.underlying_symbol }}</span>
+      {% if group.is_spread %}
+        <span class="text-xs px-1.5 py-0.5 rounded-md font-medium
+          {% if 'Debit' in group.strategy_label %}bg-purple-900 text-purple-300
+          {% elif 'Credit' in group.strategy_label %}bg-sky-900 text-sky-300
+          {% elif 'Condor' in group.strategy_label %}bg-teal-900 text-teal-300
+          {% else %}bg-gray-700 text-gray-300{% endif %}">
+          {{ group.strategy_label }}
+        </span>
+      {% else %}
+        <span class="text-xs px-1.5 py-0.5 rounded-md bg-gray-800 text-gray-400 font-medium">
+          {{ group.strategy_label }}
+        </span>
+      {% endif %}
+    </div>
+
+    {# Expiry + DTE #}
+    <div class="text-xs text-gray-400 whitespace-nowrap">
+      {{ group.expiry_date.strftime('%b %-d \'%y') }}
+      {% if group.dte is not none %}
+        <span class="ml-1 font-semibold
+          {% if group.dte <= 3 %}text-red-400
+          {% elif group.dte <= 14 %}text-amber-400
+          {% else %}text-gray-300{% endif %}">
+          {{ group.dte }}d
+        </span>
+      {% endif %}
+    </div>
+
+    {# Net P&L #}
+    <div class="font-semibold font-mono text-sm {{ pnl_class(group.net_pnl) }} whitespace-nowrap">
+      {{ pnl_fmt(group.net_pnl) }}
+    </div>
+
+    {# Spacer #}
+    <div class="flex-1"></div>
+
+    {# Net Delta bar #}
+    <div class="flex items-center gap-1.5 text-xs text-gray-400">
+      <span class="hidden sm:inline">Δ</span>
+      {{ delta_bar(group.delta_bar_pct, group.delta_bar_dir,
+           ("%.2f"|format(group.net_delta)) if group.net_delta is not none else "—") }}
+    </div>
+
+    {# Theta/day #}
+    {% if group.theta_dollar_day is not none %}
+    <div class="text-xs whitespace-nowrap {{ 'text-green-400' if group.theta_dollar_day > 0 else 'text-red-400' }}">
+      Θ {{ '+' if group.theta_dollar_day > 0 else '' }}${{ "%.2f"|format(group.theta_dollar_day) }}/d
+    </div>
+    {% endif %}
+
+    {# IV #}
+    {% if group.net_iv is not none %}
+    <div class="text-xs text-gray-400 whitespace-nowrap hidden lg:block">
+      IV {{ "%.1f"|format(group.net_iv * 100) }}%
+    </div>
+    {% endif %}
+
+    {# Payoff sparkline #}
+    {% if group.payoff_svg %}
+    <div class="w-28 h-10 flex-shrink-0 hidden sm:block" title="Payoff at expiry">
+      {{ group.payoff_svg | safe }}
+    </div>
+    {% endif %}
+
+  </div>
+  </summary>
+
+  {# ── Expanded legs ── #}
+  <div class="border-t border-gray-800">
+    <table class="min-w-full text-xs divide-y divide-gray-800/60">
+      <thead>
+        <tr class="text-gray-500 uppercase tracking-wider text-[10px]">
+          <th class="px-4 py-1.5 text-left w-6"></th>
+          <th class="px-2 py-1.5 text-left">Strike</th>
+          <th class="px-2 py-1.5 text-left">Type</th>
+          <th class="px-2 py-1.5 text-right">Qty</th>
+          <th class="px-2 py-1.5 text-right">Cost</th>
+          <th class="px-2 py-1.5 text-right">Mark</th>
+          <th class="px-2 py-1.5 text-right">P&amp;L</th>
+          <th class="px-2 py-1.5 text-right">Delta</th>
+          <th class="px-2 py-1.5 text-right">Gamma</th>
+          <th class="px-2 py-1.5 text-right">Theta</th>
+          <th class="px-2 py-1.5 text-right">Vega</th>
+          <th class="px-2 py-1.5 text-right hidden lg:table-cell">IV</th>
+          <th class="px-2 py-1.5 text-left hidden xl:table-cell">Thesis</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-800/40 bg-gray-950/40">
+      {% for pos in group.positions %}
       {% set g = pos.greeks %}
-      <tr class="hover:bg-gray-900 transition-colors">
-        <td class="px-3 py-2 font-mono text-xs text-gray-200 whitespace-nowrap">{{ pos.underlying_symbol }}</td>
-        <td class="px-3 py-2">
+      {% set leg_delta = (g.delta * pos.quantity) if g and g.delta is not none else none %}
+      {% set leg_max = [pos.quantity | abs, 1] | max %}
+      {% set leg_pct = [(leg_delta | abs / leg_max * 50), 50] | min if leg_delta is not none else 0 %}
+      {% set leg_dir = 'left' if (leg_delta is not none and leg_delta < 0) else 'right' if (leg_delta is not none and leg_delta > 0) else 'none' %}
+      <tr class="hover:bg-gray-900/40 transition-colors">
+        <td class="px-4 py-2 text-gray-600">↳</td>
+        <td class="px-2 py-2 font-mono font-semibold text-gray-200">${{ "%.0f"|format(pos.strike) }}</td>
+        <td class="px-2 py-2">
           {% if pos.option_type.value == 'call' %}
-            <span class="text-green-400 font-medium">C</span>
+            <span class="font-semibold text-green-400">C</span>
           {% else %}
-            <span class="text-red-400 font-medium">P</span>
+            <span class="font-semibold text-red-400">P</span>
           {% endif %}
         </td>
-        <td class="px-3 py-2 text-right font-mono">${{ "%.2f"|format(pos.strike) }}</td>
-        <td class="px-3 py-2 whitespace-nowrap text-gray-300">{{ pos.expiry_date.strftime('%m/%d/%y') }}</td>
-        <td class="px-3 py-2 text-right {% if pos.quantity < 0 %}text-red-400{% else %}text-green-400{% endif %}">
-          {{ pos.quantity }}
+        <td class="px-2 py-2 text-right font-mono {{ 'text-red-400' if pos.quantity < 0 else 'text-green-400' }}">
+          {{ '%+d' | format(pos.quantity) }}
         </td>
-        <td class="px-3 py-2 text-right font-mono">
-          {% if pos.current_mark is not none %}${{ "%.2f"|format(pos.current_mark) }}{% else %}—{% endif %}
+        <td class="px-2 py-2 text-right font-mono text-gray-400">
+          {{ '$' ~ '%.2f'|format(pos.opening_credit_debit) if pos.opening_credit_debit is not none else '—' }}
         </td>
-        <td class="px-3 py-2 text-right font-mono font-semibold
-          {% if pos.unrealised_pnl is not none and pos.unrealised_pnl > 0 %}text-green-400
-          {% elif pos.unrealised_pnl is not none and pos.unrealised_pnl < 0 %}text-red-400
-          {% else %}text-gray-400{% endif %}">
-          {% if pos.unrealised_pnl is not none %}
-            {% if pos.unrealised_pnl > 0 %}+{% endif %}${{ "%.2f"|format(pos.unrealised_pnl) }}
+        <td class="px-2 py-2 text-right font-mono text-gray-200">
+          {{ '$' ~ '%.2f'|format(pos.current_mark) if pos.current_mark is not none else '—' }}
+        </td>
+        <td class="px-2 py-2 text-right font-mono font-semibold {{ pnl_class(pos.unrealised_pnl | float if pos.unrealised_pnl is not none else none) }}">
+          {{ pnl_fmt(pos.unrealised_pnl | float if pos.unrealised_pnl is not none else none) }}
+        </td>
+        {# Per-leg delta with mini bar #}
+        <td class="px-2 py-2 text-right">
+          {% if g and g.delta is not none %}
+          <div class="flex items-center justify-end gap-1.5">
+            <div class="relative w-10 h-1 bg-gray-800 rounded-full overflow-visible flex-shrink-0">
+              <div class="absolute top-0 left-1/2 w-px h-full bg-gray-600 z-10"></div>
+              {% if leg_dir == 'left' %}
+                <div class="absolute top-0 right-1/2 h-full rounded-l-full bg-red-500 opacity-70" style="width:{{ leg_pct }}%"></div>
+              {% elif leg_dir == 'right' %}
+                <div class="absolute top-0 left-1/2 h-full rounded-r-full bg-green-500 opacity-70" style="width:{{ leg_pct }}%"></div>
+              {% endif %}
+            </div>
+            <span class="font-mono {{ 'text-red-400' if g.delta < 0 else 'text-green-400' }}">{{ "%.3f"|format(g.delta) }}</span>
+            {{ source_badge(g.delta_source) }}
+          </div>
           {% else %}—{% endif %}
         </td>
-        <td class="px-3 py-2 text-right
-          {% if pos.days_to_expiry is not none and pos.days_to_expiry <= 3 %}text-red-400 font-semibold
-          {% elif pos.days_to_expiry is not none and pos.days_to_expiry <= 7 %}text-amber-400
-          {% else %}text-gray-300{% endif %}">
-          {{ pos.days_to_expiry if pos.days_to_expiry is not none else '—' }}
+        <td class="px-2 py-2 text-right font-mono text-gray-300">
+          {% if g and g.gamma is not none %}{{ "%.4f"|format(g.gamma) }} {{ source_badge(g.gamma_source) }}{% else %}—{% endif %}
         </td>
-        <!-- Delta -->
-        <td class="px-3 py-2 text-right font-mono whitespace-nowrap">
-          {% if g and g.delta is not none %}{{ "%.3f"|format(g.delta) }}{{ source_badge(g.delta_source) }}{% else %}—{% endif %}
+        <td class="px-2 py-2 text-right font-mono {{ 'text-green-400' if (g and g.theta is not none and g.theta * pos.quantity > 0) else 'text-red-400' if (g and g.theta is not none) else 'text-gray-400' }}">
+          {% if g and g.theta is not none %}{{ "%.3f"|format(g.theta) }} {{ source_badge(g.theta_source) }}{% else %}—{% endif %}
         </td>
-        <!-- Gamma -->
-        <td class="px-3 py-2 text-right font-mono whitespace-nowrap">
-          {% if g and g.gamma is not none %}{{ "%.4f"|format(g.gamma) }}{{ source_badge(g.gamma_source) }}{% else %}—{% endif %}
+        <td class="px-2 py-2 text-right font-mono text-gray-300">
+          {% if g and g.vega is not none %}{{ "%.3f"|format(g.vega) }} {{ source_badge(g.vega_source) }}{% else %}—{% endif %}
         </td>
-        <!-- Theta -->
-        <td class="px-3 py-2 text-right font-mono whitespace-nowrap text-red-300">
-          {% if g and g.theta is not none %}{{ "%.3f"|format(g.theta) }}{{ source_badge(g.theta_source) }}{% else %}—{% endif %}
+        <td class="px-2 py-2 text-right font-mono text-gray-400 hidden lg:table-cell">
+          {% if g and g.implied_volatility is not none %}{{ "%.1f"|format(g.implied_volatility * 100) }}%{% else %}—{% endif %}
         </td>
-        <!-- Vega -->
-        <td class="px-3 py-2 text-right font-mono whitespace-nowrap">
-          {% if g and g.vega is not none %}{{ "%.3f"|format(g.vega) }}{{ source_badge(g.vega_source) }}{% else %}—{% endif %}
-        </td>
-        <!-- IV -->
-        <td class="px-3 py-2 text-right font-mono whitespace-nowrap">
-          {% if g and g.implied_volatility is not none %}{{ "%.1f"|format(g.implied_volatility * 100) }}%{{ source_badge(g.iv_source) }}{% else %}—{% endif %}
-        </td>
-        <td class="px-3 py-2 text-gray-400 text-xs">
+        <td class="px-2 py-2 text-gray-500 hidden xl:table-cell">
           {{ pos.thesis.name if pos.thesis else '—' }}
         </td>
       </tr>
       {% endfor %}
-    </tbody>
-  </table>
+
+      {# Net row for spreads #}
+      {% if group.is_spread %}
+      <tr class="bg-gray-900/60 font-semibold text-gray-300">
+        <td class="px-4 py-2 text-gray-500 text-[10px] uppercase tracking-wider" colspan="2">Net</td>
+        <td class="px-2 py-2"></td>
+        <td class="px-2 py-2 text-right font-mono">
+          {{ '%+d' | format(group.positions | sum(attribute='quantity')) }}
+        </td>
+        <td class="px-2 py-2"></td>
+        <td class="px-2 py-2"></td>
+        <td class="px-2 py-2 text-right font-mono font-bold {{ pnl_class(group.net_pnl) }}">
+          {{ pnl_fmt(group.net_pnl) }}
+        </td>
+        <td class="px-2 py-2 text-right font-mono {{ 'text-red-400' if (group.net_delta is not none and group.net_delta < 0) else 'text-green-400' if (group.net_delta is not none and group.net_delta > 0) else 'text-gray-400' }}">
+          {% if group.net_delta is not none %}{{ "%.3f"|format(group.net_delta) }}{% else %}—{% endif %}
+        </td>
+        <td class="px-2 py-2 text-right font-mono text-gray-300">
+          {% if group.net_gamma is not none %}{{ "%.4f"|format(group.net_gamma) }}{% else %}—{% endif %}
+        </td>
+        <td class="px-2 py-2 text-right font-mono {{ 'text-green-400' if (group.theta_dollar_day is not none and group.theta_dollar_day > 0) else 'text-red-400' if (group.theta_dollar_day is not none) else 'text-gray-400' }}">
+          {% if group.theta_dollar_day is not none %}{{ '+' if group.theta_dollar_day > 0 else '' }}${{ "%.2f"|format(group.theta_dollar_day) }}/d{% else %}—{% endif %}
+        </td>
+        <td class="px-2 py-2 text-right font-mono text-gray-300">
+          {% if group.net_vega is not none %}{{ "%.3f"|format(group.net_vega) }}{% else %}—{% endif %}
+        </td>
+        <td class="px-2 py-2 hidden lg:table-cell"></td>
+        <td class="px-2 py-2 hidden xl:table-cell"></td>
+      </tr>
+      {% endif %}
+
+      </tbody>
+    </table>
+  </div>
+
+</details>
+{% endfor %}
+
 </div>
 {% else %}
-<div class="text-center py-16 text-gray-500">
-  <p class="text-lg">No open positions</p>
-  <p class="text-sm mt-1">Data refreshes every 5 minutes during market hours.</p>
+<div class="text-center py-20 text-gray-600">
+  <p class="text-lg font-medium">No open positions</p>
+  <p class="text-sm mt-1 text-gray-700">Data refreshes every 5 minutes during market hours.</p>
 </div>
 {% endif %}

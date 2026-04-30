@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{% block title %}Option Sentinel{% endblock %}</title>
+  <link rel="icon" type="image/svg+xml" href="/static/sentinel.svg">
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/htmx.org@2.0.4"></script>
   <script src="https://unpkg.com/htmx-ext-sse@2.2.2/sse.js"></script>
@@ -17,7 +18,10 @@
 
   <!-- Nav -->
   <nav class="bg-gray-900 border-b border-gray-800 px-4 py-3 flex items-center justify-between">
-    <span class="text-lg font-semibold tracking-tight">Option Sentinel</span>
+    <div class="flex items-center gap-2.5">
+      <img src="/static/sentinel.svg" class="w-9 h-9 drop-shadow-[0_0_6px_rgba(255,34,0,0.5)]" alt="Sentinel">
+      <span class="text-lg font-semibold tracking-tight">Option Sentinel</span>
+    </div>
     <div class="flex items-center gap-4 text-sm text-gray-400">
       <span id="poll-status">Waiting for data…</span>
     </div>

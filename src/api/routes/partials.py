@@ -7,6 +7,7 @@ from sqlalchemy.orm import selectinload
 from src.api.deps import get_session
 from src.api.main import templates
 from src.data.models import Position, PositionStatus
+from src.services.position_groups import group_positions
 
 router = APIRouter(prefix="/partials")
 
@@ -27,5 +28,5 @@ async def positions_partial(request: Request, session: AsyncSession = Depends(ge
     return templates.TemplateResponse(
         request,
         "partials/positions_table.html",
-        {"positions": positions},
+        {"groups": group_positions(positions)},
     )

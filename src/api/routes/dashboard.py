@@ -8,6 +8,7 @@ from src.api.deps import get_session
 from src.api.main import templates
 from src.data.models import BinaryEventFlag, Position, PositionStatus
 from src.services import poll_scheduler
+from src.services.position_groups import group_positions
 
 router = APIRouter()
 
@@ -39,7 +40,7 @@ async def dashboard(request: Request, session: AsyncSession = Depends(get_sessio
         request,
         "dashboard.html",
         {
-            "positions": positions,
+            "groups": group_positions(positions),
             "binary_flag": binary_flag,
             "last_poll_at": poll_scheduler.last_poll_at,
         },

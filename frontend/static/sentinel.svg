@@ -1,0 +1,80 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <!-- Dark background for favicon visibility -->
+    <radialGradient id="bodyGrad" cx="50%" cy="40%" r="55%">
+      <stop offset="0%" stop-color="#4a4a5a"/>
+      <stop offset="60%" stop-color="#1e1e2e"/>
+      <stop offset="100%" stop-color="#0a0a12"/>
+    </radialGradient>
+    <radialGradient id="eyeGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#ff2200"/>
+      <stop offset="50%" stop-color="#cc1100"/>
+      <stop offset="100%" stop-color="#440000" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="redGlow" x="-80%" y="-80%" width="260%" height="260%">
+      <feGaussianBlur stdDeviation="1.4" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="bodyShine" x="-10%" y="-10%" width="120%" height="120%">
+      <feGaussianBlur stdDeviation="0.5" result="blur"/>
+      <feMerge>
+        <feMergeNode in="SourceGraphic"/>
+        <feMergeNode in="blur"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Dark background -->
+  <rect width="64" height="64" rx="8" fill="#050508"/>
+
+  <!-- Tentacles — matrix green, curving outward from center base -->
+  <!-- Left outer tentacle -->
+  <path d="M 28,46 C 22,50 10,58 4,63" stroke="#00cc33" stroke-width="1.3" fill="none" stroke-linecap="round" opacity="0.85"/>
+  <!-- Left mid tentacle -->
+  <path d="M 29,47 C 24,52 16,60 12,64" stroke="#00ff41" stroke-width="1.1" fill="none" stroke-linecap="round" opacity="0.75"/>
+  <!-- Left inner tentacle -->
+  <path d="M 30,48 C 27,54 22,60 20,64" stroke="#00cc33" stroke-width="1.0" fill="none" stroke-linecap="round" opacity="0.65"/>
+  <!-- Right inner tentacle -->
+  <path d="M 34,48 C 37,54 42,60 44,64" stroke="#00cc33" stroke-width="1.0" fill="none" stroke-linecap="round" opacity="0.65"/>
+  <!-- Right mid tentacle -->
+  <path d="M 35,47 C 40,52 48,60 52,64" stroke="#00ff41" stroke-width="1.1" fill="none" stroke-linecap="round" opacity="0.75"/>
+  <!-- Right outer tentacle -->
+  <path d="M 36,46 C 42,50 54,58 60,63" stroke="#00cc33" stroke-width="1.3" fill="none" stroke-linecap="round" opacity="0.85"/>
+
+  <!-- Upper claw appendages -->
+  <!-- Left upper claw -->
+  <path d="M 26,22 C 18,16 10,14 6,10" stroke="#2a2a3a" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+  <path d="M 26,22 C 20,14 14,10 8,6" stroke="#2a2a3a" stroke-width="1.4" fill="none" stroke-linecap="round"/>
+  <!-- Right upper claw -->
+  <path d="M 38,22 C 46,16 54,14 58,10" stroke="#2a2a3a" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+  <path d="M 38,22 C 44,14 50,10 56,6" stroke="#2a2a3a" stroke-width="1.4" fill="none" stroke-linecap="round"/>
+
+  <!-- Main body — metallic elongated oval -->
+  <ellipse cx="32" cy="30" rx="14" ry="19" fill="url(#bodyGrad)" filter="url(#bodyShine)"/>
+  <!-- Body highlight sheen -->
+  <ellipse cx="29" cy="22" rx="5" ry="8" fill="white" opacity="0.05"/>
+  <!-- Body edge ring -->
+  <ellipse cx="32" cy="30" rx="14" ry="19" fill="none" stroke="#3a3a4e" stroke-width="0.8"/>
+
+  <!-- Three red glowing eyes (triangle arrangement) -->
+  <!-- Top eye -->
+  <circle cx="32" cy="24" r="2.8" fill="url(#eyeGlow)" filter="url(#redGlow)"/>
+  <circle cx="32" cy="24" r="1.4" fill="#ff3300"/>
+  <circle cx="32" cy="24" r="0.6" fill="#ff8866"/>
+  <!-- Bottom-left eye -->
+  <circle cx="27" cy="31" r="2.4" fill="url(#eyeGlow)" filter="url(#redGlow)"/>
+  <circle cx="27" cy="31" r="1.2" fill="#ff3300"/>
+  <circle cx="27" cy="31" r="0.5" fill="#ff8866"/>
+  <!-- Bottom-right eye -->
+  <circle cx="37" cy="31" r="2.4" fill="url(#eyeGlow)" filter="url(#redGlow)"/>
+  <circle cx="37" cy="31" r="1.2" fill="#ff3300"/>
+  <circle cx="37" cy="31" r="0.5" fill="#ff8866"/>
+
+  <!-- Segmentation lines on body -->
+  <ellipse cx="32" cy="30" rx="10" ry="4" fill="none" stroke="#2a2a3c" stroke-width="0.6" opacity="0.7"/>
+  <ellipse cx="32" cy="36" rx="8" ry="3" fill="none" stroke="#2a2a3c" stroke-width="0.5" opacity="0.5"/>
+</svg>
