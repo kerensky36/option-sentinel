@@ -1,0 +1,13 @@
+Option Sentinel — Expiry Warning ({tier})
+
+Position: {symbol}
+Underlying: {underlying} {option_type} ${strike}
+Expiry:     {expiry}
+DTE:        {dte} days
+
+Unrealised P&L: ${pnl:+.2f}
+
+{urgency_note}
+
+---
+Option Sentinel  |  {timestamp}

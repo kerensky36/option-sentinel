@@ -155,14 +155,30 @@
       {# Info — right column #}
       <div class="flex-1 p-6 lg:p-8 flex flex-col justify-center gap-5">
 
-        {# Thesis name + type #}
+        {# Thesis name + type + alignment rating #}
         <div>
           <h3 class="text-2xl font-bold text-white tracking-tight">{{ current_thesis.name }}</h3>
-          <div class="flex items-center gap-2 mt-1.5">
+          <div class="flex items-center gap-2 mt-1.5 flex-wrap">
             <span class="text-xs px-2 py-0.5 rounded-md font-medium bg-indigo-900/60 text-indigo-300 border border-indigo-800">
               {{ current_thesis.template_type.value.replace('_', ' ').title() }}
             </span>
             <span class="text-xs text-gray-500 uppercase tracking-wider">{{ current_thesis.status.value }}</span>
+            {# Alignment rating — inline selector #}
+            <form hx-post="/thesis/{{ current_thesis.id }}/alignment"
+                  hx-target="#positions-table" hx-swap="innerHTML"
+                  onclick="event.stopPropagation()">
+              <select name="alignment_rating" onchange="this.form.requestSubmit()"
+                class="text-xs rounded px-1.5 py-0.5 border focus:outline-none cursor-pointer
+                  {% if current_thesis.alignment_rating.value == 'aligned' %}bg-green-900 border-green-700 text-green-300
+                  {% elif current_thesis.alignment_rating.value == 'partially_aligned' %}bg-amber-900 border-amber-700 text-amber-300
+                  {% elif current_thesis.alignment_rating.value == 'misaligned' %}bg-red-900 border-red-700 text-red-300
+                  {% else %}bg-gray-800 border-gray-700 text-gray-400{% endif %}">
+                <option value="unrated"           {% if current_thesis.alignment_rating.value == 'unrated' %}selected{% endif %}>— Alignment</option>
+                <option value="aligned"           {% if current_thesis.alignment_rating.value == 'aligned' %}selected{% endif %}>✓ Aligned</option>
+                <option value="partially_aligned" {% if current_thesis.alignment_rating.value == 'partially_aligned' %}selected{% endif %}>~ Partial</option>
+                <option value="misaligned"        {% if current_thesis.alignment_rating.value == 'misaligned' %}selected{% endif %}>✗ Misaligned</option>
+              </select>
+            </form>
           </div>
           {% if current_thesis.description %}
           <p class="text-sm text-gray-400 mt-2 leading-relaxed">{{ current_thesis.description }}</p>
@@ -219,6 +235,8 @@
           <th class="px-2 py-1.5 text-right">Cost</th>
           <th class="px-2 py-1.5 text-right">Mark</th>
           <th class="px-2 py-1.5 text-right">P&amp;L</th>
+          <th class="px-2 py-1.5 text-left hidden xl:table-cell">Exit Goal</th>
+          <th class="px-2 py-1.5 text-right hidden xl:table-cell">Score</th>
           <th class="px-2 py-1.5 text-right">Delta</th>
           <th class="px-2 py-1.5 text-right">Gamma</th>
           <th class="px-2 py-1.5 text-right">Theta</th>
@@ -254,6 +272,37 @@
         </td>
         <td class="px-2 py-2 text-right font-mono font-semibold {{ pnl_class(pos.unrealised_pnl | float if pos.unrealised_pnl is not none else none) }}">
           {{ pnl_fmt(pos.unrealised_pnl | float if pos.unrealised_pnl is not none else none) }}
+        </td>
+        {# Exit goal inline form #}
+        {% set eg = pos.exit_goal %}
+        <td class="px-2 py-1 hidden xl:table-cell" onclick="event.stopPropagation()">
+          <form hx-post="/positions/{{ pos.id }}/exit-goal"
+                hx-target="#positions-table" hx-swap="innerHTML"
+                class="flex items-center gap-1">
+            <input type="number" name="profit_target_pct" min="0" max="100" step="1"
+              placeholder="P&L%"
+              value="{{ (eg.profit_target_pct * 100) | int if eg and eg.profit_target_pct else '' }}"
+              class="w-14 text-xs bg-gray-800 border border-gray-700 text-gray-300 rounded px-1 py-0.5 focus:outline-none focus:border-indigo-500">
+            <input type="number" name="dte_threshold" min="0" max="365" step="1"
+              placeholder="DTE"
+              value="{{ eg.dte_threshold if eg and eg.dte_threshold else '' }}"
+              class="w-12 text-xs bg-gray-800 border border-gray-700 text-gray-300 rounded px-1 py-0.5 focus:outline-none focus:border-indigo-500">
+            <button type="submit" class="text-[10px] text-gray-500 hover:text-gray-300 px-1">✓</button>
+          </form>
+        </td>
+        {# Exit proximity score #}
+        <td class="px-2 py-2 text-right hidden xl:table-cell">
+          {% if eg and (eg.profit_target_pct or eg.dte_threshold) %}
+            {% set score = eg.exit_proximity_score %}
+            <span class="font-mono text-xs font-semibold
+              {% if score >= 80 %}text-red-400
+              {% elif score >= 50 %}text-amber-400
+              {% else %}text-gray-400{% endif %}">
+              {{ score }}
+            </span>
+          {% else %}
+            <span class="text-gray-600 text-xs">—</span>
+          {% endif %}
         </td>
         {# Per-leg delta with mini bar #}
         <td class="px-2 py-2 text-right">
@@ -312,6 +361,8 @@
         <td class="px-2 py-2 text-right font-mono text-gray-300">
           {% if group.net_vega is not none %}{{ "%.3f"|format(group.net_vega) }}{% else %}—{% endif %}
         </td>
+        <td class="px-2 py-2 hidden xl:table-cell"></td>
+        <td class="px-2 py-2 hidden xl:table-cell"></td>
         <td class="px-2 py-2 hidden lg:table-cell"></td>
       </tr>
       {% endif %}

@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.api._group_helpers import load_groups_and_theses
 from src.api.deps import get_session
 from src.api.main import templates
-from src.data.models import Position, Thesis, ThesisTemplateType
+from src.data.models import AlignmentRating, Position, Thesis, ThesisTemplateType
 from src.services.thesis_health import upsert_snapshot
 
 router = APIRouter()
@@ -51,6 +51,26 @@ async def assign_thesis(
 
     await session.commit()
 
+    groups, theses = await load_groups_and_theses(session)
+    return templates.TemplateResponse(
+        request,
+        "partials/positions_table.html",
+        {"groups": groups, "theses": theses},
+    )
+
+
+@router.post("/thesis/{thesis_id}/alignment", response_class=HTMLResponse)
+async def set_alignment(
+    request: Request,
+    thesis_id: str,
+    alignment_rating: str = Form(...),
+    session: AsyncSession = Depends(get_session),
+):
+    result = await session.execute(select(Thesis).where(Thesis.id == thesis_id))
+    thesis = result.scalar_one_or_none()
+    if thesis:
+        thesis.alignment_rating = AlignmentRating(alignment_rating)
+        await session.commit()
     groups, theses = await load_groups_and_theses(session)
     return templates.TemplateResponse(
         request,

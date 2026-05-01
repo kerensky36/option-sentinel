@@ -42,6 +42,15 @@ async def _poll_job() -> None:
             )
             last_poll_count = result.scalar() or 0
 
+        async with AsyncSessionLocal() as session:
+            from src.rules.profit_target import check_profit_targets
+            from src.rules.expiry_warning import check_expiry_warnings
+            from src.rules.exit_scoring import update_exit_scores
+            await check_profit_targets(session)
+            await check_expiry_warnings(session)
+            await update_exit_scores(session)
+            await session.commit()
+
         last_poll_at = datetime.now(timezone.utc)
         logger.info("Poll complete — %d open positions", last_poll_count)
 
