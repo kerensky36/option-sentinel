@@ -5,9 +5,132 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{% block title %}Option Sentinel{% endblock %}</title>
   <link rel="icon" type="image/svg+xml" href="/static/sentinel.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"JetBrains Mono"', 'Consolas', 'ui-monospace', 'monospace'],
+            mono: ['"JetBrains Mono"', 'Consolas', 'ui-monospace', 'monospace'],
+          }
+        }
+      }
+    }
+  </script>
   <script src="https://unpkg.com/htmx.org@2.0.4"></script>
   <script src="https://unpkg.com/htmx-ext-sse@2.2.2/sse.js"></script>
+  <style>
+    /* ── ThinkorSwim-inspired theme ─────────────────────────────────────── */
+
+    *, *::before, *::after { box-sizing: border-box; }
+
+    body {
+      font-family: 'JetBrains Mono', Consolas, 'Courier New', monospace;
+      font-size: 12px;
+      line-height: 1.45;
+      letter-spacing: 0.01em;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── Palette ── */
+    .bg-gray-950      { background-color: #0c0c10 !important; }
+    .bg-gray-900      { background-color: #14141a !important; }
+    .bg-gray-800      { background-color: #1c1c24 !important; }
+    .bg-gray-700      { background-color: #252532 !important; }
+
+    .bg-gray-950\/40  { background-color: rgba(12,12,16,0.40) !important; }
+    .bg-gray-950\/60  { background-color: rgba(12,12,16,0.60) !important; }
+    .bg-gray-950\/80  { background-color: rgba(12,12,16,0.80) !important; }
+    .bg-gray-950\/90  { background-color: rgba(12,12,16,0.90) !important; }
+    .bg-gray-900\/40  { background-color: rgba(20,20,26,0.40) !important; }
+    .bg-gray-900\/60  { background-color: rgba(20,20,26,0.60) !important; }
+
+    .border-gray-800        { border-color: #22222e !important; }
+    .border-gray-800\/60    { border-color: rgba(34,34,46,0.60) !important; }
+    .border-gray-800\/40    { border-color: rgba(34,34,46,0.40) !important; }
+    .border-gray-700        { border-color: #2c2c3a !important; }
+
+    .text-white    { color: #d2d2d8 !important; }
+    .text-gray-100 { color: #c6c6cc !important; }
+    .text-gray-200 { color: #aeaeb8 !important; }
+    .text-gray-300 { color: #90909c !important; }
+    .text-gray-400 { color: #626270 !important; }
+    .text-gray-500 { color: #484856 !important; }
+    .text-gray-600 { color: #303040 !important; }
+
+    /* TOS vivid green / red */
+    .text-green-400  { color: #2ec82e !important; }
+    .text-green-300  { color: #48d848 !important; }
+    .bg-green-500    { background-color: #2ec82e !important; }
+
+    .text-red-400    { color: #d43c3c !important; }
+    .text-red-300    { color: #e05050 !important; }
+    .bg-red-500      { background-color: #d43c3c !important; }
+
+    .text-amber-400  { color: #c8a820 !important; }
+    .bg-amber-900    { background-color: #1e1a08 !important; }
+    .text-amber-300  { color: #d4b840 !important; }
+
+    /* ── No rounded corners — TOS is sharp and angular ── */
+    .rounded-xl   { border-radius: 2px !important; }
+    .rounded-lg   { border-radius: 2px !important; }
+    .rounded-md   { border-radius: 1px !important; }
+    .rounded      { border-radius: 1px !important; }
+    .rounded-full { border-radius: 2px !important; }
+    .rounded-l-full, .rounded-r-full { border-radius: 1px !important; }
+
+    /* ── Nav: tighter, darker ── */
+    nav { border-bottom-width: 1px; }
+
+    /* ── Tables: denser, TOS-compact ── */
+    table           { font-size: 11px; border-collapse: collapse; }
+    table th        { font-size: 9px !important; letter-spacing: 0.14em !important; font-weight: 600; }
+    table td, table th { padding-top: 3px !important; padding-bottom: 3px !important; }
+
+    /* ── Details/summary cards: no transition flash ── */
+    details > summary { list-style: none; }
+    details > summary::-webkit-details-marker { display: none; }
+
+    /* ── Hover row: TOS subtle blue-grey highlight ── */
+    .hover\:bg-gray-900\/40:hover { background-color: rgba(34,34,50,0.55) !important; }
+    .hover\:bg-gray-800:hover     { background-color: #1e1e2c !important; }
+
+    /* ── Source badges: smaller, crisper ── */
+    .bg-blue-900  { background-color: #101828 !important; }
+    .text-blue-300 { color: #5588cc !important; }
+
+    /* Strategy badge colors: TOS muted tones */
+    .bg-purple-900 { background-color: #1a1024 !important; }
+    .text-purple-300 { color: #9966cc !important; }
+    .bg-sky-900 { background-color: #0c1a28 !important; }
+    .text-sky-300 { color: #4488bb !important; }
+    .bg-teal-900 { background-color: #0a1e1c !important; }
+    .text-teal-300 { color: #2a9a90 !important; }
+
+    /* Indigo (thesis) */
+    .bg-indigo-900\/60 { background-color: rgba(18,16,42,0.6) !important; }
+    .text-indigo-300 { color: #7766cc !important; }
+    .border-indigo-800 { border-color: #2a2450 !important; }
+
+    /* ── Inputs/selects: TOS style ── */
+    input[type="number"], select {
+      font-family: inherit;
+      font-size: 11px;
+    }
+
+    /* ── Large score number in gauge ── */
+    .thesis-score { font-variant-numeric: tabular-nums; }
+
+    /* ── Scrollbar: thin, dark ── */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #0c0c10; }
+    ::-webkit-scrollbar-thumb { background: #2c2c3a; border-radius: 2px; }
+    ::-webkit-scrollbar-thumb:hover { background: #3c3c4e; }
+  </style>
 </head>
 <body class="bg-gray-950 text-gray-100 min-h-screen">
 
@@ -17,18 +140,19 @@
   </div>
 
   <!-- Nav -->
-  <nav class="bg-gray-900 border-b border-gray-800 px-4 py-3 flex items-center justify-between">
-    <div class="flex items-center gap-2.5">
-      <img src="/static/sentinel.svg" class="w-9 h-9 drop-shadow-[0_0_6px_rgba(255,34,0,0.5)]" alt="Sentinel">
-      <span class="text-lg font-semibold tracking-tight">Option Sentinel</span>
+  <nav class="bg-gray-900 border-b border-gray-800 px-4 py-1.5 flex items-center justify-between">
+    <div class="flex items-center gap-2">
+      <img src="/static/sentinel.svg" class="w-7 h-7 drop-shadow-[0_0_5px_rgba(255,34,0,0.5)]" alt="Sentinel">
+      <span class="text-sm font-semibold tracking-widest uppercase text-gray-200">Option Sentinel</span>
     </div>
-    <div class="flex items-center gap-4 text-sm text-gray-400">
+    <div class="flex items-center gap-4 text-gray-400" style="font-size:11px">
       <span id="poll-status">Waiting for data…</span>
       <button
         hx-post="/admin/poll"
         hx-swap="none"
         hx-indicator="#poll-spinner"
-        class="flex items-center gap-1.5 text-xs bg-gray-800 hover:bg-gray-700 text-gray-300 px-2.5 py-1 rounded transition-colors">
+        class="flex items-center gap-1 bg-gray-800 hover:bg-gray-700 text-gray-300 px-2 py-1 transition-colors uppercase tracking-wider"
+        style="font-size:10px">
         <span id="poll-spinner" class="htmx-indicator animate-spin">↻</span>
         <span>Refresh</span>
       </button>

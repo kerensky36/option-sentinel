@@ -2,10 +2,10 @@
 
 {% block binary_banner %}
 {% if binary_flag and binary_flag.is_active %}
-<div class="bg-red-600 text-white text-center px-4 py-2 text-sm font-semibold">
-  ⚠ Binary Event Active — Exit all positions immediately.
+<div class="bg-red-700 text-white text-center px-4 py-1.5 font-semibold uppercase tracking-widest" style="font-size:11px">
+  ⚠ BINARY EVENT ACTIVE — EXIT ALL POSITIONS IMMEDIATELY
   <form method="post" action="/binary-event/clear" class="inline ml-4">
-    <button class="underline hover:no-underline">Clear flag</button>
+    <button class="underline hover:no-underline">[ CLEAR ]</button>
   </form>
 </div>
 {% endif %}
@@ -14,36 +14,36 @@
 {% block content %}
 <div hx-ext="sse" sse-connect="/sse">
 
-  {# ── Create thesis panel ── #}
-  <details class="mb-4 rounded-xl border border-gray-800 bg-gray-900 overflow-hidden">
-    <summary class="list-none cursor-pointer select-none px-4 py-2.5 flex items-center gap-2 text-sm text-gray-400 hover:bg-gray-800 transition-colors">
-      <span class="text-xs">▶</span>
-      <span class="font-medium">Theses</span>
+  {# ── Theses panel ── #}
+  <details class="mb-3 border border-gray-800 bg-gray-900 overflow-hidden" style="border-radius:2px">
+    <summary class="list-none cursor-pointer select-none px-3 py-2 flex items-center gap-2 text-gray-400 hover:bg-gray-800 transition-colors uppercase tracking-widest" style="font-size:10px">
+      <span class="text-gray-600">▶</span>
+      <span>Theses</span>
       {% if theses %}
-        <span class="text-xs text-gray-600">({{ theses | length }} defined)</span>
+        <span class="text-gray-600 normal-case tracking-normal">({{ theses | length }})</span>
       {% endif %}
     </summary>
-    <div class="border-t border-gray-800 px-4 py-3 space-y-3">
+    <div class="border-t border-gray-800 px-3 py-2 space-y-2">
       {% if theses %}
-      <div class="flex flex-wrap gap-2">
+      <div class="flex flex-wrap gap-1.5">
         {% for t in theses %}
-        <span class="text-xs px-2 py-1 rounded-md bg-indigo-900/50 text-indigo-300 border border-indigo-800">
+        <span class="px-2 py-0.5 bg-indigo-900/50 text-indigo-300 border border-indigo-800" style="font-size:10px">
           {{ t.name }}
-          <span class="text-indigo-500 ml-1">{{ t.template_type.value.replace('_', ' ') }}</span>
+          <span class="text-gray-500 ml-1">{{ t.template_type.value.replace('_', ' ') }}</span>
         </span>
         {% endfor %}
       </div>
       {% endif %}
       <form method="post" action="/thesis" class="flex flex-wrap items-end gap-2">
-        <div class="flex flex-col gap-1">
-          <label class="text-[10px] text-gray-500 uppercase tracking-wider">Name</label>
+        <div class="flex flex-col gap-0.5">
+          <label class="text-gray-500 uppercase tracking-widest" style="font-size:9px">Name</label>
           <input type="text" name="name" required placeholder="e.g. QQQ IV crush"
-            class="text-sm bg-gray-800 border border-gray-700 text-gray-200 rounded px-2 py-1 focus:outline-none focus:border-indigo-500 w-44">
+            class="bg-gray-800 border border-gray-700 text-gray-200 px-2 py-1 focus:outline-none focus:border-indigo-500 w-44" style="font-size:11px">
         </div>
-        <div class="flex flex-col gap-1">
-          <label class="text-[10px] text-gray-500 uppercase tracking-wider">Type</label>
+        <div class="flex flex-col gap-0.5">
+          <label class="text-gray-500 uppercase tracking-widest" style="font-size:9px">Type</label>
           <select name="template_type"
-            class="text-sm bg-gray-800 border border-gray-700 text-gray-200 rounded px-2 py-1 focus:outline-none focus:border-indigo-500">
+            class="bg-gray-800 border border-gray-700 text-gray-200 px-2 py-1 focus:outline-none focus:border-indigo-500" style="font-size:11px">
             <option value="iv_crush">IV Crush</option>
             <option value="earnings_fade">Earnings Fade</option>
             <option value="directional_momentum">Directional Momentum</option>
@@ -51,29 +51,30 @@
             <option value="custom">Custom</option>
           </select>
         </div>
-        <div class="flex flex-col gap-1">
-          <label class="text-[10px] text-gray-500 uppercase tracking-wider">Notes (optional)</label>
-          <input type="text" name="description" placeholder="Short description"
-            class="text-sm bg-gray-800 border border-gray-700 text-gray-200 rounded px-2 py-1 focus:outline-none focus:border-indigo-500 w-56">
+        <div class="flex flex-col gap-0.5">
+          <label class="text-gray-500 uppercase tracking-widest" style="font-size:9px">Notes</label>
+          <input type="text" name="description" placeholder="optional"
+            class="bg-gray-800 border border-gray-700 text-gray-200 px-2 py-1 focus:outline-none focus:border-indigo-500 w-48" style="font-size:11px">
         </div>
         <button type="submit"
-          class="text-sm bg-indigo-700 hover:bg-indigo-600 text-white font-medium px-3 py-1 rounded transition-colors">
-          + Add thesis
+          class="bg-indigo-800 hover:bg-indigo-700 text-indigo-200 px-3 py-1 uppercase tracking-widest transition-colors" style="font-size:10px">
+          + Add
         </button>
       </form>
     </div>
   </details>
 
-  <div class="flex items-center justify-between mb-4">
-    <h1 class="text-xl font-semibold">Open Positions</h1>
+  {# ── Toolbar ── #}
+  <div class="flex items-center justify-between mb-2">
+    <span class="text-gray-400 uppercase tracking-widest" style="font-size:10px">Open Positions</span>
     <div class="flex items-center gap-3">
-      <span class="text-sm text-gray-400">
-        {% if last_poll_at %}Last updated {{ last_poll_at.strftime('%H:%M:%S') }} UTC{% else %}Waiting for first poll…{% endif %}
+      <span class="text-gray-500" style="font-size:10px">
+        {% if last_poll_at %}{{ last_poll_at.strftime('%H:%M:%S') }} UTC{% else %}No data yet{% endif %}
       </span>
       {% if not binary_flag or not binary_flag.is_active %}
       <form method="post" action="/binary-event/raise">
-        <button class="bg-red-700 hover:bg-red-600 text-white text-xs font-semibold px-3 py-1.5 rounded">
-          Raise Binary Event
+        <button class="bg-red-800 hover:bg-red-700 text-red-200 px-3 py-1 uppercase tracking-widest transition-colors" style="font-size:10px">
+          ⚠ Binary Event
         </button>
       </form>
       {% endif %}

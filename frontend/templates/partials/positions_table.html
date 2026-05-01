@@ -40,11 +40,11 @@
 
 {% for group in groups %}
 {% set current_thesis = group.positions[0].thesis if group.positions[0].thesis else none %}
-<details class="group/card rounded-xl border border-gray-800 bg-gray-900 overflow-hidden" {% if not group.is_spread %}open{% endif %}>
+<details class="group/card border border-gray-800 bg-gray-900 overflow-hidden" style="border-radius:2px" {% if not group.is_spread %}open{% endif %}>
 
   {# ── Summary / header ── #}
   <summary class="list-none cursor-pointer select-none">
-  <div class="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 hover:bg-gray-800 transition-colors">
+  <div class="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 hover:bg-gray-800 transition-colors">
 
     {# Expand chevron #}
     <span class="text-gray-500 group-open/card:rotate-90 transition-transform duration-150 text-xs">▶</span>
