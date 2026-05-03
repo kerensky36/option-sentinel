@@ -23,6 +23,8 @@ Option Sentinel connects to your Charles Schwab account and gives you a **live, 
 | **Mobile-ready** | Visual-first responsive dashboard — readable on your phone mid-session |
 
 <img width="1284" height="535" alt="image" src="https://github.com/user-attachments/assets/2bcfa959-d30a-4996-aa1b-130d7a3069a9" />
+<img width="1456" height="695" alt="image" src="https://github.com/user-attachments/assets/e2408fd7-4df0-4bc4-9a87-9c8e9be83f40" />
+
 
 ---
 
