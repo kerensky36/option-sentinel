@@ -3,7 +3,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.api._group_helpers import load_groups_and_theses
+from src.api._group_helpers import load_groups_and_theses, load_thesis_cards
 from src.api.deps import get_session
 from src.api.main import templates
 from src.data.models import BinaryEventFlag
@@ -20,6 +20,7 @@ async def _get_binary_flag(session: AsyncSession) -> BinaryEventFlag | None:
 @router.get("/", response_class=HTMLResponse)
 async def dashboard(request: Request, session: AsyncSession = Depends(get_session)):
     groups, theses = await load_groups_and_theses(session)
+    thesis_cards = await load_thesis_cards(session)
     binary_flag = await _get_binary_flag(session)
     return templates.TemplateResponse(
         request,
@@ -27,8 +28,10 @@ async def dashboard(request: Request, session: AsyncSession = Depends(get_sessio
         {
             "groups": groups,
             "theses": theses,
+            "thesis_cards": thesis_cards,
             "binary_flag": binary_flag,
             "last_poll_at": poll_scheduler.last_poll_at,
+            "current_page": "thesis_monitor",
         },
     )
 

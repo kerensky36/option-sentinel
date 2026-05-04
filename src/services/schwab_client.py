@@ -33,7 +33,9 @@ async def _fetch_positions(client=None) -> list[dict]:
     if client is None:
         from src.auth.schwab_oauth import get_schwab_client
         client = await get_schwab_client()
-    resp = await client.get_account(ACCOUNT_ID, fields=[client.Account.Fields.POSITIONS])
+    from src.auth.account_resolver import resolve_account_hash
+    account_hash = await resolve_account_hash(client, ACCOUNT_ID)
+    resp = await client.get_account(account_hash, fields=[client.Account.Fields.POSITIONS])
     data = resp.json()
     positions = data.get("securitiesAccount", {}).get("positions", [])
     result = []

@@ -2,7 +2,7 @@
 
 {% block binary_banner %}
 {% if binary_flag and binary_flag.is_active %}
-<div class="bg-red-700 text-white text-center px-4 py-1.5 font-semibold uppercase tracking-widest" style="font-size:11px">
+<div class="bg-red-700 text-white text-center px-4 py-1.5 font-semibold uppercase tracking-widest" style="font-size:12px">
   ⚠ BINARY EVENT ACTIVE — EXIT ALL POSITIONS IMMEDIATELY
   <form method="post" action="/binary-event/clear" class="inline ml-4">
     <button class="underline hover:no-underline">[ CLEAR ]</button>
@@ -14,36 +14,50 @@
 {% block content %}
 <div hx-ext="sse" sse-connect="/sse">
 
-  {# ── Theses panel ── #}
-  <details class="mb-3 border border-gray-800 bg-gray-900 overflow-hidden" style="border-radius:2px">
-    <summary class="list-none cursor-pointer select-none px-3 py-2 flex items-center gap-2 text-gray-400 hover:bg-gray-800 transition-colors uppercase tracking-widest" style="font-size:10px">
-      <span class="text-gray-600">▶</span>
-      <span>Theses</span>
-      {% if theses %}
-        <span class="text-gray-600 normal-case tracking-normal">({{ theses | length }})</span>
+  {# ── Toolbar ── #}
+  <div class="flex items-center justify-between mb-3">
+    <span class="text-gray-400 uppercase tracking-widest" style="font-size:11px">Thesis Monitor</span>
+    <div class="flex items-center gap-3">
+      <span class="text-gray-500" style="font-size:11px">
+        {% if last_poll_at %}{{ last_poll_at.strftime('%H:%M:%S') }} UTC{% else %}No data yet{% endif %}
+      </span>
+      {% if not binary_flag or not binary_flag.is_active %}
+      <form method="post" action="/binary-event/raise">
+        <button class="bg-red-800 hover:bg-red-700 text-red-200 px-3 py-1 uppercase tracking-widest transition-colors" style="font-size:11px">
+          ⚠ Binary Event
+        </button>
+      </form>
       {% endif %}
+    </div>
+  </div>
+
+  {# ── Thesis cards — SSE-refreshed ── #}
+  <div
+    id="thesis-cards"
+    hx-get="/partials/thesis-cards"
+    hx-trigger="sse:refresh"
+    hx-swap="innerHTML"
+  >
+    {% include "partials/thesis_cards.html" %}
+  </div>
+
+  {# ── Add thesis form ── #}
+  <details class="mt-4 border border-gray-800 bg-gray-900 overflow-hidden" style="border-radius:2px">
+    <summary class="list-none cursor-pointer select-none px-3 py-2 flex items-center gap-2 text-gray-500 hover:bg-gray-800 transition-colors uppercase tracking-widest" style="font-size:10px">
+      <span class="text-gray-700">▶</span>
+      <span>Add Thesis Group</span>
     </summary>
-    <div class="border-t border-gray-800 px-3 py-2 space-y-2">
-      {% if theses %}
-      <div class="flex flex-wrap gap-1.5">
-        {% for t in theses %}
-        <span class="px-2 py-0.5 bg-indigo-900/50 text-indigo-300 border border-indigo-800" style="font-size:10px">
-          {{ t.name }}
-          <span class="text-gray-500 ml-1">{{ t.template_type.value.replace('_', ' ') }}</span>
-        </span>
-        {% endfor %}
-      </div>
-      {% endif %}
+    <div class="border-t border-gray-800 px-3 py-2">
       <form method="post" action="/thesis" class="flex flex-wrap items-end gap-2">
         <div class="flex flex-col gap-0.5">
-          <label class="text-gray-500 uppercase tracking-widest" style="font-size:9px">Name</label>
+          <label class="text-gray-500 uppercase tracking-widest" style="font-size:10px">Name</label>
           <input type="text" name="name" required placeholder="e.g. QQQ IV crush"
-            class="bg-gray-800 border border-gray-700 text-gray-200 px-2 py-1 focus:outline-none focus:border-indigo-500 w-44" style="font-size:11px">
+            class="bg-gray-800 border border-gray-700 text-gray-200 px-2 py-1 focus:outline-none focus:border-indigo-500 w-44" style="font-size:12px">
         </div>
         <div class="flex flex-col gap-0.5">
-          <label class="text-gray-500 uppercase tracking-widest" style="font-size:9px">Type</label>
+          <label class="text-gray-500 uppercase tracking-widest" style="font-size:10px">Type</label>
           <select name="template_type"
-            class="bg-gray-800 border border-gray-700 text-gray-200 px-2 py-1 focus:outline-none focus:border-indigo-500" style="font-size:11px">
+            class="bg-gray-800 border border-gray-700 text-gray-200 px-2 py-1 focus:outline-none focus:border-indigo-500" style="font-size:12px">
             <option value="iv_crush">IV Crush</option>
             <option value="earnings_fade">Earnings Fade</option>
             <option value="directional_momentum">Directional Momentum</option>
@@ -52,43 +66,17 @@
           </select>
         </div>
         <div class="flex flex-col gap-0.5">
-          <label class="text-gray-500 uppercase tracking-widest" style="font-size:9px">Notes</label>
+          <label class="text-gray-500 uppercase tracking-widest" style="font-size:10px">Notes</label>
           <input type="text" name="description" placeholder="optional"
-            class="bg-gray-800 border border-gray-700 text-gray-200 px-2 py-1 focus:outline-none focus:border-indigo-500 w-48" style="font-size:11px">
+            class="bg-gray-800 border border-gray-700 text-gray-200 px-2 py-1 focus:outline-none focus:border-indigo-500 w-48" style="font-size:12px">
         </div>
         <button type="submit"
-          class="bg-indigo-800 hover:bg-indigo-700 text-indigo-200 px-3 py-1 uppercase tracking-widest transition-colors" style="font-size:10px">
+          class="bg-indigo-800 hover:bg-indigo-700 text-indigo-200 px-3 py-1 uppercase tracking-widest transition-colors" style="font-size:11px">
           + Add
         </button>
       </form>
     </div>
   </details>
-
-  {# ── Toolbar ── #}
-  <div class="flex items-center justify-between mb-2">
-    <span class="text-gray-400 uppercase tracking-widest" style="font-size:10px">Open Positions</span>
-    <div class="flex items-center gap-3">
-      <span class="text-gray-500" style="font-size:10px">
-        {% if last_poll_at %}{{ last_poll_at.strftime('%H:%M:%S') }} UTC{% else %}No data yet{% endif %}
-      </span>
-      {% if not binary_flag or not binary_flag.is_active %}
-      <form method="post" action="/binary-event/raise">
-        <button class="bg-red-800 hover:bg-red-700 text-red-200 px-3 py-1 uppercase tracking-widest transition-colors" style="font-size:10px">
-          ⚠ Binary Event
-        </button>
-      </form>
-      {% endif %}
-    </div>
-  </div>
-
-  <div
-    id="positions-table"
-    hx-get="/partials/positions"
-    hx-trigger="sse:refresh"
-    hx-swap="innerHTML"
-  >
-    {% include "partials/positions_table.html" %}
-  </div>
 
 </div>
 {% endblock %}

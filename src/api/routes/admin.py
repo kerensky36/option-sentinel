@@ -6,6 +6,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api.deps import get_session
+from src.auth.account_resolver import list_accounts
 from src.data.models import Position, PositionStatus
 from src.services import poll_scheduler
 from src.services.schwab_client import sync_positions_and_greeks
@@ -29,5 +30,18 @@ async def force_poll(session: AsyncSession = Depends(get_session)):
         await notify_refresh(poll_scheduler.last_poll_at, count)
 
         return JSONResponse({"status": "ok", "open_positions": count})
+    except Exception as exc:
+        return JSONResponse({"status": "error", "detail": str(exc)}, status_code=500)
+
+
+@router.get("/accounts")
+async def list_schwab_accounts():
+    """Return all Schwab accounts accessible via the current OAuth token.
+    Use this to find the hash value for SCHWAB_CC_ACCOUNT_ID."""
+    try:
+        from src.auth.schwab_oauth import get_schwab_client
+        client = await get_schwab_client()
+        accounts = await list_accounts(client)
+        return JSONResponse({"accounts": accounts})
     except Exception as exc:
         return JSONResponse({"status": "error", "detail": str(exc)}, status_code=500)

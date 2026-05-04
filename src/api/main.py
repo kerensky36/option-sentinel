@@ -26,7 +26,7 @@ def create_app() -> FastAPI:
     if os.path.isdir(STATIC_DIR):
         app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
-    from src.api.routes import admin, dashboard, partials, sse, thesis, positions, binary
+    from src.api.routes import admin, dashboard, partials, sse, thesis, positions, binary, screener
     app.include_router(admin.router)
     app.include_router(dashboard.router)
     app.include_router(partials.router)
@@ -34,6 +34,7 @@ def create_app() -> FastAPI:
     app.include_router(thesis.router)
     app.include_router(positions.router)
     app.include_router(binary.router)
+    app.include_router(screener.router)
 
     return app
 

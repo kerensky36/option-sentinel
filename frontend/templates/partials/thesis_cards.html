@@ -1,0 +1,93 @@
+{% macro alignment_badge(rating) %}
+  {% if rating and rating.value == 'aligned' %}
+    <span class="px-1.5 py-0.5 bg-green-900 text-green-400 uppercase tracking-wider" style="font-size:10px; border-radius:1px">Aligned</span>
+  {% elif rating and rating.value == 'partially_aligned' %}
+    <span class="px-1.5 py-0.5 bg-amber-900 text-amber-300 uppercase tracking-wider" style="font-size:10px; border-radius:1px">Partial</span>
+  {% elif rating and rating.value == 'misaligned' %}
+    <span class="px-1.5 py-0.5 bg-red-900 text-red-400 uppercase tracking-wider" style="font-size:10px; border-radius:1px">Misaligned</span>
+  {% else %}
+    <span class="px-1.5 py-0.5 bg-gray-800 text-gray-500 uppercase tracking-wider" style="font-size:10px; border-radius:1px">Unrated</span>
+  {% endif %}
+{% endmacro %}
+
+{% macro template_badge(ttype) %}
+  {% set label = ttype.value.replace('_', ' ') if ttype else 'unassigned' %}
+  <span class="px-1.5 py-0.5 bg-indigo-900/60 text-indigo-300 border border-indigo-800 uppercase tracking-wider" style="font-size:10px; border-radius:1px">{{ label }}</span>
+{% endmacro %}
+
+{% macro pnl_class(val) %}{% if val is not none and val > 0 %}text-green-400{% elif val is not none and val < 0 %}text-red-400{% else %}text-gray-400{% endif %}{% endmacro %}
+
+{% macro pnl_fmt(val) %}
+  {%- if val is not none -%}{%- if val > 0 %}+{%- endif %}${{ "%.2f"|format(val) }}{%- else %}—{%- endif %}
+{%- endmacro %}
+
+{% macro score_cell(score) %}
+  {% if score is none %}
+    <span class="text-gray-600">—</span>
+  {% elif score >= 80 %}
+    <span class="text-amber-300 font-semibold">{{ score }}</span>
+  {% elif score >= 50 %}
+    <span class="text-yellow-500">{{ score }}</span>
+  {% else %}
+    <span class="text-gray-300">{{ score }}</span>
+  {% endif %}
+{% endmacro %}
+
+<div class="space-y-2">
+{% for card in thesis_cards %}
+  {% set t = card.thesis %}
+  {% set is_misaligned = t and t.alignment_rating.value == 'misaligned' %}
+  {% set is_hot = card.avg_exit_proximity_score is not none and card.avg_exit_proximity_score >= 80 %}
+
+  <details class="border bg-gray-900 overflow-hidden group"
+           style="border-radius:2px; border-color: {% if is_misaligned %}rgba(180,40,40,0.4){% elif is_hot %}rgba(180,140,0,0.35){% else %}#22222e{% endif %}">
+
+    <summary class="list-none cursor-pointer select-none px-3 py-2.5 flex items-center gap-3 hover:bg-gray-800 transition-colors">
+
+      {# Left accent bar #}
+      <div class="flex-shrink-0 w-0.5 self-stretch rounded-full"
+           style="background: {% if is_misaligned %}#d43c3c{% elif t and t.alignment_rating.value == 'aligned' %}#2ec82e{% elif t and t.alignment_rating.value == 'partially_aligned' %}#c8a820{% else %}#303040{% endif %}"></div>
+
+      {# Thesis name #}
+      <div class="flex-1 min-w-0">
+        <div class="flex items-center gap-2 flex-wrap">
+          <span class="text-gray-200 font-medium" style="font-size:13px">
+            {% if t %}{{ t.name }}{% else %}<span class="text-gray-500">Unassigned</span>{% endif %}
+          </span>
+          {% if t %}{{ template_badge(t.template_type) }}{% endif %}
+          {% if t %}{{ alignment_badge(t.alignment_rating) }}{% endif %}
+        </div>
+      </div>
+
+      {# Stats row #}
+      <div class="flex items-center gap-4 flex-shrink-0 text-right">
+        <div class="flex flex-col items-end gap-0.5">
+          <span class="text-gray-600 uppercase tracking-wider" style="font-size:9px">Positions</span>
+          <span class="text-gray-300" style="font-size:12px">{{ card.position_count }}</span>
+        </div>
+        <div class="flex flex-col items-end gap-0.5">
+          <span class="text-gray-600 uppercase tracking-wider" style="font-size:9px">Avg Score</span>
+          <span style="font-size:12px">{{ score_cell(card.avg_exit_proximity_score) }}</span>
+        </div>
+        <div class="flex flex-col items-end gap-0.5">
+          <span class="text-gray-600 uppercase tracking-wider" style="font-size:9px">P&amp;L</span>
+          <span class="{{ pnl_class(card.combined_pnl) }}" style="font-size:12px">{{ pnl_fmt(card.combined_pnl) }}</span>
+        </div>
+        <span class="text-gray-600 group-open:rotate-90 transition-transform" style="font-size:11px">▶</span>
+      </div>
+
+    </summary>
+
+    {# Expanded: inline positions table #}
+    <div class="border-t border-gray-800"
+         hx-get="/partials/positions{% if t %}?thesis_id={{ t.id }}{% else %}?thesis_id=unassigned{% endif %}"
+         hx-trigger="toggle once"
+         hx-swap="innerHTML">
+      <div class="px-4 py-3 text-gray-600 uppercase tracking-wider" style="font-size:10px">Loading…</div>
+    </div>
+
+  </details>
+{% else %}
+  <div class="text-gray-600 py-6 text-center uppercase tracking-widest" style="font-size:11px">No open positions</div>
+{% endfor %}
+</div>

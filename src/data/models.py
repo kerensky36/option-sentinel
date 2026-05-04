@@ -276,3 +276,24 @@ class BinaryEventFlag(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     activated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     cleared_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+class ScreenerResult(Base):
+    """Cached covered call screener results — replaced wholesale on each refresh."""
+    __tablename__ = "screener_result"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    ticker: Mapped[str] = mapped_column(String(10), nullable=False)
+    shares: Mapped[int] = mapped_column(Integer, nullable=False)
+    stock_price: Mapped[float] = mapped_column(Float, nullable=False)
+    iv_rank: Mapped[float | None] = mapped_column(Float, nullable=True)
+    recommended_strike: Mapped[float | None] = mapped_column(Float, nullable=True)
+    recommended_expiry: Mapped[str | None] = mapped_column(String(12), nullable=True)
+    bid_premium: Mapped[float | None] = mapped_column(Float, nullable=True)
+    annualised_yield: Mapped[float | None] = mapped_column(Float, nullable=True)
+    call_delta: Mapped[float | None] = mapped_column(Float, nullable=True)
+    days_to_earnings: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    composite_score: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    recommendation_status: Mapped[str] = mapped_column(String(20), nullable=False)
+    refreshed_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)

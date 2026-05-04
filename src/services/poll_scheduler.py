@@ -61,10 +61,22 @@ async def _poll_job() -> None:
         logger.exception("Poll job failed")
 
 
+async def _screener_job() -> None:
+    if not _is_market_open():
+        return
+    try:
+        from src.services.covered_call_screener import refresh_and_cache
+        async with AsyncSessionLocal() as session:
+            await refresh_and_cache(session)
+    except Exception:
+        logger.exception("Screener refresh job failed")
+
+
 async def start_scheduler() -> None:
     global _scheduler
     _scheduler = AsyncIOScheduler()
     _scheduler.add_job(_poll_job, CronTrigger(minute="*/5"), id="poll_positions")
+    _scheduler.add_job(_screener_job, CronTrigger(minute="*/15"), id="screener_refresh")
     _scheduler.start()
     logger.info("Scheduler started")
 
