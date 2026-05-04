@@ -1,49 +1,25 @@
-from fastapi import APIRouter, Depends, Form, Request
-from fastapi.responses import HTMLResponse
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
+"""Positions routes — stateless, no DB."""
+from __future__ import annotations
 
-from src.api._group_helpers import load_groups_and_theses
-from src.api.deps import get_session
-from src.api.main import templates
-from src.data.models import ExitGoal, Position
+from fastapi import APIRouter, Depends
+from fastapi.responses import JSONResponse
 
-router = APIRouter()
+from src.api.deps import get_schwab_client
+from src.services.schwab_client import fetch_positions_and_greeks
+
+router = APIRouter(prefix="/api")
 
 
-@router.post("/positions/{position_id}/exit-goal", response_class=HTMLResponse)
-async def upsert_exit_goal(
-    request: Request,
-    position_id: str,
-    profit_target_pct: str = Form(""),
-    dte_threshold: str = Form(""),
-    session: AsyncSession = Depends(get_session),
-):
-    result = await session.execute(select(Position).where(Position.id == position_id))
-    pos = result.scalar_one_or_none()
-    if not pos:
-        return HTMLResponse("Position not found", status_code=404)
+@router.get("/positions/refresh")
+async def refresh_positions(schwab_client=Depends(get_schwab_client)):
+    """Fetch live positions + Greeks from Schwab and return as JSON array.
 
-    goal_result = await session.execute(
-        select(ExitGoal).where(ExitGoal.position_id == position_id)
-    )
-    goal = goal_result.scalar_one_or_none()
+    The client sends Authorization: Bearer <token> with each request.
+    This endpoint never logs the Authorization header value.
 
-    ptp = float(profit_target_pct) / 100.0 if profit_target_pct.strip() else None
-    dte = int(dte_threshold) if dte_threshold.strip() else None
-
-    if goal is None:
-        goal = ExitGoal(position_id=position_id, profit_target_pct=ptp, dte_threshold=dte)
-        session.add(goal)
-    else:
-        goal.profit_target_pct = ptp
-        goal.dte_threshold = dte
-
-    await session.commit()
-
-    groups, theses = await load_groups_and_theses(session)
-    return templates.TemplateResponse(
-        request,
-        "partials/positions_table.html",
-        {"groups": groups, "theses": theses},
-    )
+    Returns:
+        JSON array of PositionView objects.
+    """
+    positions = await fetch_positions_and_greeks(schwab_client)
+    # Serialise Pydantic models to JSON-safe dicts
+    return JSONResponse(content=[p.model_dump(mode="json") for p in positions])

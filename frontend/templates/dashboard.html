@@ -1,82 +1,77 @@
 {% extends "base.html" %}
 
-{% block binary_banner %}
-{% if binary_flag and binary_flag.is_active %}
-<div class="bg-red-700 text-white text-center px-4 py-1.5 font-semibold uppercase tracking-widest" style="font-size:12px">
-  ⚠ BINARY EVENT ACTIVE — EXIT ALL POSITIONS IMMEDIATELY
-  <form method="post" action="/binary-event/clear" class="inline ml-4">
-    <button class="underline hover:no-underline">[ CLEAR ]</button>
-  </form>
-</div>
-{% endif %}
-{% endblock %}
-
 {% block content %}
-<div hx-ext="sse" sse-connect="/sse">
+<div>
 
   {# ── Toolbar ── #}
   <div class="flex items-center justify-between mb-3">
-    <span class="text-gray-400 uppercase tracking-widest" style="font-size:11px">Thesis Monitor</span>
+    <span class="text-gray-400 uppercase tracking-widest" style="font-size:11px">Positions Dashboard</span>
     <div class="flex items-center gap-3">
-      <span class="text-gray-500" style="font-size:11px">
-        {% if last_poll_at %}{{ last_poll_at.strftime('%H:%M:%S') }} UTC{% else %}No data yet{% endif %}
-      </span>
-      {% if not binary_flag or not binary_flag.is_active %}
-      <form method="post" action="/binary-event/raise">
-        <button class="bg-red-800 hover:bg-red-700 text-red-200 px-3 py-1 uppercase tracking-widest transition-colors" style="font-size:11px">
-          ⚠ Binary Event
-        </button>
-      </form>
-      {% endif %}
+      <span id="positions-timestamp" class="text-gray-500 hidden" style="font-size:11px"></span>
+      <button
+        id="positions-refresh-btn"
+        class="flex items-center gap-1 bg-gray-800 hover:bg-gray-700 text-gray-300 px-2 py-1 transition-colors uppercase tracking-wider"
+        style="font-size:11px">
+        <span>↻</span>
+        <span>Refresh</span>
+      </button>
     </div>
   </div>
 
-  {# ── Thesis cards — SSE-refreshed ── #}
-  <div
-    id="thesis-cards"
-    hx-get="/partials/thesis-cards"
-    hx-trigger="sse:refresh"
-    hx-swap="innerHTML"
-  >
-    {% include "partials/thesis_cards.html" %}
+  {# ── Positions table placeholder ── #}
+  <div id="positions-table" class="border border-gray-800 bg-gray-900 min-h-24 flex items-center justify-center" style="border-radius:2px; min-height:100px">
+    <span class="text-gray-500" style="font-size:12px">Loading cached positions…</span>
   </div>
 
-  {# ── Add thesis form ── #}
+  {# ── Thesis group create/assign panel ── #}
   <details class="mt-4 border border-gray-800 bg-gray-900 overflow-hidden" style="border-radius:2px">
     <summary class="list-none cursor-pointer select-none px-3 py-2 flex items-center gap-2 text-gray-500 hover:bg-gray-800 transition-colors uppercase tracking-widest" style="font-size:10px">
       <span class="text-gray-700">▶</span>
-      <span>Add Thesis Group</span>
+      <span>Thesis Groups</span>
     </summary>
-    <div class="border-t border-gray-800 px-3 py-2">
-      <form method="post" action="/thesis" class="flex flex-wrap items-end gap-2">
+    <div class="border-t border-gray-800 px-3 py-3">
+
+      {# Create thesis group — client-side only, no server POST #}
+      <div class="flex flex-wrap items-end gap-2 mb-3">
         <div class="flex flex-col gap-0.5">
           <label class="text-gray-500 uppercase tracking-widest" style="font-size:10px">Name</label>
-          <input type="text" name="name" required placeholder="e.g. QQQ IV crush"
+          <input type="text" id="thesis-name" placeholder="e.g. QQQ IV crush"
             class="bg-gray-800 border border-gray-700 text-gray-200 px-2 py-1 focus:outline-none focus:border-indigo-500 w-44" style="font-size:12px">
         </div>
         <div class="flex flex-col gap-0.5">
           <label class="text-gray-500 uppercase tracking-widest" style="font-size:10px">Type</label>
-          <select name="template_type"
+          <select id="thesis-type"
             class="bg-gray-800 border border-gray-700 text-gray-200 px-2 py-1 focus:outline-none focus:border-indigo-500" style="font-size:12px">
-            <option value="iv_crush">IV Crush</option>
-            <option value="earnings_fade">Earnings Fade</option>
-            <option value="directional_momentum">Directional Momentum</option>
-            <option value="mean_reversion">Mean Reversion</option>
+            <option value="credit_spread">Credit Spread</option>
+            <option value="covered_call">Covered Call</option>
+            <option value="protective_put">Protective Put</option>
             <option value="custom">Custom</option>
           </select>
         </div>
         <div class="flex flex-col gap-0.5">
           <label class="text-gray-500 uppercase tracking-widest" style="font-size:10px">Notes</label>
-          <input type="text" name="description" placeholder="optional"
+          <input type="text" id="thesis-desc" placeholder="optional"
             class="bg-gray-800 border border-gray-700 text-gray-200 px-2 py-1 focus:outline-none focus:border-indigo-500 w-48" style="font-size:12px">
         </div>
-        <button type="submit"
+        <button id="thesis-add-btn"
           class="bg-indigo-800 hover:bg-indigo-700 text-indigo-200 px-3 py-1 uppercase tracking-widest transition-colors" style="font-size:11px">
           + Add
         </button>
-      </form>
+      </div>
+
+      {# Thesis group list #}
+      <div id="thesis-list" class="space-y-1"></div>
+
     </div>
   </details>
 
 </div>
+
+<script type="module">
+  import './../../static/js/auth.js';
+  import './../../static/js/position_cache.js';
+  import './../../static/js/thesis_store.js';
+  import './../../static/js/thesis_ui.js';
+  import './../../static/js/positions_ui.js';
+</script>
 {% endblock %}

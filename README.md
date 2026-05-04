@@ -217,9 +217,47 @@ specs/004-stateless-ephemeral-refactor/
 | Stateless architecture spec | ✅ Done |
 | Plan + research + data model | ✅ Done |
 | 45 tasks generated | ✅ Done |
-| Implementation | ⬜ Ready (`/speckit-implement`) |
+| Phase 1 — Teardown (delete DB/scheduler/alerts) | ✅ Done |
+| Phase 2 — Foundational (Pydantic models, deps, OAuth) | ✅ Done |
+| Phase 3 — OAuth login (sessionStorage token delivery) | ✅ Done |
+| Phase 4 — Positions dashboard (Refresh button, IndexedDB cache) | ✅ Done |
+| Phase 5 — Erase All Data | ✅ Done |
+| Phase 6 — Thesis groups (localStorage) | ✅ Done |
+| Phase 7 — Covered call screener (stateless) | ✅ Done |
+| Phase 8 — Dockerfile + Cloud Run | ✅ Done |
+| Phase 9 — Test cleanup + documentation | ✅ Done |
 
-**MVP target**: Phases 1–4 — login, positions dashboard, and Erase All. Everything else builds on that foundation.
+**All 43/45 tasks complete.** App is deployed and stateless.
+
+---
+
+## Cloud Run Deployment
+
+```bash
+# Build
+docker build -t option-sentinel .
+
+# Test locally
+docker run -p 8080:8080 \
+  -e SCHWAB_APP_KEY=... \
+  -e SCHWAB_APP_SECRET=... \
+  -e SCHWAB_CALLBACK_URL=https://your-run-url/auth/callback \
+  -e SCHWAB_ACCOUNT_ID=... \
+  -e OAUTH_STATE_SECRET=$(python3 -c "import secrets; print(secrets.token_hex(32))") \
+  option-sentinel
+
+# Deploy to Cloud Run
+gcloud run deploy option-sentinel \
+  --image=gcr.io/YOUR_PROJECT/option-sentinel \
+  --region=us-central1 \
+  --platform=managed \
+  --min-instances=0 \
+  --max-instances=1 \
+  --set-secrets=OAUTH_STATE_SECRET=oauth-state-secret:latest \
+  --set-env-vars=SCHWAB_APP_KEY=...,SCHWAB_APP_SECRET=...,SCHWAB_ACCOUNT_ID=...
+```
+
+No database, no volume mounts, no Redis. Cold start target: under 3 seconds.
 
 ---
 

@@ -1,24 +1,30 @@
+"""Shared test fixtures for the stateless Option Sentinel architecture.
+
+No database fixtures — the app has no database.
+"""
+from __future__ import annotations
+
+import base64
+import json
+
 import pytest
-import pytest_asyncio
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
-from src.data.models import Base
 
 
-TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
+@pytest.fixture
+def auth_headers() -> dict[str, str]:
+    """Returns Authorization headers with a mock Schwab token for route tests.
 
-
-@pytest_asyncio.fixture
-async def db_engine():
-    engine = create_async_engine(TEST_DATABASE_URL, echo=False)
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    yield engine
-    await engine.dispose()
-
-
-@pytest_asyncio.fixture
-async def db(db_engine):
-    session_factory = async_sessionmaker(db_engine, expire_on_commit=False)
-    async with session_factory() as session:
-        yield session
-        await session.rollback()
+    The token is base64-encoded JSON in the format expected by get_schwab_client().
+    """
+    token_dict = {
+        "access_token": "test-access-token",
+        "refresh_token": "test-refresh-token",
+        "token_type": "Bearer",
+        "access_token_expiry": 9999999999,
+        "refresh_token_expiry": 9999999999,
+        "scope": "api",
+        "expires_in": 1800,
+    }
+    json_str = json.dumps(token_dict)
+    b64 = base64.b64encode(json_str.encode()).decode()
+    return {"Authorization": f"Bearer {b64}"}

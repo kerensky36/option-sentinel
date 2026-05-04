@@ -1,29 +1,23 @@
-from fastapi import APIRouter, Depends, Request
-from fastapi.responses import HTMLResponse
-from sqlalchemy.ext.asyncio import AsyncSession
+"""Partials routes — stateless shell renders for HTMX fragments.
 
-from src.api._group_helpers import load_groups_and_theses, load_thesis_cards
-from src.api.deps import get_session
+These routes are now minimal since all data fetching is done client-side
+via /api/positions/refresh and /api/screener/refresh.
+"""
+from __future__ import annotations
+
+from fastapi import APIRouter, Request
+from fastapi.responses import HTMLResponse
+
 from src.api.main import templates
 
 router = APIRouter(prefix="/partials")
 
 
 @router.get("/positions", response_class=HTMLResponse)
-async def positions_partial(request: Request, session: AsyncSession = Depends(get_session)):
-    groups, theses = await load_groups_and_theses(session)
+async def positions_partial(request: Request):
+    """Empty positions table partial — data is loaded via client-side JS."""
     return templates.TemplateResponse(
         request,
         "partials/positions_table.html",
-        {"groups": groups, "theses": theses},
-    )
-
-
-@router.get("/thesis-cards", response_class=HTMLResponse)
-async def thesis_cards_partial(request: Request, session: AsyncSession = Depends(get_session)):
-    thesis_cards = await load_thesis_cards(session)
-    return templates.TemplateResponse(
-        request,
-        "partials/thesis_cards.html",
-        {"thesis_cards": thesis_cards},
+        {},
     )

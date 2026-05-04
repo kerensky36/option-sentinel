@@ -21,8 +21,6 @@
       }
     }
   </script>
-  <script src="https://unpkg.com/htmx.org@2.0.4"></script>
-  <script src="https://unpkg.com/htmx-ext-sse@2.2.2/sse.js"></script>
   <style>
     /* ── ThinkorSwim-inspired theme ─────────────────────────────────────── */
 
@@ -117,7 +115,7 @@
     .border-indigo-800 { border-color: #2a2450 !important; }
 
     /* ── Inputs/selects: TOS style ── */
-    input[type="number"], select {
+    input[type="number"], input[type="text"], select {
       font-family: inherit;
       font-size: 12px;
     }
@@ -216,11 +214,6 @@
 </head>
 <body class="bg-gray-950 text-gray-100 min-h-screen flex flex-col">
 
-  <!-- Binary event banner slot -->
-  <div id="binary-banner">
-    {% block binary_banner %}{% endblock %}
-  </div>
-
   <!-- Top nav -->
   <nav class="bg-gray-900 border-b border-gray-800 px-4 py-1.5 flex items-center justify-between flex-shrink-0">
     <div class="flex items-center gap-2">
@@ -228,16 +221,20 @@
       <span class="text-sm font-semibold tracking-widest uppercase text-gray-200">Option Sentinel</span>
     </div>
     <div class="flex items-center gap-4 text-gray-400" style="font-size:12px">
-      <span id="poll-status">Waiting for data…</span>
       <button
-        hx-post="/admin/poll"
-        hx-swap="none"
-        hx-indicator="#poll-spinner"
-        class="flex items-center gap-1 bg-gray-800 hover:bg-gray-700 text-gray-300 px-2 py-1 transition-colors uppercase tracking-wider"
-        style="font-size:11px">
-        <span id="poll-spinner" class="htmx-indicator animate-spin">↻</span>
-        <span>Refresh</span>
+        id="erase-all-btn"
+        class="flex items-center gap-1 bg-red-900 hover:bg-red-800 text-red-300 px-2 py-1 transition-colors uppercase tracking-wider"
+        style="font-size:10px"
+        title="Wipe all browser storage: token, position cache, thesis groups">
+        Erase All Data
       </button>
+      <form method="post" action="/auth/logout" style="display:inline">
+        <button type="submit"
+          class="flex items-center gap-1 bg-gray-800 hover:bg-gray-700 text-gray-300 px-2 py-1 transition-colors uppercase tracking-wider"
+          style="font-size:10px">
+          Disconnect
+        </button>
+      </form>
     </div>
   </nav>
 
@@ -246,7 +243,7 @@
     <a href="/"
        class="flex flex-1 items-center justify-center gap-2 py-2 px-3 text-center {% if current_page == 'thesis_monitor' %}nav-active{% endif %}"
        style="font-size:11px; letter-spacing:0.04em; text-decoration:none; color:{% if current_page == 'thesis_monitor' %}#d0d0f0{% else %}#7070a0{% endif %}; border-bottom:2px solid {% if current_page == 'thesis_monitor' %}#6699dd{% else %}transparent{% endif %}; margin:4px 4px 0; border-radius:2px 2px 0 0;">
-      <span class="pill pill-red"></span> Thesis
+      <span class="pill pill-red"></span> Positions
     </a>
     <a href="/screener"
        class="flex flex-1 items-center justify-center gap-2 py-2 px-3 text-center {% if current_page == 'covered_call_screener' %}nav-active{% endif %}"
@@ -265,7 +262,7 @@
       <a href="/"
          class="nav-item {% if current_page == 'thesis_monitor' %}nav-active{% endif %}">
         <span class="pill pill-red"></span>
-        Thesis Monitor
+        Positions
       </a>
 
       <a href="/screener"
@@ -288,6 +285,26 @@
     </main>
 
   </div>
+
+  <!-- Erase All Data handler -->
+  <script type="module">
+    import { eraseAll } from '/static/js/auth.js';
+    const btn = document.getElementById('erase-all-btn');
+    if (btn) {
+      btn.addEventListener('click', async () => {
+        const confirmed = window.confirm(
+          'Erase All Data?\n\nThis will clear:\n' +
+          '• Your Schwab token (sessionStorage)\n' +
+          '• Position cache (IndexedDB)\n' +
+          '• Thesis groups and assignments (localStorage)\n\n' +
+          'You will need to reconnect your Schwab account.'
+        );
+        if (confirmed) {
+          await eraseAll();
+        }
+      });
+    }
+  </script>
 
 </body>
 </html>

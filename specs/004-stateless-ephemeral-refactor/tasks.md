@@ -17,14 +17,14 @@
 
 **Purpose**: Remove all infrastructure that no longer has a role. These deletions unblock every subsequent phase by eliminating import conflicts.
 
-- [ ] T001 Strip removed packages from `requirements.txt`: delete `sqlalchemy[asyncio]`, `aiosqlite`, `alembic`, `apscheduler`, `aiosmtplib`, `cryptography`, `holidays`, `sse-starlette`; remove `itsdangerous` (no longer needed — no server-side sessions)
-- [ ] T002 [P] Delete `src/data/migrations/` directory (all versions and env.py) and `alembic.ini` if present
-- [ ] T003 [P] Delete `src/auth/token_store.py`
-- [ ] T004 [P] Delete `src/notifications/` directory (email_client.py and __init__.py)
-- [ ] T005 [P] Delete `src/rules/` directory (profit_target.py, expiry_warning.py, exit_scoring.py, binary_event.py, __init__.py)
-- [ ] T006 [P] Delete `src/services/poll_scheduler.py`, `src/services/thesis_health.py`, `src/services/position_groups.py`
-- [ ] T007 [P] Delete `src/api/routes/sse.py`, `src/api/routes/admin.py`, `src/api/routes/thesis.py`, `src/api/routes/binary.py`
-- [ ] T008 [P] Delete `src/api/_group_helpers.py`
+- [x] T001 Strip removed packages from `requirements.txt`: delete `sqlalchemy[asyncio]`, `aiosqlite`, `alembic`, `apscheduler`, `aiosmtplib`, `cryptography`, `holidays`, `sse-starlette`; remove `itsdangerous` (no longer needed — no server-side sessions)
+- [x] T002 [P] Delete `src/data/migrations/` directory (all versions and env.py) and `alembic.ini` if present
+- [x] T003 [P] Delete `src/auth/token_store.py`
+- [x] T004 [P] Delete `src/notifications/` directory (email_client.py and __init__.py)
+- [x] T005 [P] Delete `src/rules/` directory (profit_target.py, expiry_warning.py, exit_scoring.py, binary_event.py, __init__.py)
+- [x] T006 [P] Delete `src/services/poll_scheduler.py`, `src/services/thesis_health.py`, `src/services/position_groups.py`
+- [x] T007 [P] Delete `src/api/routes/sse.py`, `src/api/routes/admin.py`, `src/api/routes/thesis.py`, `src/api/routes/binary.py`
+- [x] T008 [P] Delete `src/api/_group_helpers.py`
 
 **Checkpoint**: All deleted modules removed. `git status` shows only deletions + requirements.txt change. No `src/` files should import from deleted modules yet — Phase 2 fixes remaining imports.
 
@@ -36,10 +36,10 @@
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete.
 
-- [ ] T009 Replace `src/data/models.py` with Pydantic in-memory models: `PositionView` and `ScreenerResultView` per `specs/004-stateless-ephemeral-refactor/data-model.md` — no SQLAlchemy imports
-- [ ] T010 Refactor `src/api/deps.py`: remove `get_session` and all SQLAlchemy imports; add `get_schwab_client(request: Request)` dependency that reads the Bearer token from the `Authorization` header (`request.headers.get("Authorization")`), strips the `Bearer ` prefix, and returns a configured schwab async client using `client_from_access_functions`; raise `HTTPException(401)` if header is absent or malformed
-- [ ] T011 Refactor `src/auth/schwab_oauth.py`: replace file-based token logic with `build_auth_url() -> tuple[str, str]` (returns Schwab authorize URL and PKCE state string — no server session involved) and `exchange_code_for_token(received_url: str, state: str) -> dict` (exchanges code for token dict and returns it — caller is responsible for delivering it to the browser); use `schwab.auth.client_from_access_functions` to rebuild clients from a token dict passed in per-request
-- [ ] T012 Refactor `src/api/main.py`: remove `start_scheduler`/`stop_scheduler` lifespan; remove lifespan context manager entirely; do NOT add `SessionMiddleware` (no server-side sessions); remove deleted route imports (`sse`, `admin`, `thesis`, `binary`); add auth router import; keep `dashboard`, `partials`, `positions`, `screener` routers; configure uvicorn access log format to exclude `Authorization` header values
+- [x] T009 Replace `src/data/models.py` with Pydantic in-memory models: `PositionView` and `ScreenerResultView` per `specs/004-stateless-ephemeral-refactor/data-model.md` — no SQLAlchemy imports
+- [x] T010 Refactor `src/api/deps.py`: remove `get_session` and all SQLAlchemy imports; add `get_schwab_client(request: Request)` dependency that reads the Bearer token from the `Authorization` header (`request.headers.get("Authorization")`), strips the `Bearer ` prefix, and returns a configured schwab async client using `client_from_access_functions`; raise `HTTPException(401)` if header is absent or malformed
+- [x] T011 Refactor `src/auth/schwab_oauth.py`: replace file-based token logic with `build_auth_url() -> tuple[str, str]` (returns Schwab authorize URL and PKCE state string — no server session involved) and `exchange_code_for_token(received_url: str, state: str) -> dict` (exchanges code for token dict and returns it — caller is responsible for delivering it to the browser); use `schwab.auth.client_from_access_functions` to rebuild clients from a token dict passed in per-request
+- [x] T012 Refactor `src/api/main.py`: remove `start_scheduler`/`stop_scheduler` lifespan; remove lifespan context manager entirely; do NOT add `SessionMiddleware` (no server-side sessions); remove deleted route imports (`sse`, `admin`, `thesis`, `binary`); add auth router import; keep `dashboard`, `partials`, `positions`, `screener` routers; configure uvicorn access log format to exclude `Authorization` header values
 
 **Checkpoint**: App starts cleanly (`uvicorn src.api.main:app`). No import errors. No SessionMiddleware. No DB connection attempted on startup.
 
@@ -53,11 +53,11 @@
 
 ### Implementation
 
-- [ ] T013 [US1] Create `src/api/routes/auth.py`: `GET /auth/login` (render login.html), `GET /auth/connect` (call `build_auth_url()`, store PKCE state in a short-lived server-side state cookie for CSRF validation only, redirect to Schwab), `GET /auth/callback` (validate state cookie, call `exchange_code_for_token(received_url, state)`, render a minimal HTML page with an inline `<script>` that calls `sessionStorage.setItem('schwab_token', JSON.stringify({...}))` then `window.location.replace('/')` — token delivered to browser and immediately moved to sessionStorage), `POST /auth/logout` (render a page that calls `sessionStorage.clear()`, `localStorage.clear()`, then `indexedDB.deleteDatabase('option-sentinel')` before redirecting to `/auth/login`)
-- [ ] T014 [US1] Create `frontend/templates/login.html`: ThinkorSwim-styled page with "Option Sentinel" heading, brief one-paragraph description of the privacy model (token stays in your browser, server never stores it), and a single "Connect Schwab Account" button linking to `/auth/connect`; extend `base.html`; no nav sidebar when unauthenticated
-- [ ] T015 [US1] Create `frontend/static/js/auth.js`: exports `getToken()` (reads `sessionStorage.getItem('schwab_token')` and parses JSON), `isAuthenticated()` (returns true if token exists and not expired), and `eraseAll()` (clears sessionStorage, localStorage, deletes IndexedDB `option-sentinel` database, redirects to `/auth/login`); used by all other JS modules
-- [ ] T016 [US1] Add server-side auth guard in `src/api/deps.py`: `require_auth(request)` dependency checks for `Authorization: Bearer` header; if absent returns 401 JSON `{"error": "unauthenticated"}` (client JS intercepts 401s and redirects to login); apply to all non-auth, non-health route handlers
-- [ ] T017 [US1] Write unit tests in `tests/unit/test_schwab_oauth.py`: test `build_auth_url()` returns a valid URL string and state, test `exchange_code_for_token()` returns a token dict given a mocked Schwab response, test `require_auth` returns 401 when Authorization header absent
+- [x] T013 [US1] Create `src/api/routes/auth.py`: `GET /auth/login` (render login.html), `GET /auth/connect` (call `build_auth_url()`, store PKCE state in a short-lived server-side state cookie for CSRF validation only, redirect to Schwab), `GET /auth/callback` (validate state cookie, call `exchange_code_for_token(received_url, state)`, render a minimal HTML page with an inline `<script>` that calls `sessionStorage.setItem('schwab_token', JSON.stringify({...}))` then `window.location.replace('/')` — token delivered to browser and immediately moved to sessionStorage), `POST /auth/logout` (render a page that calls `sessionStorage.clear()`, `localStorage.clear()`, then `indexedDB.deleteDatabase('option-sentinel')` before redirecting to `/auth/login`)
+- [x] T014 [US1] Create `frontend/templates/login.html`: ThinkorSwim-styled page with "Option Sentinel" heading, brief one-paragraph description of the privacy model (token stays in your browser, server never stores it), and a single "Connect Schwab Account" button linking to `/auth/connect`; extend `base.html`; no nav sidebar when unauthenticated
+- [x] T015 [US1] Create `frontend/static/js/auth.js`: exports `getToken()` (reads `sessionStorage.getItem('schwab_token')` and parses JSON), `isAuthenticated()` (returns true if token exists and not expired), and `eraseAll()` (clears sessionStorage, localStorage, deletes IndexedDB `option-sentinel` database, redirects to `/auth/login`); used by all other JS modules
+- [x] T016 [US1] Add server-side auth guard in `src/api/deps.py`: `require_auth(request)` dependency checks for `Authorization: Bearer` header; if absent returns 401 JSON `{"error": "unauthenticated"}` (client JS intercepts 401s and redirects to login); apply to all non-auth, non-health route handlers
+- [x] T017 [US1] Write unit tests in `tests/unit/test_schwab_oauth.py`: test `build_auth_url()` returns a valid URL string and state, test `exchange_code_for_token()` returns a token dict given a mocked Schwab response, test `require_auth` returns 401 when Authorization header absent
 
 **Checkpoint**: OAuth flow completes. Token in sessionStorage confirmed via DevTools. No token in cookies or server logs. Logout clears all browser storage.
 
@@ -71,15 +71,15 @@
 
 ### Implementation
 
-- [ ] T018 [US2] Refactor `src/services/schwab_client.py`: delete `sync_positions_and_greeks` (DB-writing version); add `fetch_positions_and_greeks(schwab_client) -> list[PositionView]` that calls the existing `_fetch_positions` and `_fetch_greeks` helpers, builds `PositionView` objects using `build_greeks` from `src/services/greeks_service.py`, computes `unrealised_pnl` and `days_to_expiry` in-memory, and returns a plain list — no session, no DB
-- [ ] T019 [US2] Refactor `src/services/greeks_service.py`: update `build_greeks` signature to accept raw position dict and Greeks dict instead of SQLAlchemy `Position` model; return a plain dict keyed by the `PositionView` Greek field names; keep Black-Scholes fallback logic intact
-- [ ] T020 [US2] Create `GET /api/positions/refresh` in `src/api/routes/positions.py`: extract Bearer token from `Authorization` header via `get_schwab_client` dep; call `fetch_positions_and_greeks`; return raw JSON array of `PositionView` objects (not an HTML partial — client JS renders and caches); do NOT log the Authorization header value
-- [ ] T021 [US2] Create `frontend/static/js/position_cache.js`: exports `savePositions(positions)` (writes positions JSON array to IndexedDB `option-sentinel` store `positions` with key `latest`), `loadPositions()` (reads latest cached positions from IndexedDB, returns null if empty), `clearPositions()` (deletes all records from the positions store)
-- [ ] T022 [US2] Create `frontend/static/js/positions_ui.js`: on Refresh button click, reads token from `auth.getToken()`, sends `fetch('/api/positions/refresh', {headers: {Authorization: 'Bearer ...'}})`, on success calls `position_cache.savePositions()` then renders the positions table from JSON (applying thesis assignments from `thesis_store.getAssignments()`); on page load, calls `position_cache.loadPositions()` and renders cached data immediately with a "last refreshed at X" timestamp badge
-- [ ] T023 [US2] Refactor `src/api/routes/dashboard.py`: remove all DB session dependencies, `poll_scheduler` import, `BinaryEventFlag` query, `_group_helpers` import; `GET /` renders `dashboard.html` shell (no position data server-side); update `/health` to return `{"status": "ok"}` with no DB check
-- [ ] T024 [US2] Refactor `frontend/templates/dashboard.html`: remove SSE JavaScript and EventSource setup; add Refresh button wired to `positions_ui.js`; add `<div id="positions-table">` placeholder; import `auth.js`, `position_cache.js`, `positions_ui.js` as ES modules; keep ThinkorSwim styling
-- [ ] T025 [US2] Refactor `frontend/templates/base.html`: remove SSE connection setup, EventSource JS, `sse-starlette` client scripts; remove references to deleted routes in nav; add "Erase All Data" button in nav wired to `auth.eraseAll()` with a confirmation dialog
-- [ ] T026 [US2] Write contract test in `tests/contract/test_positions_api.py`: mock `fetch_positions_and_greeks` to return two `PositionView` fixtures; assert `GET /api/positions/refresh` with valid `Authorization` header returns 200 JSON array; assert request without `Authorization` header returns 401; assert response does not set any cookies
+- [x] T018 [US2] Refactor `src/services/schwab_client.py`: delete `sync_positions_and_greeks` (DB-writing version); add `fetch_positions_and_greeks(schwab_client) -> list[PositionView]` that calls the existing `_fetch_positions` and `_fetch_greeks` helpers, builds `PositionView` objects using `build_greeks` from `src/services/greeks_service.py`, computes `unrealised_pnl` and `days_to_expiry` in-memory, and returns a plain list — no session, no DB
+- [x] T019 [US2] Refactor `src/services/greeks_service.py`: update `build_greeks` signature to accept raw position dict and Greeks dict instead of SQLAlchemy `Position` model; return a plain dict keyed by the `PositionView` Greek field names; keep Black-Scholes fallback logic intact
+- [x] T020 [US2] Create `GET /api/positions/refresh` in `src/api/routes/positions.py`: extract Bearer token from `Authorization` header via `get_schwab_client` dep; call `fetch_positions_and_greeks`; return raw JSON array of `PositionView` objects (not an HTML partial — client JS renders and caches); do NOT log the Authorization header value
+- [x] T021 [US2] Create `frontend/static/js/position_cache.js`: exports `savePositions(positions)` (writes positions JSON array to IndexedDB `option-sentinel` store `positions` with key `latest`), `loadPositions()` (reads latest cached positions from IndexedDB, returns null if empty), `clearPositions()` (deletes all records from the positions store)
+- [x] T022 [US2] Create `frontend/static/js/positions_ui.js`: on Refresh button click, reads token from `auth.getToken()`, sends `fetch('/api/positions/refresh', {headers: {Authorization: 'Bearer ...'}})`, on success calls `position_cache.savePositions()` then renders the positions table from JSON (applying thesis assignments from `thesis_store.getAssignments()`); on page load, calls `position_cache.loadPositions()` and renders cached data immediately with a "last refreshed at X" timestamp badge
+- [x] T023 [US2] Refactor `src/api/routes/dashboard.py`: remove all DB session dependencies, `poll_scheduler` import, `BinaryEventFlag` query, `_group_helpers` import; `GET /` renders `dashboard.html` shell (no position data server-side); update `/health` to return `{"status": "ok"}` with no DB check
+- [x] T024 [US2] Refactor `frontend/templates/dashboard.html`: remove SSE JavaScript and EventSource setup; add Refresh button wired to `positions_ui.js`; add `<div id="positions-table">` placeholder; import `auth.js`, `position_cache.js`, `positions_ui.js` as ES modules; keep ThinkorSwim styling
+- [x] T025 [US2] Refactor `frontend/templates/base.html`: remove SSE connection setup, EventSource JS, `sse-starlette` client scripts; remove references to deleted routes in nav; add "Erase All Data" button in nav wired to `auth.eraseAll()` with a confirmation dialog
+- [x] T026 [US2] Write contract test in `tests/contract/test_positions_api.py`: mock `fetch_positions_and_greeks` to return two `PositionView` fixtures; assert `GET /api/positions/refresh` with valid `Authorization` header returns 200 JSON array; assert request without `Authorization` header returns 401; assert response does not set any cookies
 
 **Checkpoint**: Full positions refresh cycle works. Dashboard loads in < 1s. Clicking Refresh fetches and renders positions. Greeks show source indicators. No SSE connection established.
 
@@ -93,8 +93,8 @@
 
 ### Implementation
 
-- [ ] T027 [US4] Verify `auth.eraseAll()` in `frontend/static/js/auth.js` (from T015) correctly sequences: `sessionStorage.clear()` → `localStorage.clear()` → `indexedDB.deleteDatabase('option-sentinel')` (awaited) → `window.location.replace('/auth/login')`; write a unit test in `tests/unit/test_erase_all.js` using a mock browser environment that confirms each storage layer is cleared before redirect
-- [ ] T028 [US4] Confirm the "Erase All Data" button in `base.html` (added in T025) shows a `window.confirm()` prompt before calling `auth.eraseAll()`; button must be visible in the nav on all authenticated pages
+- [x] T027 [US4] Verify `auth.eraseAll()` in `frontend/static/js/auth.js` (from T015) correctly sequences: `sessionStorage.clear()` → `localStorage.clear()` → `indexedDB.deleteDatabase('option-sentinel')` (awaited) → `window.location.replace('/auth/login')`; write a unit test in `tests/unit/test_erase_all.js` using a mock browser environment that confirms each storage layer is cleared before redirect
+- [x] T028 [US4] Confirm the "Erase All Data" button in `base.html` (added in T025) shows a `window.confirm()` prompt before calling `auth.eraseAll()`; button must be visible in the nav on all authenticated pages
 
 **Checkpoint**: Erase All clears all three storage mechanisms. DevTools confirms empty state. Redirect to login occurs. Server receives no request during the erase operation.
 
@@ -108,9 +108,9 @@
 
 ### Implementation
 
-- [ ] T029 [US3] Create `frontend/static/js/thesis_store.js`: plain JS module with functions `getThesisGroups()`, `saveThesisGroup(group)`, `deleteThesisGroup(id)`, `getAssignments()`, `setAssignment(symbol, thesisGroupId)` — all read/write from `localStorage` keys `thesis_groups` and `thesis_assignments`; export as ES module
-- [ ] T030 [US3] Create `frontend/static/js/thesis_ui.js`: wires up thesis create/assign form inputs to `thesis_store.js` save functions; called by `positions_ui.js` after table render to apply thesis labels to position rows
-- [ ] T031 [US3] Update `frontend/templates/dashboard.html` to include thesis group create/assign UI as a client-side-only panel (no form `action` to any server route); import `thesis_store.js` and `thesis_ui.js` as ES modules; remove any `<form>` that POSTs to `/thesis/*` routes
+- [x] T029 [US3] Create `frontend/static/js/thesis_store.js`: plain JS module with functions `getThesisGroups()`, `saveThesisGroup(group)`, `deleteThesisGroup(id)`, `getAssignments()`, `setAssignment(symbol, thesisGroupId)` — all read/write from `localStorage` keys `thesis_groups` and `thesis_assignments`; export as ES module
+- [x] T030 [US3] Create `frontend/static/js/thesis_ui.js`: wires up thesis create/assign form inputs to `thesis_store.js` save functions; called by `positions_ui.js` after table render to apply thesis labels to position rows
+- [x] T031 [US3] Update `frontend/templates/dashboard.html` to include thesis group create/assign UI as a client-side-only panel (no form `action` to any server route); import `thesis_store.js` and `thesis_ui.js` as ES modules; remove any `<form>` that POSTs to `/thesis/*` routes
 
 **Checkpoint**: Thesis groups persist across page reloads (localStorage). Assignments render in position rows after Refresh. No `/thesis/*` network requests made.
 
@@ -124,11 +124,11 @@
 
 ### Implementation
 
-- [ ] T032 [US5] Refactor `src/services/covered_call_screener.py`: remove all SQLAlchemy session parameters and `ScreenerResult` DB model writes; add `run_screener(schwab_client) -> list[ScreenerResultView]` that fetches long stock positions from `SCHWAB_SCREENER_ACCOUNT_ID`, computes rankings, and returns a plain `list[ScreenerResultView]` — no persistence
-- [ ] T033 [US5] Refactor `src/api/routes/screener.py`: add `GET /api/screener/refresh` endpoint that reads Bearer token via `get_schwab_client` dep, calls `run_screener`, returns JSON array of `ScreenerResultView`; remove DB-writing logic; keep `GET /screener` as shell page render only; do NOT log Authorization header
-- [ ] T034 [US5] Create `frontend/static/js/screener_ui.js`: on Refresh button click, reads token from `auth.getToken()`, sends `fetch('/api/screener/refresh', {headers: {Authorization: 'Bearer ...'}})`, renders screener table from JSON response; show "Suppressed" badge for suppressed rows
-- [ ] T035 [US5] Update `frontend/templates/screener.html`: add Refresh button wired to `screener_ui.js`; add `<div id="screener-table">` placeholder; import `auth.js` and `screener_ui.js` as ES modules; keep ThinkorSwim styling
-- [ ] T036 [US5] Write contract test in `tests/contract/test_screener_api.py`: mock `run_screener` to return two `ScreenerResultView` fixtures; assert `GET /api/screener/refresh` with valid `Authorization` header returns 200 JSON array; assert request without header returns 401
+- [x] T032 [US5] Refactor `src/services/covered_call_screener.py`: remove all SQLAlchemy session parameters and `ScreenerResult` DB model writes; add `run_screener(schwab_client) -> list[ScreenerResultView]` that fetches long stock positions from `SCHWAB_SCREENER_ACCOUNT_ID`, computes rankings, and returns a plain `list[ScreenerResultView]` — no persistence
+- [x] T033 [US5] Refactor `src/api/routes/screener.py`: add `GET /api/screener/refresh` endpoint that reads Bearer token via `get_schwab_client` dep, calls `run_screener`, returns JSON array of `ScreenerResultView`; remove DB-writing logic; keep `GET /screener` as shell page render only; do NOT log Authorization header
+- [x] T034 [US5] Create `frontend/static/js/screener_ui.js`: on Refresh button click, reads token from `auth.getToken()`, sends `fetch('/api/screener/refresh', {headers: {Authorization: 'Bearer ...'}})`, renders screener table from JSON response; show "Suppressed" badge for suppressed rows
+- [x] T035 [US5] Update `frontend/templates/screener.html`: add Refresh button wired to `screener_ui.js`; add `<div id="screener-table">` placeholder; import `auth.js` and `screener_ui.js` as ES modules; keep ThinkorSwim styling
+- [x] T036 [US5] Write contract test in `tests/contract/test_screener_api.py`: mock `run_screener` to return two `ScreenerResultView` fixtures; assert `GET /api/screener/refresh` with valid `Authorization` header returns 200 JSON array; assert request without header returns 401
 
 **Checkpoint**: Screener page loads instantly (empty). Refresh populates table with live results. Suppressed positions are visually distinct. No DB activity in server logs.
 
@@ -142,10 +142,10 @@
 
 ### Implementation
 
-- [ ] T037 [US6] Create `Dockerfile`: `python:3.11-slim` base; copy `requirements.txt`, `pip install --no-cache-dir -r requirements.txt`; copy `src/`, `frontend/`; expose port 8080; `CMD ["uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8080", "--no-access-log"]` — access logging disabled to prevent any chance of token values appearing in logs; use Cloud Run structured logging instead
-- [ ] T038 [US6] Update `.env.example`: remove `DATABASE_URL`, `SCHWAB_TOKEN_PATH`, `SECRET_KEY` (old DB encryption var); add `SCHWAB_SCREENER_ACCOUNT_ID`; add `OAUTH_STATE_SECRET` (for signing the short-lived CSRF state cookie only — separate from any token); add comments for Cloud Run Secret Manager usage
-- [ ] T039 [US6] Verify `/health` endpoint returns `{"status": "ok"}` with no auth required and no DB check; add smoke test in `tests/unit/test_health.py`
-- [ ] T040 [US6] Add `.dockerignore` excluding `__pycache__`, `*.pyc`, `.env`, `*.sqlite`, `schwab_token.json`, `specs/`, `tests/` to minimise image size
+- [x] T037 [US6] Create `Dockerfile`: `python:3.11-slim` base; copy `requirements.txt`, `pip install --no-cache-dir -r requirements.txt`; copy `src/`, `frontend/`; expose port 8080; `CMD ["uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8080", "--no-access-log"]` — access logging disabled to prevent any chance of token values appearing in logs; use Cloud Run structured logging instead
+- [x] T038 [US6] Update `.env.example`: remove `DATABASE_URL`, `SCHWAB_TOKEN_PATH`, `SECRET_KEY` (old DB encryption var); add `SCHWAB_SCREENER_ACCOUNT_ID`; add `OAUTH_STATE_SECRET` (for signing the short-lived CSRF state cookie only — separate from any token); add comments for Cloud Run Secret Manager usage
+- [x] T039 [US6] Verify `/health` endpoint returns `{"status": "ok"}` with no auth required and no DB check; add smoke test in `tests/unit/test_health.py`
+- [x] T040 [US6] Add `.dockerignore` excluding `__pycache__`, `*.pyc`, `.env`, `*.sqlite`, `schwab_token.json`, `specs/`, `tests/` to minimise image size
 
 **Checkpoint**: `docker build` succeeds. `docker run` with env vars starts and serves `/health` in < 3 s. Image size < 500 MB.
 
@@ -153,9 +153,9 @@
 
 ## Phase 9: Polish & Cross-Cutting Concerns
 
-- [ ] T041 [P] Remove remaining dead test files: `tests/integration/test_thesis_assignment.py`, `tests/unit/test_covered_call_screener.py`, `tests/contract/test_api_contracts.py` (replaced by new contract tests from T026, T036)
-- [ ] T042 [P] Update `tests/` conftest.py: remove DB fixture setup (`AsyncSessionLocal`, migration calls); add an `auth_headers` fixture that returns `{"Authorization": "Bearer <mock_token>"}` for route tests
-- [ ] T043 Run `pytest tests/` and confirm all new tests pass; fix any import errors from Phase 1 deletions
+- [x] T041 [P] Remove remaining dead test files: `tests/integration/test_thesis_assignment.py`, `tests/unit/test_covered_call_screener.py`, `tests/contract/test_api_contracts.py` (replaced by new contract tests from T026, T036)
+- [x] T042 [P] Update `tests/` conftest.py: remove DB fixture setup (`AsyncSessionLocal`, migration calls); add an `auth_headers` fixture that returns `{"Authorization": "Bearer <mock_token>"}` for route tests
+- [x] T043 Run `pytest tests/` and confirm all new tests pass; fix any import errors from Phase 1 deletions
 - [ ] T044 Validate `specs/004-stateless-ephemeral-refactor/quickstart.md` against actual local run: follow each step, confirm app starts, OAuth flow completes, positions refresh, screener refresh, Erase All all work
 - [ ] T045 Write `README.md` "Privacy & Data Handling" section (new, detailed): explain the full login flow step by step, where each piece of data lives (sessionStorage/IndexedDB/localStorage), that Cloud Run only forwards the token and never stores it, and how to use the Erase All button; remove DB setup steps from existing README; add Cloud Run deployment section
 

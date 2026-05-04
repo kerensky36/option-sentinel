@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Option Sentinel — Connect</title>
+  <link rel="icon" type="image/svg+xml" href="/static/sentinel.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"JetBrains Mono"', 'Consolas', 'ui-monospace', 'monospace'],
+            mono: ['"JetBrains Mono"', 'Consolas', 'ui-monospace', 'monospace'],
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    body {
+      font-family: 'JetBrains Mono', Consolas, 'Courier New', monospace;
+      font-size: 13px;
+      line-height: 1.5;
+      letter-spacing: 0.01em;
+      -webkit-font-smoothing: antialiased;
+      background-color: #0c0c10;
+      color: #c6c6cc;
+    }
+    .bg-gray-950 { background-color: #0c0c10; }
+    .bg-gray-900 { background-color: #14141a; }
+    .bg-gray-800 { background-color: #1c1c24; }
+    .border-gray-800 { border-color: #22222e; }
+    .text-gray-400 { color: #626270; }
+    .text-gray-300 { color: #90909c; }
+    .text-gray-200 { color: #aeaeb8; }
+    .text-gray-100 { color: #c6c6cc; }
+    .text-white    { color: #d2d2d8; }
+    .text-green-400 { color: #2ec82e; }
+    .text-amber-400 { color: #c8a820; }
+    .rounded-xl { border-radius: 2px; }
+    .rounded-lg { border-radius: 2px; }
+    .rounded { border-radius: 1px; }
+  </style>
+</head>
+<body class="bg-gray-950 min-h-screen flex items-center justify-center">
+
+  <div class="w-full max-w-md px-6">
+
+    <!-- Logo + title -->
+    <div class="flex flex-col items-center mb-8 gap-3">
+      <img src="/static/sentinel.svg" class="w-14 h-14 drop-shadow-[0_0_12px_rgba(255,34,0,0.4)]" alt="Sentinel">
+      <span class="text-sm font-semibold tracking-widest uppercase text-gray-200">Option Sentinel</span>
+      <span class="text-gray-400 tracking-wider" style="font-size:10px; letter-spacing:0.18em;">PERSONAL TRADING DASHBOARD</span>
+    </div>
+
+    <!-- Card -->
+    <div class="bg-gray-900 border border-gray-800 px-6 py-7" style="border-radius:2px">
+
+      <!-- Error message (if redirected back with error) -->
+      {% if request.query_params.get('error') %}
+      <div class="mb-4 bg-red-900 border border-red-800 text-red-200 px-3 py-2" style="font-size:12px; border-radius:1px">
+        Authentication failed. Please try again.
+      </div>
+      {% endif %}
+
+      <h1 class="text-white font-semibold tracking-wider uppercase mb-2" style="font-size:14px; letter-spacing:0.12em;">
+        Connect Your Account
+      </h1>
+
+      <p class="text-gray-300 mb-5" style="font-size:12px; line-height:1.7;">
+        Option Sentinel connects to your Schwab account using OAuth.
+        Your token is stored <strong class="text-green-400">only in your browser's sessionStorage</strong>
+        and is never sent to any server log or database.
+        It is automatically cleared when you close the tab.
+      </p>
+
+      <ul class="text-gray-400 mb-6 space-y-1" style="font-size:11px; list-style:none; padding:0;">
+        <li><span class="text-green-400">✓</span> Token lives in your browser only</li>
+        <li><span class="text-green-400">✓</span> Server never stores or logs your token</li>
+        <li><span class="text-green-400">✓</span> Closing the tab clears all credentials</li>
+        <li><span class="text-green-400">✓</span> "Erase All Data" wipes everything instantly</li>
+      </ul>
+
+      <a href="/auth/connect"
+         class="block w-full text-center bg-indigo-800 hover:bg-indigo-700 text-indigo-100 px-4 py-2.5 uppercase tracking-widest font-semibold transition-colors"
+         style="font-size:12px; letter-spacing:0.14em; border-radius:1px; text-decoration:none;">
+        Connect Schwab Account
+      </a>
+
+    </div>
+
+    <p class="text-center text-gray-400 mt-4" style="font-size:10px; letter-spacing:0.08em;">
+      OPTION SENTINEL — DATA STAYS IN YOUR BROWSER
+    </p>
+
+  </div>
+
+</body>
+</html>

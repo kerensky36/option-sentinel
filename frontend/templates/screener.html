@@ -20,13 +20,10 @@
 <div class="flex items-center justify-between mb-3">
   <span class="text-gray-400 uppercase tracking-widest" style="font-size:11px">Covered Call Screener</span>
   <button
-    hx-post="/screener/refresh"
-    hx-target="#screener-table"
-    hx-swap="innerHTML"
-    hx-indicator="#screener-spinner"
+    id="screener-refresh-btn"
     class="flex items-center gap-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 px-2 py-1 transition-colors uppercase tracking-wider"
     style="font-size:11px">
-    <span id="screener-spinner" class="htmx-indicator animate-spin">↻</span>
+    <span>↻</span>
     <span>Refresh</span>
   </button>
 </div>
@@ -88,9 +85,15 @@
   </div>
 </details>
 
-<div id="screener-table">
-  {% include "partials/screener_table.html" %}
+{# ── Screener table placeholder ── #}
+<div id="screener-table" class="border border-gray-800 bg-gray-900 min-h-24 flex items-center justify-center" style="border-radius:2px; min-height:100px">
+  <span class="text-gray-500" style="font-size:12px">Click <strong>Refresh</strong> to fetch live screener data.</span>
 </div>
+
+<script type="module">
+  import '/static/js/auth.js';
+  import '/static/js/screener_ui.js';
+</script>
 
 {% endif %}
 {% endblock %}
