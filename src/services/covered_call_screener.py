@@ -6,7 +6,6 @@ a list of ScreenerResultView objects. No database reads or writes.
 from __future__ import annotations
 
 import logging
-import os
 from datetime import datetime, timedelta, timezone
 
 from src.data.models import ScreenerResultView
@@ -102,16 +101,15 @@ async def run_screener(client=None) -> list[ScreenerResultView]:
     Returns:
         List of ScreenerResultView objects sorted by composite_score descending.
     """
-    account_id = os.environ.get("SCHWAB_CC_ACCOUNT_ID", "")
-    if not account_id:
-        logger.warning("SCHWAB_CC_ACCOUNT_ID not set — screener returning empty results")
-        return []
-
     if client is None:
         raise ValueError("A Schwab client must be provided to run_screener")
 
-    from src.auth.account_resolver import resolve_account_hash
-    account_hash = await resolve_account_hash(client, account_id)
+    from src.auth.account_resolver import list_accounts
+    accounts = await list_accounts(client)
+    if not accounts:
+        logger.warning("No accounts found on token — screener returning empty results")
+        return []
+    account_hash = accounts[0]["hashValue"]
 
     stock_positions = await _fetch_stock_positions(client, account_hash)
     open_calls      = await _fetch_open_calls(client, account_hash)

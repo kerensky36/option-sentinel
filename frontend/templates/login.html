@@ -87,11 +87,19 @@
         <li><span class="text-green-400">✓</span> "Erase All Data" wipes everything instantly</li>
       </ul>
 
-      <a href="/auth/connect"
+      <a href="/auth/start"
          class="block w-full text-center bg-indigo-800 hover:bg-indigo-700 text-indigo-100 px-4 py-2.5 uppercase tracking-widest font-semibold transition-colors"
          style="font-size:12px; letter-spacing:0.14em; border-radius:1px; text-decoration:none;">
         Connect Schwab Account
       </a>
+
+      {% if dev_login_available %}
+      <a href="/auth/dev-login"
+         class="block w-full text-center mt-3 border border-amber-800 text-amber-400 hover:bg-amber-950 px-4 py-2 uppercase tracking-widest transition-colors"
+         style="font-size:10px; letter-spacing:0.14em; border-radius:1px; text-decoration:none;">
+        Dev Login (local token)
+      </a>
+      {% endif %}
 
     </div>
 

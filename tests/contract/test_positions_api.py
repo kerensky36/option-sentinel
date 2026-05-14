@@ -1,8 +1,6 @@
 """Contract tests for the positions refresh API."""
 from __future__ import annotations
 
-import base64
-import json
 from datetime import date
 from decimal import Decimal
 from unittest.mock import AsyncMock, patch
@@ -13,18 +11,9 @@ from fastapi.testclient import TestClient
 from src.data.models import PositionView
 
 
-def _make_auth_header(token_dict: dict | None = None) -> str:
-    """Build a valid Authorization: Bearer header with a token dict."""
-    if token_dict is None:
-        token_dict = {
-            "access_token": "test-access-token",
-            "refresh_token": "test-refresh-token",
-            "token_type": "Bearer",
-            "access_token_expiry": 9999999999,
-        }
-    json_str = json.dumps(token_dict)
-    b64 = base64.b64encode(json_str.encode()).decode()
-    return f"Bearer {b64}"
+def _make_auth_header(access_token: str = "test-access-token") -> str:
+    """Build a valid Authorization: Bearer header with a raw access token string."""
+    return f"Bearer {access_token}"
 
 
 _FIXTURE_POSITIONS = [
@@ -110,11 +99,19 @@ class TestPositionsRefresh:
         resp = client.get("/api/positions/refresh")
         assert resp.status_code == 401
 
-    def test_returns_401_with_malformed_header(self, client):
-        """GET /api/positions/refresh with malformed bearer token returns 401."""
+    def test_returns_401_with_missing_bearer_prefix(self, client):
+        """GET /api/positions/refresh with wrong auth scheme returns 401."""
         resp = client.get(
             "/api/positions/refresh",
-            headers={"Authorization": "Bearer not-valid-base64-json!@#"},
+            headers={"Authorization": "Token some-token"},
+        )
+        assert resp.status_code == 401
+
+    def test_returns_401_with_empty_bearer_token(self, client):
+        """GET /api/positions/refresh with empty Bearer value returns 401."""
+        resp = client.get(
+            "/api/positions/refresh",
+            headers={"Authorization": "Bearer "},
         )
         assert resp.status_code == 401
 

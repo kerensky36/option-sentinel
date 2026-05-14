@@ -2,7 +2,7 @@
 
 > A personal options position monitor built with Claude Pro, spec-driven from day one.
 
-![Status](https://img.shields.io/badge/status-implementing-blue)
+![Status](https://img.shields.io/badge/status-complete-brightgreen)
 ![Stack](https://img.shields.io/badge/stack-FastAPI%20%2B%20Vanilla%20JS%20%2B%20IndexedDB-informational)
 ![Auth](https://img.shields.io/badge/brokerage-Charles%20Schwab-4a7c59)
 ![License](https://img.shields.io/badge/license-MIT-lightgrey)
@@ -204,7 +204,7 @@ specs/004-stateless-ephemeral-refactor/
 ├── contracts/
 │   └── http.md      ← API endpoint contracts
 ├── quickstart.md    ← setup guide
-└── tasks.md         ← 45 implementation tasks
+└── tasks.md         ← 58 implementation tasks (45 + 13 Phase 10)
 ```
 
 ---
@@ -226,38 +226,39 @@ specs/004-stateless-ephemeral-refactor/
 | Phase 7 — Covered call screener (stateless) | ✅ Done |
 | Phase 8 — Dockerfile + Cloud Run | ✅ Done |
 | Phase 9 — Test cleanup + documentation | ✅ Done |
+| Phase 10 — Multi-user OAuth (stateless PKCE, dynamic accounts) | ✅ Done |
 
-**All 43/45 tasks complete.** App is deployed and stateless.
+**All 45/45 tasks complete. Phase 10 (multi-user OAuth) also complete.** App is deployed and stateless.
 
 ---
 
-## Cloud Run Deployment
+## Deployment (Cloud Run + Firebase Hosting)
+
+Backend runs on GCP Cloud Run (stateless, scale-to-zero). Frontend is served from Firebase Hosting CDN, with `/api/**` and `/auth/**` proxied to Cloud Run.
+
+**Required env vars**: `GCP_PROJECT_ID`, `SCHWAB_CLIENT_ID`, `SCHWAB_CLIENT_SECRET`, `SCHWAB_REDIRECT_URI`, `SCHWAB_AUTH_URL`, `SCHWAB_TOKEN_URL`
 
 ```bash
-# Build
-docker build -t option-sentinel .
+# One-command deploy (backend + frontend)
+export GCP_PROJECT_ID=your-project-id
+export SCHWAB_CLIENT_ID=...
+export SCHWAB_CLIENT_SECRET=...
+export SCHWAB_REDIRECT_URI=https://your-project.web.app/auth/callback
+export SCHWAB_AUTH_URL=https://api.schwabapi.com/v1/oauth/authorize
+export SCHWAB_TOKEN_URL=https://api.schwabapi.com/v1/oauth/token
 
-# Test locally
-docker run -p 8080:8080 \
-  -e SCHWAB_APP_KEY=... \
-  -e SCHWAB_APP_SECRET=... \
-  -e SCHWAB_CALLBACK_URL=https://your-run-url/auth/callback \
-  -e SCHWAB_ACCOUNT_ID=... \
-  -e OAUTH_STATE_SECRET=$(python3 -c "import secrets; print(secrets.token_hex(32))") \
-  option-sentinel
-
-# Deploy to Cloud Run
-gcloud run deploy option-sentinel \
-  --image=gcr.io/YOUR_PROJECT/option-sentinel \
-  --region=us-central1 \
-  --platform=managed \
-  --min-instances=0 \
-  --max-instances=1 \
-  --set-secrets=OAUTH_STATE_SECRET=oauth-state-secret:latest \
-  --set-env-vars=SCHWAB_APP_KEY=...,SCHWAB_APP_SECRET=...,SCHWAB_ACCOUNT_ID=...
+bash scripts/deploy.sh
 ```
 
-No database, no volume mounts, no Redis. Cold start target: under 3 seconds.
+Or deploy individually:
+```bash
+bash scripts/deploy_backend.sh    # Cloud Run only
+bash scripts/deploy_frontend.sh   # Firebase Hosting only
+```
+
+Full setup instructions: [`specs/005-cloudrun-firebase-deploy/quickstart.md`](specs/005-cloudrun-firebase-deploy/quickstart.md)
+
+No database, no volume mounts, no Redis. Cold start target: under 3 seconds. `max-instances=1` required (PKCE state is in-memory).
 
 ---
 

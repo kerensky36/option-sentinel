@@ -1,8 +1,6 @@
 """Screener routes — stateless, no DB."""
 from __future__ import annotations
 
-import os
-
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 
@@ -16,14 +14,10 @@ router = APIRouter()
 @router.get("/screener", response_class=HTMLResponse)
 async def screener(request: Request):
     """Render the screener shell page. Results loaded on demand via Refresh button."""
-    setup_required = not bool(os.environ.get("SCHWAB_CC_ACCOUNT_ID"))
     return templates.TemplateResponse(
         request,
         "screener.html",
-        {
-            "current_page": "covered_call_screener",
-            "setup_required": setup_required,
-        },
+        {"current_page": "covered_call_screener"},
     )
 
 

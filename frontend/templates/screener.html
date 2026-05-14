@@ -3,20 +3,6 @@
 {% block title %}Covered Call Screener — Option Sentinel{% endblock %}
 
 {% block content %}
-{% if setup_required %}
-<div class="border border-gray-800 bg-gray-900 px-4 py-6 max-w-lg" style="border-radius:2px">
-  <div class="text-amber-400 uppercase tracking-widest mb-2" style="font-size:10px">Setup Required</div>
-  <p class="text-gray-300 mb-3" style="font-size:12px">
-    Set your second Schwab account number to enable the Covered Call Screener.
-  </p>
-  <div class="bg-gray-800 border border-gray-700 px-3 py-2 text-green-400 font-mono" style="font-size:11px">
-    SCHWAB_CC_ACCOUNT_ID=&lt;your-account-number&gt;
-  </div>
-  <p class="text-gray-500 mt-2" style="font-size:10px">Add this to your <code>.env</code> file and restart the server.</p>
-</div>
-
-{% else %}
-
 <div class="flex items-center justify-between mb-3">
   <span class="text-gray-400 uppercase tracking-widest" style="font-size:11px">Covered Call Screener</span>
   <button
@@ -95,5 +81,4 @@
   import '/static/js/screener_ui.js';
 </script>
 
-{% endif %}
 {% endblock %}

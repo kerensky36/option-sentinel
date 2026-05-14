@@ -1,58 +1,61 @@
 /**
  * auth.js — Token management and browser storage utilities.
  *
- * The Schwab token is stored exclusively in sessionStorage under the key
- * 'schwab_token'. It is never sent to any server storage, only forwarded
- * via Authorization header on API calls.
+ * The Schwab access token is stored exclusively in sessionStorage under the key
+ * 'schwab_access_token'. It is never sent to any server storage, only forwarded
+ * via Authorization header on API calls. Any 401 response triggers eraseAll()
+ * and redirects to login — there is no silent token refresh.
  */
 
-const TOKEN_KEY = 'schwab_token';
+const ACCESS_TOKEN_KEY = 'schwab_access_token';
 const DB_NAME = 'option-sentinel';
 
 /**
- * Read the token dict from sessionStorage.
- * @returns {object|null} Parsed token dict, or null if not present.
+ * Read the raw access token string from sessionStorage.
+ * @returns {string|null}
  */
-export function getToken() {
-  try {
-    const raw = sessionStorage.getItem(TOKEN_KEY);
-    if (!raw) return null;
-    return JSON.parse(raw);
-  } catch (e) {
-    console.error('auth.getToken: failed to parse token', e);
-    return null;
-  }
-}
-
-/**
- * Build the Authorization header value from the stored token.
- * @returns {string|null} "Bearer <base64(json)>" or null if not authenticated.
- */
-export function getAuthHeader() {
-  const token = getToken();
-  if (!token) return null;
-  try {
-    const json = JSON.stringify(token);
-    const b64 = btoa(unescape(encodeURIComponent(json)));
-    return `Bearer ${b64}`;
-  } catch (e) {
-    console.error('auth.getAuthHeader: encoding failed', e);
-    return null;
-  }
+export function getAccessToken() {
+  return sessionStorage.getItem(ACCESS_TOKEN_KEY) || null;
 }
 
 /**
  * Check whether the user is currently authenticated.
- * Returns true if a token exists and its access_token_expiry is in the future.
  * @returns {boolean}
  */
 export function isAuthenticated() {
-  const token = getToken();
-  if (!token || !token.access_token) return false;
-  const expiry = token.access_token_expiry;
-  if (!expiry) return true; // unknown expiry — assume valid
-  const nowSeconds = Math.floor(Date.now() / 1000);
-  return nowSeconds < expiry;
+  return !!getAccessToken();
+}
+
+/**
+ * Fetch a URL with the Bearer Authorization header attached.
+ * On 401: calls eraseAll() (clears all storage and redirects to login).
+ * Returns null if not authenticated or after a 401.
+ *
+ * @param {string} url
+ * @param {RequestInit} [options]
+ * @returns {Promise<Response|null>}
+ */
+export async function fetchWithAuth(url, options = {}) {
+  const token = getAccessToken();
+  if (!token) {
+    await eraseAll();
+    return null;
+  }
+
+  const resp = await fetch(url, {
+    ...options,
+    headers: {
+      ...(options.headers || {}),
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (resp.status === 401) {
+    await eraseAll();
+    return null;
+  }
+
+  return resp;
 }
 
 /**
@@ -73,7 +76,7 @@ export async function eraseAll() {
       const req = indexedDB.deleteDatabase(DB_NAME);
       req.onsuccess = resolve;
       req.onerror = reject;
-      req.onblocked = resolve; // proceed even if blocked
+      req.onblocked = resolve;
     });
   } catch (e) {
     console.warn('auth.eraseAll: IndexedDB delete failed (continuing)', e);

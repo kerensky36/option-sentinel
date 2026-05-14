@@ -6,7 +6,7 @@
  * caches result, then re-renders.
  */
 
-import { getAuthHeader, isAuthenticated } from './auth.js';
+import { fetchWithAuth, isAuthenticated } from './auth.js';
 import { savePositions, loadPositions } from './position_cache.js';
 import { getAssignments } from './thesis_store.js';
 
@@ -152,21 +152,10 @@ async function refreshPositions() {
     btn.textContent = 'Refreshing…';
   }
 
-  const authHeader = getAuthHeader();
-  if (!authHeader) {
-    window.location.replace('/auth/login');
-    return;
-  }
-
   try {
-    const resp = await fetch('/api/positions/refresh', {
-      headers: { Authorization: authHeader },
-    });
+    const resp = await fetchWithAuth('/api/positions/refresh');
 
-    if (resp.status === 401) {
-      window.location.replace('/auth/login');
-      return;
-    }
+    if (!resp) return; // eraseAll() already called by fetchWithAuth on 401
 
     if (!resp.ok) {
       throw new Error(`HTTP ${resp.status}: ${resp.statusText}`);
@@ -197,22 +186,28 @@ async function refreshPositions() {
 
 /**
  * Initialise: load cached positions immediately, wire up Refresh button.
+ * Auto-fetches live data on first visit when no cache exists.
  */
 async function init() {
-  // Load cached data immediately for fast page render
+  let hasCached = false;
+
   try {
     const cached = await loadPositions();
     if (cached) {
+      hasCached = true;
       renderPositions(cached.positions, cached.savedAt);
     }
   } catch (e) {
     console.warn('positions_ui: cache load failed', e);
   }
 
-  // Wire up Refresh button
   const btn = document.getElementById(REFRESH_BTN_ID);
   if (btn) {
     btn.addEventListener('click', refreshPositions);
+  }
+
+  if (!hasCached) {
+    await refreshPositions();
   }
 }
 

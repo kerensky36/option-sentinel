@@ -12,13 +12,12 @@ class TestBuildAuthUrl:
     def test_returns_url_and_state(self):
         """build_auth_url() returns a non-empty URL string and a non-empty state."""
         with patch("src.auth.schwab_oauth.schwab_auth") as mock_auth:
-            # Mock the OAuth2Client chain
-            mock_client = MagicMock()
-            mock_client.create_authorization_url.return_value = (
-                "https://api.schwabapi.com/v1/oauth/authorize?client_id=key&state=teststate123",
-                "teststate123",
+            mock_ctx = MagicMock()
+            mock_ctx.authorization_url = (
+                "https://api.schwabapi.com/v1/oauth/authorize?client_id=key&state=teststate123"
             )
-            mock_auth.oauth.OAuth2Client.return_value = mock_client
+            mock_ctx.state = "teststate123"
+            mock_auth.get_auth_context.return_value = mock_ctx
 
             from src.auth.schwab_oauth import build_auth_url
             url, state = build_auth_url()
@@ -31,16 +30,16 @@ class TestBuildAuthUrl:
     def test_state_is_unique(self):
         """Each call to build_auth_url() returns a different state."""
         with patch("src.auth.schwab_oauth.schwab_auth") as mock_auth:
-            mock_client = MagicMock()
             call_count = [0]
 
-            def make_url(*args, **kwargs):
+            def make_ctx(*args, **kwargs):
                 call_count[0] += 1
-                state = f"state-{call_count[0]}"
-                return f"https://schwab.example.com?state={state}", state
+                ctx = MagicMock()
+                ctx.authorization_url = f"https://schwab.example.com?state=state-{call_count[0]}"
+                ctx.state = f"state-{call_count[0]}"
+                return ctx
 
-            mock_client.create_authorization_url.side_effect = make_url
-            mock_auth.oauth.OAuth2Client.return_value = mock_client
+            mock_auth.get_auth_context.side_effect = make_ctx
 
             from src.auth.schwab_oauth import build_auth_url
             _, state1 = build_auth_url()
@@ -79,10 +78,10 @@ class TestExchangeCodeForToken:
             received_url = "https://127.0.0.1?code=abc123&state=mystate"
             token = await exchange_code_for_token(received_url, "mystate")
 
-        assert token["access_token"] == "test-access-token"
-        assert token["refresh_token"] == "test-refresh-token"
-        assert "access_token_expiry" in token
-        assert "refresh_token_expiry" in token
+        assert "creation_timestamp" in token
+        assert token["token"]["access_token"] == "test-access-token"
+        assert token["token"]["refresh_token"] == "test-refresh-token"
+        assert "expires_at" in token["token"]
 
     @pytest.mark.asyncio
     async def test_raises_on_state_mismatch(self):

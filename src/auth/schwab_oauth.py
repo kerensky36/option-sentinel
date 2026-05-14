@@ -33,14 +33,8 @@ def build_auth_url() -> tuple[str, str]:
         (authorize_url, state) — state must be stored in a short-lived signed
         cookie by the caller and validated in the callback.
     """
-    # schwab-py exposes a helper to build the URL without opening a browser
-    # or writing a token file. We use the lower-level URL builder.
-    auth_url, state = schwab_auth.oauth.OAuth2Client(
-        client_id=APP_KEY,
-        client_secret=APP_SECRET,
-        redirect_uri=CALLBACK_URL,
-    ).create_authorization_url("https://api.schwabapi.com/v1/oauth/authorize")
-    return auth_url, state
+    ctx = schwab_auth.get_auth_context(APP_KEY, CALLBACK_URL)
+    return ctx.authorization_url, ctx.state
 
 
 async def exchange_code_for_token(received_url: str, state: str) -> dict:
@@ -93,18 +87,15 @@ async def exchange_code_for_token(received_url: str, state: str) -> dict:
 
     raw = resp.json()
 
-    # Normalise into the format schwab-py's client_from_access_functions expects
+    # Add expires_at so authlib can detect expiry and auto-refresh.
     now = int(time.time())
-    token_dict = {
-        "token_type": raw.get("token_type", "Bearer"),
-        "access_token": raw["access_token"],
-        "refresh_token": raw.get("refresh_token", ""),
-        "scope": raw.get("scope", ""),
-        "expires_in": raw.get("expires_in", 1800),
-        "access_token_expiry": now + raw.get("expires_in", 1800),
-        "refresh_token_expiry": now + raw.get("refresh_token_expires_in", 7 * 24 * 3600),
+    raw.setdefault("expires_at", now + raw.get("expires_in", 1800))
+
+    # Wrap in the full format client_from_access_functions (TokenMetadata) expects.
+    return {
+        "creation_timestamp": now,
+        "token": raw,
     }
-    return token_dict
 
 
 def get_schwab_client_from_token(token_dict: dict) -> schwab.client.AsyncClient:

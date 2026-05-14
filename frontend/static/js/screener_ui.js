@@ -2,7 +2,7 @@
  * screener_ui.js — Covered call screener table rendering and refresh logic.
  */
 
-import { getAuthHeader, isAuthenticated } from './auth.js';
+import { fetchWithAuth, isAuthenticated } from './auth.js';
 
 const TABLE_ID = 'screener-table';
 const REFRESH_BTN_ID = 'screener-refresh-btn';
@@ -106,21 +106,10 @@ async function refreshScreener() {
     btn.textContent = 'Refreshing…';
   }
 
-  const authHeader = getAuthHeader();
-  if (!authHeader) {
-    window.location.replace('/auth/login');
-    return;
-  }
-
   try {
-    const resp = await fetch('/api/screener/refresh', {
-      headers: { Authorization: authHeader },
-    });
+    const resp = await fetchWithAuth('/api/screener/refresh');
 
-    if (resp.status === 401) {
-      window.location.replace('/auth/login');
-      return;
-    }
+    if (!resp) return; // eraseAll() already called by fetchWithAuth on 401
 
     if (!resp.ok) {
       throw new Error(`HTTP ${resp.status}: ${resp.statusText}`);
@@ -146,13 +135,14 @@ async function refreshScreener() {
 }
 
 /**
- * Initialise: wire up Refresh button.
+ * Initialise: wire up Refresh button and auto-fetch on first visit.
  */
-function init() {
+async function init() {
   const btn = document.getElementById(REFRESH_BTN_ID);
   if (btn) {
     btn.addEventListener('click', refreshScreener);
   }
+  await refreshScreener();
 }
 
 init();

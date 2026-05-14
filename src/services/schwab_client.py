@@ -4,15 +4,11 @@ All functions return plain Pydantic model instances or dicts — no DB, no sessi
 """
 from __future__ import annotations
 
-import os
 from datetime import date, datetime, timezone
 from decimal import Decimal
 
 from src.data.models import PositionView
 from src.services.greeks_service import build_greeks
-
-ACCOUNT_ID = os.getenv("SCHWAB_ACCOUNT_ID", "")
-
 
 def _parse_occ_symbol(symbol: str) -> tuple[str, date, str, float] | None:
     """Parse OCC symbol e.g. 'QQQ   260618P00650000' → (underlying, expiry, option_type, strike)."""
@@ -32,8 +28,11 @@ def _parse_occ_symbol(symbol: str) -> tuple[str, date, str, float] | None:
 
 async def _fetch_positions(client) -> list[dict]:
     """Fetch raw option positions from the Schwab account."""
-    from src.auth.account_resolver import resolve_account_hash
-    account_hash = await resolve_account_hash(client, ACCOUNT_ID)
+    from src.auth.account_resolver import list_accounts
+    accounts = await list_accounts(client)
+    if not accounts:
+        return []
+    account_hash = accounts[0]["hashValue"]
     resp = await client.get_account(account_hash, fields=[client.Account.Fields.POSITIONS])
     data = resp.json()
     positions = data.get("securitiesAccount", {}).get("positions", [])

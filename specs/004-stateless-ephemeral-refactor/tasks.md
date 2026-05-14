@@ -156,8 +156,32 @@
 - [x] T041 [P] Remove remaining dead test files: `tests/integration/test_thesis_assignment.py`, `tests/unit/test_covered_call_screener.py`, `tests/contract/test_api_contracts.py` (replaced by new contract tests from T026, T036)
 - [x] T042 [P] Update `tests/` conftest.py: remove DB fixture setup (`AsyncSessionLocal`, migration calls); add an `auth_headers` fixture that returns `{"Authorization": "Bearer <mock_token>"}` for route tests
 - [x] T043 Run `pytest tests/` and confirm all new tests pass; fix any import errors from Phase 1 deletions
-- [ ] T044 Validate `specs/004-stateless-ephemeral-refactor/quickstart.md` against actual local run: follow each step, confirm app starts, OAuth flow completes, positions refresh, screener refresh, Erase All all work
-- [ ] T045 Write `README.md` "Privacy & Data Handling" section (new, detailed): explain the full login flow step by step, where each piece of data lives (sessionStorage/IndexedDB/localStorage), that Cloud Run only forwards the token and never stores it, and how to use the Erase All button; remove DB setup steps from existing README; add Cloud Run deployment section
+- [x] T044 Validate `specs/004-stateless-ephemeral-refactor/quickstart.md` against actual local run: follow each step, confirm app starts, OAuth flow completes, positions refresh, screener refresh, Erase All all work
+- [x] T045 Write `README.md` "Privacy & Data Handling" section (new, detailed): explain the full login flow step by step, where each piece of data lives (sessionStorage/IndexedDB/localStorage), that Cloud Run only forwards the token and never stores it, and how to use the Erase All button; remove DB setup steps from existing README; add Cloud Run deployment section
+
+---
+
+## Phase 10: Multi-User OAuth (from `specs/multi-user-oauth.md`, 2026-05-13)
+
+**Purpose**: Replace session-cookie auth and hardcoded account env vars with stateless PKCE OAuth,
+raw Bearer token delivery to sessionStorage, dynamic account resolution, and simplified 401→login
+error handling (no silent refresh).
+
+**⚠️ SPEC CHANGE**: `schwab_refresh_token` is NOT stored. Any 401 → `eraseAll()` → login.
+
+- [x] T046 Remove `itsdangerous` from `requirements.txt`; verify no remaining imports of `itsdangerous` in codebase
+- [x] T047 Create `src/auth/router.py`: `GET /auth/login` (render login.html), `GET /auth/start` (PKCE: generate verifier+challenge+state, store in `_pkce_store` dict, redirect to `SCHWAB_AUTH_URL`), `GET /auth/callback` (lookup+delete state from dict, httpx POST to `SCHWAB_TOKEN_URL`, HTML inline script stores only `schwab_access_token` in sessionStorage), `GET /auth/dev-login` (extract `access_token` from `schwab_token.json`, store as `schwab_access_token`), `POST /auth/logout` (HTML that calls `eraseAll()` JS sequence). NO `/auth/refresh` route.
+- [x] T048 Update `src/api/main.py`: in `create_app()`, add startup validation — check `SCHWAB_CLIENT_ID`, `SCHWAB_CLIENT_SECRET`, `SCHWAB_REDIRECT_URI`, `SCHWAB_AUTH_URL`, `SCHWAB_TOKEN_URL` are all set, raise `RuntimeError` with missing names if any absent; replace `from src.api.routes import auth` import with `from src.auth import router as auth_module` and `app.include_router(auth_module.router)`
+- [x] T049 Delete `src/api/routes/auth.py` (all functionality moved to `src/auth/router.py`)
+- [x] T050 Update `src/api/deps.py`: replace `get_schwab_client` implementation — `get_current_token(request) -> str` extracts raw Bearer string (raises 401 if absent/malformed); `build_schwab_client(access_token: str)` wraps token as `{"creation_timestamp": now, "token": {"access_token": ..., "token_type": "Bearer"}}` and calls `client_from_access_functions` with `SCHWAB_CLIENT_ID`/`SCHWAB_CLIENT_SECRET`; `get_schwab_client` combines both as a FastAPI dependency
+- [x] T051 [P] Update `src/services/covered_call_screener.py`: remove `SCHWAB_CC_ACCOUNT_ID` env var guard and early return; replace `resolve_account_hash(client, account_id)` call with `list_accounts(client)` → use `accounts[0]["hashValue"]`; log warning and return `[]` if no accounts found
+- [x] T052 [P] Update `src/services/schwab_client.py`: remove `ACCOUNT_ID = os.getenv(...)` global; in `_fetch_positions`, replace `resolve_account_hash(client, ACCOUNT_ID)` with `list_accounts(client)` → `accounts[0]["hashValue"]`
+- [x] T053 Rewrite `frontend/static/js/auth.js`: export `getAccessToken()` (reads `sessionStorage.getItem('schwab_access_token')`); export `isAuthenticated()` (returns `!!getAccessToken()`); export `fetchWithAuth(url, options={})` (attaches `Authorization: Bearer <token>`, on 401 calls `eraseAll()`); export `eraseAll()` (unchanged: clears sessionStorage+localStorage+IndexedDB, redirects to `/auth/login`); remove `getToken()`, `getAuthHeader()`, all base64 encoding
+- [x] T054 [P] Update `frontend/static/js/positions_ui.js`: import `fetchWithAuth, isAuthenticated` instead of `getAuthHeader`; in `refreshPositions()`, replace `isAuthenticated()` guard + manual `fetch` with `const resp = await fetchWithAuth('/api/positions/refresh')` followed by `if (!resp) return;` guard; remove explicit `Authorization` header construction
+- [x] T055 [P] Update `frontend/static/js/screener_ui.js`: same pattern as T054 — import `fetchWithAuth, isAuthenticated`; replace manual fetch+auth with `fetchWithAuth`
+- [x] T056 [P] Update `frontend/templates/login.html`: change `href="/auth/connect"` to `href="/auth/start"`
+- [x] T057 [P] Update `.env`: add `SCHWAB_CLIENT_ID` (= current `SCHWAB_APP_KEY` value), `SCHWAB_CLIENT_SECRET` (= `SCHWAB_APP_SECRET`), `SCHWAB_REDIRECT_URI` (= `SCHWAB_CALLBACK_URL`), `SCHWAB_AUTH_URL=https://api.schwabapi.com/v1/oauth/authorize`, `SCHWAB_TOKEN_URL=https://api.schwabapi.com/v1/oauth/token`; old vars can remain for reference but are no longer read by the app
+- [x] T058 [P] Update `.env.example`: replace old var names with new ones; remove `DATABASE_URL`, `OAUTH_STATE_SECRET`, `SECRET_KEY`; add `SCHWAB_AUTH_URL` and `SCHWAB_TOKEN_URL` with correct Schwab URLs
 
 ---
 
