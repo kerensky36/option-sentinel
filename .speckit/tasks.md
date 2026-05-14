@@ -184,6 +184,72 @@ Tests MUST be written and confirmed failing before implementation.
 
 ---
 
+---
+
+## Phase 9: User Story 6 — Left Navigation Shell (Priority: P1)
+
+**Goal**: Persistent left sidebar with "Thesis Monitor" and "Covered Call Screener" nav items. Active item highlighted. Mobile-responsive collapse. No new backend routes beyond a stub for `/screener`.
+
+**Independent Test**: Open `http://localhost:8000`; confirm sidebar renders with both items; click each item; confirm correct view loads and active state updates. No brokerage connection required.
+
+### Tests for User Story 6 ⚠️ Write FIRST — confirm FAILING before T062
+
+- [ ] T060 [P] [US6] Write contract tests in `tests/contract/test_api_contracts.py`: `GET /` response HTML contains nav items "Thesis Monitor" and "Covered Call Screener"; `GET /screener` returns 200; active item receives highlight class based on current route
+
+### Implementation for User Story 6
+
+- [ ] T061 [US6] Restructure `frontend/templates/base.html`: change outer layout to `flex` row — `<aside>` left sidebar (fixed ~160px, `bg-gray-900 border-r border-gray-800`) containing nav items linking to `/` and `/screener`, active state driven by `current_page` context variable; keep existing top nav bar for logo and system controls; `<main>` content area fills remaining width
+- [ ] T062 [US6] Update `src/api/routes/dashboard.py` `GET /` to pass `current_page="thesis_monitor"` in template context; create `src/api/routes/screener.py` with stub `GET /screener` route passing `current_page="covered_call_screener"`; register `screener` router in `src/api/main.py`
+- [ ] T063 [P] [US6] Mobile responsive sidebar in `base.html`: sidebar collapses to a compact horizontal icon strip on viewports narrower than Tailwind `md` (768px); main content stacks below; confirm at 375px width
+
+**Checkpoint**: User Story 6 independently functional and tested — nav shell ready for US7 and US8
+
+---
+
+## Phase 10: User Story 7 — Thesis Monitor View (Priority: P2)
+
+**Goal**: Thesis-first health summary cards at `GET /`. Each card shows alignment rating, position count, aggregate exit proximity score, and combined P&L. Misaligned cards have red accent. Score ≥ 80 is highlighted. Cards expand inline to show individual position rows. SSE-driven updates.
+
+**Independent Test**: Create 2 thesis groups with different alignment ratings; assign ≥ 1 position to each; open Thesis Monitor; confirm one card per group with correct counts, scores, and P&L; confirm misaligned card has red accent; confirm card expands to show position rows.
+
+### Tests for User Story 7 ⚠️ Write FIRST — confirm FAILING before T067
+
+- [ ] T064 [P] [US7] Write contract test in `tests/contract/test_api_contracts.py`: `GET /` HTML contains thesis card elements (name, alignment badge, position count, score, P&L)
+- [ ] T065 [P] [US7] Write integration test in `tests/integration/test_thesis_assignment.py`: create 2 thesis groups + 2 positions each; call aggregation helper; assert correct avg score, combined P&L, and position count per group
+
+### Implementation for User Story 7
+
+- [ ] T066 [US7] Extend `src/api/_group_helpers.py` with `load_thesis_cards(session)`: for each thesis group query avg exit proximity score (across member positions with goals defined), sum of unrealised P&L, and position count; return list of thesis card dicts alongside existing helpers
+- [ ] T067 [P] [US7] Create `frontend/templates/partials/thesis_cards.html`: grid of thesis health cards using ThinkorSwim palette; each card shows name + template badge + alignment rating pill (green=aligned, amber=partial, red=misaligned, grey=unrated); position count; avg exit proximity score with `≥80` highlight; combined P&L (green/red); "Unassigned" card last if unassigned positions exist; card body (hidden by default) shows inline position rows via HTMX `hx-get="/partials/positions?thesis_id={id}"` on expand
+- [ ] T068 [US7] Update `frontend/templates/dashboard.html` to render `thesis_cards.html` partial as the primary content; wire `hx-get="/partials/thesis-cards"` SSE refresh; add `GET /partials/thesis-cards` route to `src/api/routes/partials.py` returning updated cards fragment
+- [ ] T069 [US7] Update `src/api/routes/dashboard.py` `GET /` to call `load_thesis_cards` and pass results to template; confirm `pytest tests/contract/` and `pytest tests/integration/test_thesis_assignment.py` pass
+
+**Checkpoint**: User Story 7 independently functional and tested
+
+---
+
+## Phase 11: User Story 8 — Covered Call Screener (Priority: P3)
+
+**Goal**: Rank stock positions from second Schwab account by covered call income potential. IV Rank (primary), annualised yield, assignment safety (delta 0.20–0.30), earnings suppression. On-demand refresh only. Setup prompt when `SCHWAB_CC_ACCOUNT_ID` not configured.
+
+**Independent Test**: Set `SCHWAB_CC_ACCOUNT_ID` to second account; open `/screener`; click Refresh; confirm ranked table with IV Rank, yield, delta, earnings proximity for each stock position. Test setup prompt by unsetting env var and reloading.
+
+### Tests for User Story 8 ⚠️ Write FIRST — confirm FAILING before T072
+
+- [ ] T070 [P] [US8] Write unit tests in `tests/unit/test_covered_call_screener.py`: composite score ranks high-IV position above low-IV; earnings suppression sets status to `earnings_risk`; liquidity exclusion sets status to `no_liquid_options`; call-already-written sets status to `call_written`; missing env var returns setup prompt flag
+- [ ] T071 [P] [US8] Write contract tests in `tests/contract/test_api_contracts.py`: `GET /screener` returns 200 HTML; when env var missing, response contains setup prompt text; `POST /screener/refresh` returns 200 HTML fragment
+
+### Implementation for User Story 8
+
+- [ ] T072 [US8] Implement `src/services/covered_call_screener.py`: `screen(schwab_client, account_id) -> list[CoveredCallCandidate]`; fetch stock positions from `account_id` via schwab-py; for each position call Schwab `/marketdata/v1/chains` for 30–45 DTE window; find best call strike where delta is closest to 0.25 with bid ≥ 0.05 and OI ≥ 100; compute IV Rank (current IV vs 52-week IV range from chain data), annualised yield `((bid / stock_price) * (365 / dte))`, composite score `(iv_rank * 0.50) + (yield_score * 0.30) + (delta_safety * 0.20)`; apply suppression rules (earnings within 7d → `earnings_risk`, no liquid options → `no_liquid_options`, existing short call detected → `call_written`); return sorted descending by composite score
+- [ ] T073 [US8] Implement `src/api/routes/screener.py`: `GET /screener` renders `screener.html` — if `SCHWAB_CC_ACCOUNT_ID` not set, pass `setup_required=True`; `POST /screener/refresh` calls screener service and returns `screener_table.html` fragment via HTMX swap; register routes in `src/api/main.py`
+- [ ] T074 [P] [US8] Create `frontend/templates/screener.html` extending `base.html`: setup prompt block (shown when `setup_required=True`) with env var name and instructions; screener table section with `hx-post="/screener/refresh"` Refresh button; create `frontend/templates/partials/screener_table.html`: ranked table with columns ticker / shares / price / IV Rank (highlighted >50 in green) / rec. strike / rec. expiry / bid / yield % / delta / DTE to earnings / score / status badge; status badges: `RANKED` (default), `AVOID — EARNINGS RISK` (amber), `CALL WRITTEN` (grey), `NO LIQUID OPTIONS` (dark grey)
+- [ ] T075 [US8] Confirm all US8 unit and contract tests pass; note that end-to-end validation with live second account is deferred until `SCHWAB_CC_ACCOUNT_ID` is configured
+
+**Checkpoint**: User Story 8 independently functional and tested (unit + contract); live validation deferred
+
+---
+
 ## Dependencies & Execution Order
 
 ### Phase Dependencies
@@ -193,11 +259,14 @@ Tests MUST be written and confirmed failing before implementation.
 - **US1 (Phase 3)**: Depends on Foundational — first user story (MVP)
 - **US2, US3, US4 (Phases 4–6)**: All depend on Foundational + US1 email infrastructure (T029)
 - **US5 (Phase 7)**: Depends on Foundational; independent of US2–US4
+- **US6 (Phase 9)**: Depends on US1 (base.html already exists); blocks US7 and US8 visually but not functionally
+- **US7 (Phase 10)**: Depends on US5 (thesis groups must exist); requires US6 nav shell
+- **US8 (Phase 11)**: Depends on US6 nav shell; independent of US2–US7 backend logic
 - **Polish (Phase 8)**: Depends on all user stories complete
 
 ### Critical Path
 
-Setup → Foundational → US1 → US2 (email client T029 needed by US3, US4) → US3 + US4 (parallel) → US5 → Polish
+Setup → Foundational → US1 → US2 (email client T029 needed by US3, US4) → US3 + US4 (parallel) → US5 → US6 → US7 + US8 (parallel) → Polish
 
 ### Parallel Opportunities Within US1
 
@@ -248,4 +317,7 @@ T018 → T019 → T020 → T021 → T022 → T023 → T026
 | US4 — Binary Event | T037–T043 | P2 |
 | US5 — Thesis & Scoring | T044–T053 | P3 |
 | Polish | T054–T059 | — |
-| **Total** | **59 tasks** | |
+| US6 — Left Nav Shell | T060–T063 | P1 |
+| US7 — Thesis Monitor | T064–T069 | P2 |
+| US8 — Covered Call Screener | T070–T075 | P3 |
+| **Total** | **75 tasks** | |

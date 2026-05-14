@@ -21,8 +21,6 @@
       }
     }
   </script>
-  <script src="https://unpkg.com/htmx.org@2.0.4"></script>
-  <script src="https://unpkg.com/htmx-ext-sse@2.2.2/sse.js"></script>
   <style>
     /* ── ThinkorSwim-inspired theme ─────────────────────────────────────── */
 
@@ -30,8 +28,8 @@
 
     body {
       font-family: 'JetBrains Mono', Consolas, 'Courier New', monospace;
-      font-size: 12px;
-      line-height: 1.45;
+      font-size: 13px;
+      line-height: 1.5;
       letter-spacing: 0.01em;
       -webkit-font-smoothing: antialiased;
     }
@@ -87,9 +85,9 @@
     nav { border-bottom-width: 1px; }
 
     /* ── Tables: denser, TOS-compact ── */
-    table           { font-size: 11px; border-collapse: collapse; }
-    table th        { font-size: 9px !important; letter-spacing: 0.14em !important; font-weight: 600; }
-    table td, table th { padding-top: 3px !important; padding-bottom: 3px !important; }
+    table           { font-size: 12px; border-collapse: collapse; }
+    table th        { font-size: 10px !important; letter-spacing: 0.12em !important; font-weight: 600; }
+    table td, table th { padding-top: 4px !important; padding-bottom: 4px !important; }
 
     /* ── Details/summary cards: no transition flash ── */
     details > summary { list-style: none; }
@@ -117,9 +115,9 @@
     .border-indigo-800 { border-color: #2a2450 !important; }
 
     /* ── Inputs/selects: TOS style ── */
-    input[type="number"], select {
+    input[type="number"], input[type="text"], select {
       font-family: inherit;
-      font-size: 11px;
+      font-size: 12px;
     }
 
     /* ── Large score number in gauge ── */
@@ -130,39 +128,183 @@
     ::-webkit-scrollbar-track { background: #0c0c10; }
     ::-webkit-scrollbar-thumb { background: #2c2c3a; border-radius: 2px; }
     ::-webkit-scrollbar-thumb:hover { background: #3c3c4e; }
+
+    /* ── Left sidebar nav ── */
+    .nav-section-label {
+      padding: 14px 12px 6px;
+      font-size: 10px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: #3a3a52;
+      user-select: none;
+    }
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      margin: 3px 8px;
+      padding: 9px 12px;
+      font-size: 12px;
+      letter-spacing: 0.03em;
+      color: #9090b8;
+      text-decoration: none;
+      line-height: 1.35;
+      cursor: pointer;
+      border-radius: 2px;
+      /* raised 3D button */
+      background: linear-gradient(180deg, #20202e 0%, #161622 100%);
+      border: 1px solid #2c2c42;
+      border-top-color: #36364e;
+      border-bottom-color: #0e0e18;
+      box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.05),
+        0 2px 4px rgba(0,0,0,0.5),
+        0 1px 2px rgba(0,0,0,0.35);
+      transition: background 0.1s, color 0.1s, box-shadow 0.1s;
+    }
+    .nav-item:hover:not(.nav-active) {
+      background: linear-gradient(180deg, #26263a 0%, #1c1c2c 100%);
+      border-top-color: #42425e;
+      color: #b8b8d8;
+      box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.07),
+        0 3px 7px rgba(0,0,0,0.55),
+        0 1px 3px rgba(0,0,0,0.4);
+    }
+    .nav-active {
+      /* sunken / pressed */
+      background: linear-gradient(180deg, #0c0c1c 0%, #12122a 100%) !important;
+      border: 1px solid #4040660 !important;
+      border-color: #3e3e62 !important;
+      border-top-color: #080810 !important;
+      color: #d0d0f0 !important;
+      box-shadow:
+        inset 0 3px 7px rgba(0,0,0,0.65),
+        inset 0 1px 3px rgba(0,0,0,0.5),
+        0 0 0 1px rgba(100,120,220,0.18) !important;
+    }
+    /* ── Matrix pill icons ── */
+    .pill {
+      display: inline-block;
+      width: 22px;
+      height: 11px;
+      border-radius: 11px;
+      flex-shrink: 0;
+      transition: box-shadow 0.15s, opacity 0.15s;
+    }
+    .pill-red {
+      background: linear-gradient(145deg, #c42828 0%, #7a1010 100%);
+      box-shadow: 0 1px 4px rgba(180,30,30,0.45), inset 0 1px 0 rgba(255,100,100,0.25);
+      opacity: 0.65;
+    }
+    .pill-blue {
+      background: linear-gradient(145deg, #2255cc 0%, #0e2d7a 100%);
+      box-shadow: 0 1px 4px rgba(30,70,200,0.45), inset 0 1px 0 rgba(100,150,255,0.25);
+      opacity: 0.65;
+    }
+    .nav-item:hover .pill-red, .nav-active .pill-red {
+      opacity: 1;
+      box-shadow: 0 0 8px rgba(210,40,40,0.7), 0 1px 4px rgba(180,30,30,0.5), inset 0 1px 0 rgba(255,120,120,0.35);
+    }
+    .nav-item:hover .pill-blue, .nav-active .pill-blue {
+      opacity: 1;
+      box-shadow: 0 0 8px rgba(40,90,220,0.7), 0 1px 4px rgba(30,70,200,0.5), inset 0 1px 0 rgba(120,170,255,0.35);
+    }
   </style>
 </head>
-<body class="bg-gray-950 text-gray-100 min-h-screen">
+<body class="bg-gray-950 text-gray-100 min-h-screen flex flex-col">
 
-  <!-- Binary event banner slot -->
-  <div id="binary-banner">
-    {% block binary_banner %}{% endblock %}
-  </div>
-
-  <!-- Nav -->
-  <nav class="bg-gray-900 border-b border-gray-800 px-4 py-1.5 flex items-center justify-between">
+  <!-- Top nav -->
+  <nav class="bg-gray-900 border-b border-gray-800 px-4 py-1.5 flex items-center justify-between flex-shrink-0">
     <div class="flex items-center gap-2">
       <img src="/static/sentinel.svg" class="w-7 h-7 drop-shadow-[0_0_5px_rgba(255,34,0,0.5)]" alt="Sentinel">
       <span class="text-sm font-semibold tracking-widest uppercase text-gray-200">Option Sentinel</span>
     </div>
-    <div class="flex items-center gap-4 text-gray-400" style="font-size:11px">
-      <span id="poll-status">Waiting for data…</span>
+    <div class="flex items-center gap-4 text-gray-400" style="font-size:12px">
       <button
-        hx-post="/admin/poll"
-        hx-swap="none"
-        hx-indicator="#poll-spinner"
-        class="flex items-center gap-1 bg-gray-800 hover:bg-gray-700 text-gray-300 px-2 py-1 transition-colors uppercase tracking-wider"
-        style="font-size:10px">
-        <span id="poll-spinner" class="htmx-indicator animate-spin">↻</span>
-        <span>Refresh</span>
+        id="erase-all-btn"
+        class="flex items-center gap-1 bg-red-900 hover:bg-red-800 text-red-300 px-2 py-1 transition-colors uppercase tracking-wider"
+        style="font-size:10px"
+        title="Wipe all browser storage: token, position cache, thesis groups">
+        Erase All Data
       </button>
+      <form method="post" action="/auth/logout" style="display:inline">
+        <button type="submit"
+          class="flex items-center gap-1 bg-gray-800 hover:bg-gray-700 text-gray-300 px-2 py-1 transition-colors uppercase tracking-wider"
+          style="font-size:10px">
+          Disconnect
+        </button>
+      </form>
     </div>
   </nav>
 
-  <!-- Main content -->
-  <main class="max-w-screen-xl mx-auto px-4 py-6">
-    {% block content %}{% endblock %}
-  </main>
+  <!-- Mobile nav strip (visible below md) -->
+  <div class="flex md:hidden border-b border-gray-800" style="background:#12121e">
+    <a href="/"
+       class="flex flex-1 items-center justify-center gap-2 py-2 px-3 text-center {% if current_page == 'thesis_monitor' %}nav-active{% endif %}"
+       style="font-size:11px; letter-spacing:0.04em; text-decoration:none; color:{% if current_page == 'thesis_monitor' %}#d0d0f0{% else %}#7070a0{% endif %}; border-bottom:2px solid {% if current_page == 'thesis_monitor' %}#6699dd{% else %}transparent{% endif %}; margin:4px 4px 0; border-radius:2px 2px 0 0;">
+      <span class="pill pill-red"></span> Positions
+    </a>
+    <a href="/screener"
+       class="flex flex-1 items-center justify-center gap-2 py-2 px-3 text-center {% if current_page == 'covered_call_screener' %}nav-active{% endif %}"
+       style="font-size:11px; letter-spacing:0.04em; text-decoration:none; color:{% if current_page == 'covered_call_screener' %}#d0d0f0{% else %}#7070a0{% endif %}; border-bottom:2px solid {% if current_page == 'covered_call_screener' %}#6699dd{% else %}transparent{% endif %}; margin:4px 4px 0; border-radius:2px 2px 0 0;">
+      <span class="pill pill-blue"></span> CC Screener
+    </a>
+  </div>
+
+  <!-- Body: sidebar + content -->
+  <div class="flex flex-1 min-h-0">
+
+    <!-- Left sidebar (hidden on mobile) -->
+    <aside class="hidden md:flex flex-col bg-gray-900 border-r border-gray-800 flex-shrink-0" style="width:224px">
+      <div class="nav-section-label">Views</div>
+
+      <a href="/"
+         class="nav-item {% if current_page == 'thesis_monitor' %}nav-active{% endif %}">
+        <span class="pill pill-red"></span>
+        Positions
+      </a>
+
+      <a href="/screener"
+         class="nav-item {% if current_page == 'covered_call_screener' %}nav-active{% endif %}">
+        <span class="pill pill-blue"></span>
+        Covered Call Screener
+      </a>
+
+      <!-- Spacer pushes future items to bottom -->
+      <div class="flex-1"></div>
+      <div class="border-t border-gray-800" style="margin:0 10px; opacity:0.4"></div>
+      <div class="nav-section-label" style="padding-bottom:10px; font-size:9px; color:#252532">
+        OPTION SENTINEL
+      </div>
+    </aside>
+
+    <!-- Main content -->
+    <main class="flex-1 overflow-auto px-5 py-5">
+      {% block content %}{% endblock %}
+    </main>
+
+  </div>
+
+  <!-- Erase All Data handler -->
+  <script type="module">
+    import { eraseAll } from '/static/js/auth.js';
+    const btn = document.getElementById('erase-all-btn');
+    if (btn) {
+      btn.addEventListener('click', async () => {
+        const confirmed = window.confirm(
+          'Erase All Data?\n\nThis will clear:\n' +
+          '• Your Schwab token (sessionStorage)\n' +
+          '• Position cache (IndexedDB)\n' +
+          '• Thesis groups and assignments (localStorage)\n\n' +
+          'You will need to reconnect your Schwab account.'
+        );
+        if (confirmed) {
+          await eraseAll();
+        }
+      });
+    }
+  </script>
 
 </body>
 </html>

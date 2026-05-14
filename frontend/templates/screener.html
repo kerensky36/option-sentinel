@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+
+{% block title %}Covered Call Screener — Option Sentinel{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-between mb-3">
+  <span class="text-gray-400 uppercase tracking-widest" style="font-size:11px">Covered Call Screener</span>
+  <button
+    id="screener-refresh-btn"
+    class="flex items-center gap-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 px-2 py-1 transition-colors uppercase tracking-wider"
+    style="font-size:11px">
+    <span>↻</span>
+    <span>Refresh</span>
+  </button>
+</div>
+
+<details class="mb-4 border border-gray-800 bg-gray-900 overflow-hidden" style="border-radius:2px">
+  <summary class="list-none cursor-pointer select-none px-3 py-2 flex items-center gap-2 text-gray-500 hover:bg-gray-800 transition-colors uppercase tracking-widest" style="font-size:10px">
+    <span class="text-gray-700">▶</span>
+    <span>How Scoring Works</span>
+  </summary>
+  <div class="border-t border-gray-800 px-4 py-3">
+
+    <div class="grid gap-3 mb-3" style="grid-template-columns: repeat(3, 1fr)">
+
+      <div class="border border-gray-800 bg-gray-950 px-3 py-2.5" style="border-radius:1px">
+        <div class="text-green-400 font-semibold mb-1" style="font-size:12px">IV Rank <span class="text-gray-500 font-normal">× 50%</span></div>
+        <div class="text-gray-400 leading-relaxed" style="font-size:11px">
+          Implied volatility rank 0–100. Measures how elevated IV is relative to its 52-week range.
+          Higher IV = fatter premiums. <span class="text-green-400">≥50</span> is considered elevated and shown in green.
+        </div>
+      </div>
+
+      <div class="border border-gray-800 bg-gray-950 px-3 py-2.5" style="border-radius:1px">
+        <div class="text-amber-300 font-semibold mb-1" style="font-size:12px">Yield Score <span class="text-gray-500 font-normal">× 30%</span></div>
+        <div class="text-gray-400 leading-relaxed" style="font-size:11px">
+          Annualised premium yield as % of stock price, normalised to 0–100.
+          A 20%+ annualised yield scores 100. Shown in <span class="text-green-400">green</span> when ≥10%.
+        </div>
+      </div>
+
+      <div class="border border-gray-800 bg-gray-950 px-3 py-2.5" style="border-radius:1px">
+        <div class="text-blue-300 font-semibold mb-1" style="font-size:12px">Delta Safety <span class="text-gray-500 font-normal">× 20%</span></div>
+        <div class="text-gray-400 leading-relaxed" style="font-size:11px">
+          Targets strikes near 0.25 delta — balancing premium income against assignment risk.
+          Higher delta means deeper ITM and higher assignment risk; scores near 0.
+        </div>
+      </div>
+
+    </div>
+
+    <div class="border-t border-gray-800 pt-3 flex flex-wrap gap-6" style="font-size:11px">
+      <div>
+        <span class="text-gray-600 uppercase tracking-wider" style="font-size:10px">Call Selection</span>
+        <div class="text-gray-400 mt-0.5">30–45 DTE · bid ≥ $0.05 · OI ≥ 100 · closest delta to 0.25</div>
+      </div>
+      <div>
+        <span class="text-gray-600 uppercase tracking-wider" style="font-size:10px">Score Thresholds</span>
+        <div class="mt-0.5 flex items-center gap-3">
+          <span class="text-green-400">≥70 Strong</span>
+          <span class="text-amber-300">40–69 Moderate</span>
+          <span class="text-gray-500">&lt;40 Weak</span>
+        </div>
+      </div>
+      <div>
+        <span class="text-gray-600 uppercase tracking-wider" style="font-size:10px">Suppression</span>
+        <div class="text-amber-300 mt-0.5">Earnings within 7 days → row dimmed</div>
+      </div>
+    </div>
+
+  </div>
+</details>
+
+{# ── Screener table placeholder ── #}
+<div id="screener-table" class="border border-gray-800 bg-gray-900 min-h-24 flex items-center justify-center" style="border-radius:2px; min-height:100px">
+  <span class="text-gray-500" style="font-size:12px">Click <strong>Refresh</strong> to fetch live screener data.</span>
+</div>
+
+<script type="module">
+  import '/static/js/auth.js';
+  import '/static/js/screener_ui.js';
+</script>
+
+{% endblock %}

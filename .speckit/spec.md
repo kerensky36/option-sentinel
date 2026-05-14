@@ -7,6 +7,14 @@
 
 ## Clarifications
 
+### Session 2026-05-02
+
+- Q: What does "Thesis Monitor" show that the current dashboard does not? → A: A thesis-centric view — each thesis group gets a dedicated health summary card (alignment rating, aggregate exit proximity, position count, P&L rollup) rather than the current position-row-first table layout.
+- Q: What does the Covered Call Screener screen against? → A: Long stock positions in a second Schwab account. Goal is to rank which positions would benefit most from selling a covered call to generate income without getting called away.
+- Q: Is the second account also at Schwab? → A: Yes — same Schwab OAuth client, different account number. Account number will be configured via environment variable; not hardcoded. Wiring happens in a later session.
+- Q: What signals determine "benefits most from covered call selling"? → A: Composite of IV Rank (primary — higher = more premium), annualised premium yield at the recommended strike, delta of the recommended call (target 0.20–0.30 for assignment safety), and days to nearest earnings (suppress recommendations within 7 days of earnings).
+- Q: How is the left nav structured? → A: Persistent vertical sidebar replaces the current top-nav-only layout. Two items: Thesis Monitor (existing dashboard refocused) and Covered Call Screener (new). Active item highlighted. ThinkorSwim-consistent styling.
+
 ### Session 2026-04-29
 
 - Q: Is a thesis per-position or a grouping entity for multiple positions? → A: Template-based thesis groups — theses are named, template-defined entities; multiple positions are assigned to one thesis group rather than each position holding its own thesis.
@@ -102,6 +110,65 @@ The trader creates named thesis groups using predefined templates (e.g., "IV cru
 
 ---
 
+---
+
+### User Story 6 - Left Navigation Shell (Priority: P1)
+
+The trader opens Option Sentinel and sees a persistent left sidebar with two named views: Thesis Monitor and Covered Call Screener. Clicking a nav item loads the corresponding view in the main content area without a full page reload. The active item is visually highlighted. The sidebar is always present regardless of which view is active, giving the app a consistent navigation structure as new views are added.
+
+**Why this priority**: The left nav is the structural container for US7 and US8. Both views require it to exist before they can be implemented or tested. It also meaningfully improves the trader's orientation in the app.
+
+**Independent Test**: Can be tested by opening the dashboard, verifying the sidebar renders with both items, clicking each item, and confirming the correct view loads and the active state updates. No backend changes are required to deliver this story.
+
+**Acceptance Scenarios**:
+
+1. **Given** the trader opens the application, **When** the page loads, **Then** a persistent left sidebar is visible containing exactly two items: "Thesis Monitor" and "Covered Call Screener".
+2. **Given** the trader is on the Thesis Monitor view, **When** they look at the sidebar, **Then** "Thesis Monitor" is visually highlighted as the active item.
+3. **Given** the trader clicks "Covered Call Screener" in the sidebar, **When** the view loads, **Then** the main content area shows the Covered Call Screener and "Covered Call Screener" is highlighted in the sidebar.
+4. **Given** the trader clicks "Thesis Monitor" in the sidebar, **When** the view loads, **Then** the main content area shows the Thesis Monitor view and "Thesis Monitor" is highlighted.
+5. **Given** the sidebar is visible, **When** the trader views it on a mobile viewport, **Then** the sidebar collapses to a top bar or icon strip and the main content remains fully accessible.
+
+---
+
+### User Story 7 - Thesis Monitor View (Priority: P2)
+
+The trader navigates to the Thesis Monitor view and sees all their thesis groups displayed as health summary cards. Each card shows the thesis name, template type, alignment rating, the number of positions assigned to it, the aggregate exit proximity score across those positions, and the combined unrealised P&L. Positions not assigned to a thesis appear in an "Unassigned" card at the bottom. The trader uses this view to quickly assess which thesis groups need attention without wading through individual position rows.
+
+**Why this priority**: The current dashboard is position-first. A thesis-first view gives the trader a higher-level risk signal — they can see at a glance that an entire group is misaligned or nearing exit, not just individual legs.
+
+**Independent Test**: Can be tested by creating two thesis groups with different alignment ratings, assigning at least one position to each, and verifying that the Thesis Monitor displays one card per group with correct position counts, aggregate scores, and P&L rollups. Delivers standalone value as a portfolio health view even before individual position drill-down is implemented.
+
+**Acceptance Scenarios**:
+
+1. **Given** the trader navigates to Thesis Monitor, **When** the view loads, **Then** one card is shown per thesis group containing: thesis name, template type, alignment rating badge, position count, aggregate exit proximity score (average of member positions), and combined unrealised P&L.
+2. **Given** one or more positions are not assigned to any thesis, **When** the Thesis Monitor loads, **Then** those positions appear under an "Unassigned" card at the bottom of the view.
+3. **Given** a thesis group has an alignment rating of "misaligned", **When** its card is displayed, **Then** the card is visually distinct (e.g., red accent) to draw the trader's attention.
+4. **Given** a thesis group has an aggregate exit proximity score ≥ 80, **When** its card is displayed, **Then** the score is highlighted to indicate at least one member position is near its exit threshold.
+5. **Given** the trader clicks on a thesis group card, **When** the card expands, **Then** the individual positions belonging to that thesis are shown inline with the same fields as the main positions table (mark, P&L, DTE, Greeks, exit proximity score).
+6. **Given** the page is open during market hours and an SSE refresh event fires, **When** the event is received, **Then** the thesis cards update their aggregate scores and P&L without a full page reload.
+
+---
+
+### User Story 8 - Covered Call Screener (Priority: P3)
+
+The trader navigates to the Covered Call Screener. The system fetches all long stock positions from the trader's second Schwab account and, for each position, evaluates whether selling a covered call would generate meaningful income without unacceptable assignment risk. Results are displayed as a ranked table. The top-ranked positions are those with high IV Rank, attractive annualised premium yield at a sensible OTM strike, and no earnings event within the next 7 days. The trader uses this to decide which positions to write calls against on any given week.
+
+**Why this priority**: This is additive income tooling on a separate account — valuable but independent from the core options monitor. It can be built and tested entirely independently once the nav shell (US6) exists.
+
+**Independent Test**: Can be tested by configuring the second account number, opening the Covered Call Screener, and verifying that stock positions are fetched, option chains are evaluated, and a ranked table is produced with correct IV Rank, premium yield, delta, and earnings proximity for at least one position.
+
+**Acceptance Scenarios**:
+
+1. **Given** the trader navigates to the Covered Call Screener, **When** the view loads, **Then** all long stock positions from the second Schwab account are listed in a ranked table sorted by composite score (descending).
+2. **Given** a stock position is displayed in the screener, **When** the trader reads the row, **Then** it shows: ticker, shares held, current stock price, IV Rank (0–100), recommended call strike, recommended expiry (30–45 DTE), bid premium, annualised premium yield (%), delta of recommended call, days to nearest earnings, and composite score.
+3. **Given** IV Rank for a position is above 50, **When** it is displayed, **Then** the IV Rank cell is highlighted to signal elevated premium opportunity.
+4. **Given** a stock position has an earnings event within 7 days, **When** it is displayed, **Then** the row is flagged with an earnings warning and the call recommendation is suppressed (recommendation cell shows "Avoid — earnings risk").
+5. **Given** no liquid call options exist for a stock (bid < $0.05 or open interest < 100 at any strike in the 30–45 DTE window), **When** the row is displayed, **Then** the recommendation cell shows "No liquid options" and the position is ranked last.
+6. **Given** the trader clicks "Refresh" in the screener, **When** the refresh completes, **Then** all option chain data and IV Ranks are re-fetched from Schwab and the table re-ranks.
+7. **Given** the second account number is not yet configured, **When** the Covered Call Screener loads, **Then** a clear setup prompt is shown explaining which environment variable to set, rather than an error.
+
+---
+
 ### Edge Cases
 
 - What happens when the brokerage account has no open positions? Dashboard shows an empty state with a clear message rather than an error.
@@ -113,6 +180,11 @@ The trader creates named thesis groups using predefined templates (e.g., "IV cru
 - What happens if email delivery fails? The alert is logged locally and retried on the next poll cycle up to 3 attempts before being marked failed.
 - What happens when Schwab does not return any Greeks for a position and Black-Scholes cannot be computed (e.g., missing underlying price)? All Greek fields display "—" with an "unavailable" indicator; no error is surfaced to the trader.
 - What happens when a thesis group is deleted? Positions previously in that group move to "Unassigned"; their exit goals and scores are preserved.
+- What happens when the second Schwab account has no long stock positions? The Covered Call Screener shows an empty state with a message rather than an error.
+- What happens when a stock in the second account already has an open covered call? The screener flags the position as "Call already written" and excludes it from ranked recommendations.
+- What happens when the Schwab API does not return an IV Rank for a stock? IV Rank shows "—" and the position is ranked last; the other fields still populate if available.
+- What happens when the 30–45 DTE window straddles two expiry cycles? The screener uses the nearest expiry within the window; if two expiries are equidistant, it picks the further one for more time value.
+- What happens when earnings data is unavailable for a stock? Days to earnings shows "Unknown" and no suppression is applied; the trader is responsible for checking manually.
 
 ## Requirements *(mandatory)*
 
@@ -171,6 +243,33 @@ The trader creates named thesis groups using predefined templates (e.g., "IV cru
 - **FR-028**: When the trader raises the binary event flag, the system MUST immediately send a single consolidated email listing all open positions with an instruction to exit all positions.
 - **FR-029**: The binary event alert MUST fire once per flag-raise event; re-raising the flag after it has been cleared triggers a new alert.
 
+**Navigation Shell**
+
+- **FR-033**: The application MUST render a persistent left sidebar containing exactly two navigation items: "Thesis Monitor" and "Covered Call Screener".
+- **FR-034**: The active navigation item MUST be visually highlighted. Navigation between items MUST load the corresponding view without a full page reload (HTMX swap or equivalent).
+- **FR-035**: On mobile viewports the sidebar MUST collapse to a compact navigation strip; the main content area MUST remain fully accessible.
+
+**Thesis Monitor**
+
+- **FR-036**: The Thesis Monitor view MUST display one summary card per thesis group containing: name, template type, alignment rating badge, position count, average exit proximity score across member positions, and combined unrealised P&L.
+- **FR-037**: Positions not assigned to any thesis MUST appear in a single "Unassigned" card at the bottom of the Thesis Monitor view.
+- **FR-038**: A thesis card with alignment rating "misaligned" MUST render a distinct visual treatment (red accent) to draw the trader's attention.
+- **FR-039**: A thesis card whose average exit proximity score is ≥ 80 MUST highlight the score field to indicate at least one member position is approaching its exit threshold.
+- **FR-040**: Clicking a thesis card MUST expand it inline to show individual position rows with the same fields as the main positions table (mark, P&L, DTE, Greeks, exit proximity score).
+- **FR-041**: The Thesis Monitor MUST update card scores and P&L without a full page reload when an SSE refresh event fires during market hours.
+
+**Covered Call Screener**
+
+- **FR-042**: The Covered Call Screener MUST read long stock positions from a second Schwab account whose account number is supplied via an environment variable (`SCHWAB_CC_ACCOUNT_ID`).
+- **FR-043**: If `SCHWAB_CC_ACCOUNT_ID` is not set, the Covered Call Screener MUST display a setup prompt naming the required environment variable rather than an error.
+- **FR-044**: For each long stock position, the screener MUST fetch option chain data from Schwab for expiries in the 30–45 DTE window and derive: IV Rank, the recommended call strike (delta 0.20–0.30), bid premium, annualised premium yield, and days to nearest earnings.
+- **FR-045**: The screener MUST compute a composite score for each position using: IV Rank (primary weight), annualised premium yield, and assignment safety (inverse of delta distance from 0.25 target). Earnings proximity within 7 days suppresses the recommendation entirely.
+- **FR-046**: The screener MUST rank results in descending composite score order and display: ticker, shares held, stock price, IV Rank, recommended strike, recommended expiry, bid premium, annualised yield (%), call delta, days to earnings, composite score, and recommendation status.
+- **FR-047**: The screener MUST flag positions where a covered call is already written (detected via open option positions in the same account) and exclude them from ranked recommendations.
+- **FR-048**: The screener MUST suppress the call recommendation and display "Avoid — earnings risk" for any position with an earnings event within 7 calendar days.
+- **FR-049**: The screener MUST display "No liquid options" and rank the position last when no call option in the 30–45 DTE window has a bid ≥ $0.05 and open interest ≥ 100.
+- **FR-050**: The screener MUST provide a manual Refresh button that re-fetches option chain data and re-ranks the table on demand. Screener data is NOT refreshed on the automatic 5-minute poll cycle.
+
 **Alerting — Delivery**
 
 - **FR-030**: The system MUST deliver alerts via email as the primary notification channel.
@@ -187,6 +286,8 @@ The trader creates named thesis groups using predefined templates (e.g., "IV cru
 - **Alert**: A triggered notification event. Key attributes: alert type, position or spread reference, severity, trigger timestamp, delivery status, retry count, acknowledged timestamp.
 - **AuthToken**: Brokerage OAuth token state. Key attributes: access token, access expiry, refresh token, refresh expiry, re-auth required flag.
 - **BinaryEventFlag**: The trader's manual full-exit signal. Key attributes: active state, activated timestamp, cleared timestamp.
+- **StockPosition**: A long equity position in the second Schwab account used by the Covered Call Screener. Key attributes: ticker, shares held, average cost, current price, account_id. Transient — not persisted; fetched on demand.
+- **CoveredCallCandidate**: A screener result row derived from a StockPosition. Key attributes: ticker, shares, stock price, IV Rank, recommended strike, recommended expiry, bid premium, annualised yield, call delta, days to earnings, composite score, recommendation status (`ranked` | `earnings_risk` | `call_written` | `no_liquid_options`). Transient — not persisted; computed on each screener refresh.
 
 ## Success Criteria *(mandatory)*
 
@@ -201,10 +302,13 @@ The trader creates named thesis groups using predefined templates (e.g., "IV cru
 - **SC-007**: 100% of triggered alerts for the 3-day expiry threshold and the close-trigger rule result in a delivered or logged-retry notification.
 - **SC-008**: The re-authentication prompt appears at least 24 hours before the refresh token expires.
 - **SC-009**: Greek values (from API or calculated) are displayed for all open positions within one poll cycle of the dashboard opening.
+- **SC-010**: The left sidebar renders on every page load with correct active state highlighting; navigation between Thesis Monitor and Covered Call Screener completes without a full page reload.
+- **SC-011**: The Thesis Monitor displays one card per thesis group with correct position count, aggregate exit proximity score, and combined P&L within one SSE cycle of opening the view.
+- **SC-012**: The Covered Call Screener produces a ranked table for a second account with at least one long stock position within 10 seconds of the trader clicking Refresh.
 
 ## Assumptions
 
-- The trader operates a single brokerage account; multi-account support is out of scope.
+- The trader operates two Schwab accounts under the same OAuth client: a primary options account (monitored by the Thesis Monitor) and a secondary equities account (read-only, used only by the Covered Call Screener). Both accounts share the same OAuth token; only the account number differs. Full multi-account support beyond these two accounts is out of scope.
 - "Market hours" means US equity market hours: 9:30 AM – 4:00 PM ET, Monday through Friday, excluding US market holidays. The holiday calendar is embedded in the application and updated annually.
 - The trader's brokerage (Charles Schwab) provides a publicly accessible OAuth2 API supporting position retrieval. No internal or institutional API access is assumed.
 - The Schwab API may return Greeks on option quote responses; availability is not guaranteed for all strikes/expiries. Black-Scholes fallback uses the US 3-month Treasury rate as the risk-free rate, configurable via environment variable.

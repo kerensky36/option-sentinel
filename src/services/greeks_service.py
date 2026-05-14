@@ -1,22 +1,44 @@
-import os
-from datetime import date
+"""Greeks computation service.
 
-from src.data.models import Position, SourceEnum
-from src.services.bs_calculator import bs_greeks, implied_volatility
+build_greeks() accepts raw position parameters and a Greeks dict from the
+Schwab option chain API, and returns a plain dict of Greek field values.
+Falls back to Black-Scholes when API values are absent.
+"""
+from __future__ import annotations
+
+import os
+
+from src.services.bs_calculator import bs_greeks
 
 RISK_FREE_RATE = float(os.getenv("RISK_FREE_RATE", "0.045"))
 
 
-def build_greeks(position: Position, raw: dict) -> dict:
-    dte = position.days_to_expiry or 0
-    T = dte / 365.0
-    K = float(position.strike)
-    option_type = position.option_type.value if hasattr(position.option_type, "value") else position.option_type
-    # Use underlying price from chain response; fall back to strike as last resort
+def build_greeks(
+    strike: float,
+    option_type: str,
+    days_to_expiry: int,
+    raw: dict,
+) -> dict:
+    """Build a Greeks dict from raw API data, falling back to Black-Scholes.
+
+    Args:
+        strike: Option strike price.
+        option_type: "call" or "put".
+        days_to_expiry: Days remaining until expiry.
+        raw: Dict from Schwab option chain response containing delta, gamma,
+             theta, vega, implied_volatility, underlying_price.
+
+    Returns:
+        Dict with keys: delta, delta_source, gamma, gamma_source, theta,
+        theta_source, vega, vega_source, implied_volatility, iv_source.
+        Source values are "api" or "calculated" (or None if unavailable).
+    """
+    T = days_to_expiry / 365.0
+    K = float(strike)
     underlying_price = float(raw.get("underlying_price") or 0) or K
 
-    def _src(val) -> SourceEnum:
-        return SourceEnum.api if val is not None else SourceEnum.unavailable
+    def _src(val) -> str | None:
+        return "api" if val is not None else None
 
     delta = raw.get("delta")
     gamma = raw.get("gamma")
@@ -49,16 +71,16 @@ def build_greeks(position: Position, raw: dict) -> dict:
             bs = bs_greeks(S=underlying_price, K=K, T=T, r=RISK_FREE_RATE, sigma=sigma, option_type=option_type)
             if result["delta"] is None:
                 result["delta"] = bs.delta
-                result["delta_source"] = SourceEnum.calculated
+                result["delta_source"] = "calculated"
             if result["gamma"] is None:
                 result["gamma"] = bs.gamma
-                result["gamma_source"] = SourceEnum.calculated
+                result["gamma_source"] = "calculated"
             if result["theta"] is None:
                 result["theta"] = bs.theta
-                result["theta_source"] = SourceEnum.calculated
+                result["theta_source"] = "calculated"
             if result["vega"] is None:
                 result["vega"] = bs.vega
-                result["vega_source"] = SourceEnum.calculated
+                result["vega_source"] = "calculated"
         except Exception:
             pass
 
