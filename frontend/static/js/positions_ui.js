@@ -7,7 +7,7 @@
  */
 
 import { fetchWithAuth, isAuthenticated } from './auth.js';
-import { withAccountHash } from './account_picker.js';
+import { withAccountHash, getSelectedAccountHash } from './account_picker.js';
 import { savePositions, loadPositions } from './position_cache.js';
 import { getAssignments } from './thesis_store.js';
 
@@ -48,7 +48,7 @@ function fmt(val, decimals = 4) {
 function sourceBadge(source) {
   if (!source) return '';
   if (source === 'calculated') {
-    return '<span class="ml-0.5 text-amber-400" title="Black-Scholes estimate" style="font-size:9px">BS</span>';
+    return '<span class="ml-0.5 text-amber-400 text-xs" title="Black-Scholes estimate">BS</span>';
   }
   return '';
 }
@@ -70,7 +70,7 @@ export function renderPositions(positions, timestamp) {
 
   if (!positions || positions.length === 0) {
     container.innerHTML = `
-      <div class="text-gray-500 text-center py-8" style="font-size:12px">
+      <div class="text-gray-500 text-center py-8 text-sm">
         No open positions. Click <strong>Refresh</strong> to fetch live data.
       </div>`;
     return;
@@ -80,14 +80,14 @@ export function renderPositions(positions, timestamp) {
     const pnl = formatPnl(p.unrealised_pnl);
     const thesisId = assignMap[p.symbol];
     const thesisBadge = thesisId
-      ? `<span class="bg-indigo-900\/60 text-indigo-300 border border-indigo-800 px-1" style="font-size:10px">${thesisId}</span>`
+      ? `<span class="bg-indigo-900\/60 text-indigo-300 border border-indigo-800 px-1 text-xs">${thesisId}</span>`
       : '';
 
     return `
     <tr class="border-b border-gray-800 hover:bg-gray-900\/40 transition-colors">
-      <td class="px-2 py-1 text-gray-200 font-mono" style="font-size:11px">${p.symbol}</td>
+      <td class="px-2 py-1 text-gray-200 font-mono">${p.symbol}</td>
       <td class="px-2 py-1 text-gray-300">${p.underlying_symbol}</td>
-      <td class="px-2 py-1 ${p.option_type === 'call' ? 'text-green-400' : 'text-red-400'} uppercase" style="font-size:10px">${p.option_type}</td>
+      <td class="px-2 py-1 ${p.option_type === 'call' ? 'text-green-400' : 'text-red-400'} uppercase text-xs">${p.option_type}</td>
       <td class="px-2 py-1 text-gray-200">${Number(p.strike).toFixed(2)}</td>
       <td class="px-2 py-1 text-gray-300">${p.expiry_date}</td>
       <td class="px-2 py-1 text-right ${p.quantity < 0 ? 'text-red-400' : 'text-green-400'}">${p.quantity}</td>
@@ -107,7 +107,7 @@ export function renderPositions(positions, timestamp) {
     <div class="overflow-x-auto">
       <table class="w-full text-left">
         <thead>
-          <tr class="border-b border-gray-700 text-gray-500 uppercase" style="font-size:10px; letter-spacing:0.10em;">
+          <tr class="border-b border-gray-700 text-gray-500 uppercase text-xs tracking-wider">
             <th class="px-2 py-1">Symbol</th>
             <th class="px-2 py-1">Underlying</th>
             <th class="px-2 py-1">Type</th>
@@ -164,16 +164,16 @@ async function refreshPositions() {
 
     const positions = await resp.json();
     const timestamp = new Date().toISOString();
-    await savePositions(positions);
+    savePositions(positions, getSelectedAccountHash());
     renderPositions(positions, timestamp);
   } catch (err) {
     console.error('positions_ui: refresh failed', err);
     const container = document.getElementById(TABLE_ID);
     if (container) {
       container.innerHTML = `
-        <div class="text-red-400 text-center py-4" style="font-size:12px">
+        <div class="text-red-400 text-center py-4 text-sm">
           Failed to refresh positions: ${err.message}
-          <button id="${REFRESH_BTN_ID}" class="ml-3 bg-gray-800 hover:bg-gray-700 text-gray-300 px-2 py-0.5 uppercase tracking-wider" style="font-size:10px">Retry</button>
+          <button id="${REFRESH_BTN_ID}" class="ml-3 bg-gray-800 hover:bg-gray-700 text-gray-300 px-2 py-0.5 uppercase tracking-wider text-xs">Retry</button>
         </div>`;
       document.getElementById(REFRESH_BTN_ID)?.addEventListener('click', refreshPositions);
     }
@@ -186,30 +186,30 @@ async function refreshPositions() {
 }
 
 /**
- * Initialise: load cached positions immediately, wire up Refresh button.
- * Auto-fetches live data on first visit when no cache exists.
+ * Handle account selection: load account-scoped cache or fetch fresh data.
+ * @param {string} accountHash
  */
-async function init() {
-  let hasCached = false;
-
-  try {
-    const cached = await loadPositions();
-    if (cached) {
-      hasCached = true;
-      renderPositions(cached.positions, cached.savedAt);
-    }
-  } catch (e) {
-    console.warn('positions_ui: cache load failed', e);
+function handleAccountChange(accountHash) {
+  const cached = loadPositions(accountHash);
+  if (cached) {
+    renderPositions(cached.positions, cached.savedAt);
+    return;
   }
+  refreshPositions();
+}
 
+/**
+ * Initialise: wire up Refresh button and wait for account to resolve.
+ * Data is fetched/rendered once the accountchange event fires.
+ */
+function init() {
   const btn = document.getElementById(REFRESH_BTN_ID);
   if (btn) {
     btn.addEventListener('click', refreshPositions);
   }
-
-  if (!hasCached) {
-    await refreshPositions();
-  }
+  document.addEventListener('accountchange', (e) => {
+    handleAccountChange(e.detail.accountHash);
+  });
 }
 
 init();

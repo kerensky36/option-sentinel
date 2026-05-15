@@ -1,35 +1,39 @@
 <!--
 SYNC IMPACT REPORT
 ==================
-Version change: 3.0.0 → 3.1.0
-Bump type: MINOR — Principle II (Security-First) materially expanded with
-  explicit threat-model-driven controls. No principles added or removed.
-  No scope changes.
+Version change: 3.1.0 → 3.2.0
+Bump type: MINOR — Principle I (Privacy-First) and Technology Constraints
+  (Storage) expanded to explicitly cover all client-side trader data, not
+  just the access token. No principles added or removed. No scope changes.
 
-Modified principles:
-  II. Security-First
-    Rationale: The v3.0.0 Security-First principle listed 8 high-level
-    controls. This amendment expands each control to be explicit and
-    testable against a blackhat threat model: credential theft via XSS,
-    IDOR attacks, OAuth flow manipulation, token interception, clickjacking,
-    supply chain compromise, and information disclosure via error responses.
-    New controls added: Content Security Policy, security response headers
-    (X-Frame-Options, HSTS, X-Content-Type-Options, Referrer-Policy),
-    no-token-in-URL rule, OAuth PKCE integrity mandate, security event
-    audit logging, and zero-tolerance for sensitive data in any output.
+Modified sections:
+  I. Privacy-First Data Handling
+    Rationale: The v3.1.0 wording restricted the sessionStorage-only rule
+    to the Schwab access token. This amendment extends the rule to ALL
+    client-side trader data (positions cache, screener cache, account hash).
+    Adds the explicit "no persistence beyond tab close" guarantee that is
+    communicated to users on the login screen. eraseAll() is now described
+    as a failsafe only — sessionStorage's automatic clearing on tab close
+    is the primary enforcement mechanism.
+
+  Technology Constraints → Storage
+    Rationale: Updated to match Principle I amendment — all client caches
+    (positions, screener results) MUST use sessionStorage; IndexedDB is
+    explicitly prohibited for any trader data.
 
 Added sections:
-  None (controls expanded within existing Principle II)
+  None
 
 Removed sections:
-  None
+  None (IndexedDB position cache implementation removed from codebase;
+  position_cache.js migrated to sessionStorage)
 
 Templates reviewed:
   ✅ .specify/templates/plan-template.md — no changes needed
   ✅ .specify/templates/spec-template.md — no changes needed
   ✅ .specify/templates/tasks-template.md — no changes needed
 
-Follow-up TODOs (implementation required — not yet in code):
+Follow-up TODOs carried forward from 3.1.0 (implementation required):
   - Implement CSP middleware in src/api/main.py (strict-dynamic or nonce-based)
   - Implement security response headers middleware in src/api/main.py
     (X-Frame-Options: DENY, HSTS, X-Content-Type-Options: nosniff,
@@ -56,11 +60,20 @@ provably stateless: no user data persists on the server between requests, and
 no user's data is accessible from any other user's session. No external logging
 services, cloud storage writes, or third-party analytics are permitted. Ephemeral
 processing in a server container is acceptable provided nothing is written to
-disk, a database, or any external service after the request completes. The Schwab
-access token MUST be stored in browser sessionStorage only — never on the server,
-in a cookie, or in any persistent browser store (localStorage, IndexedDB).
-Compliance is verifiable by confirming no persistent storage layer exists in the
-server and that token values never appear in server logs or error responses.
+disk, a database, or any external service after the request completes.
+
+ALL client-side trader data — the access token, account hash, position cache,
+and screener cache — MUST be stored in browser sessionStorage only. No trader
+data may be written to localStorage, IndexedDB, cookies, or any other persistent
+browser store. This guarantees that closing the tab or browser window erases all
+data automatically, with no manual action required from the user. This guarantee
+is communicated to users on the login screen and MUST be maintained in all future
+features. eraseAll() serves as a failsafe for explicit logout and 401 handling;
+it is NOT the primary data-clearing mechanism — sessionStorage's automatic
+lifetime enforcement is. Compliance is verifiable by confirming no persistent
+storage layer exists on the server, that no trader data is written to IndexedDB
+or localStorage, and that token values never appear in server logs or error
+responses.
 
 ### II. Security-First
 
@@ -204,8 +217,9 @@ is sufficient.
   authenticates via their own Schwab OAuth token (Bearer header). The server is
   stateless per-request — no user state is retained between requests.
 - **Storage**: No server-side storage. All server state is ephemeral — held in
-  memory for the duration of a single request only. The Schwab access token is
-  stored in browser sessionStorage client-side and never persisted server-side.
+  memory for the duration of a single request only. All client-side trader data
+  (access token, account hash, position cache, screener cache) MUST be stored
+  in browser sessionStorage only — never in localStorage, IndexedDB, or cookies.
   No database, filesystem writes, or mounted volumes are permitted in production.
 - **Security controls**: All controls in Principle II are mandatory in production.
   CSP, security headers, HTTPS/HSTS, CORS, rate limiting, pip-audit, and zero
@@ -239,4 +253,4 @@ documented in plan.md's Complexity Tracking table before implementation proceeds
 Security control gaps identified during review MUST be logged as follow-up TODOs
 in the Sync Impact Report of the relevant amendment.
 
-**Version**: 3.1.0 | **Ratified**: 2026-04-28 | **Last Amended**: 2026-05-14
+**Version**: 3.2.0 | **Ratified**: 2026-04-28 | **Last Amended**: 2026-05-15

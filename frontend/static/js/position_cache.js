@@ -1,92 +1,45 @@
 /**
- * position_cache.js — IndexedDB-backed position cache.
+ * position_cache.js — sessionStorage-backed position cache.
  *
- * Positions are stored in IndexedDB so they survive page refreshes within a
- * session. The cache is cleared by auth.eraseAll() on logout.
+ * Positions are stored in sessionStorage so they survive page navigation
+ * within a tab but are automatically cleared when the tab or browser closes.
+ * The cache is also cleared by auth.eraseAll() on logout.
  */
 
-const DB_NAME = 'option-sentinel';
-const DB_VERSION = 1;
-const STORE_NAME = 'positions';
-const CACHE_KEY = 'latest';
+const CACHE_PREFIX = 'positions';
 
-/**
- * Open (or create) the IndexedDB database.
- * @returns {Promise<IDBDatabase>}
- */
-function openDB() {
-  return new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, DB_VERSION);
-    req.onupgradeneeded = (event) => {
-      const db = event.target.result;
-      if (!db.objectStoreNames.contains(STORE_NAME)) {
-        db.createObjectStore(STORE_NAME);
-      }
-    };
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
-  });
+function _key(accountHash) {
+  return accountHash ? `${CACHE_PREFIX}_${accountHash}` : CACHE_PREFIX;
 }
 
 /**
- * Save a positions array to IndexedDB under key 'latest'.
- * @param {Array<object>} positions - Array of PositionView objects.
- * @returns {Promise<void>}
+ * Save a positions array to sessionStorage, keyed by account hash.
+ * @param {Array<object>} positions
+ * @param {string|null} accountHash
  */
-export async function savePositions(positions) {
-  const db = await openDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, 'readwrite');
-    const store = tx.objectStore(STORE_NAME);
-    const req = store.put({ positions, savedAt: new Date().toISOString() }, CACHE_KEY);
-    req.onsuccess = () => resolve();
-    req.onerror = () => reject(req.error);
-    tx.oncomplete = () => db.close();
-  });
+export function savePositions(positions, accountHash) {
+  sessionStorage.setItem(_key(accountHash), JSON.stringify({ positions, savedAt: new Date().toISOString() }));
 }
 
 /**
- * Load the latest cached positions from IndexedDB.
- * @returns {Promise<{positions: Array<object>, savedAt: string}|null>}
+ * Load cached positions for the given account hash.
+ * @param {string|null} accountHash
+ * @returns {{positions: Array<object>, savedAt: string}|null}
  */
-export async function loadPositions() {
+export function loadPositions(accountHash) {
   try {
-    const db = await openDB();
-    return new Promise((resolve, reject) => {
-      const tx = db.transaction(STORE_NAME, 'readonly');
-      const store = tx.objectStore(STORE_NAME);
-      const req = store.get(CACHE_KEY);
-      req.onsuccess = () => {
-        db.close();
-        resolve(req.result || null);
-      };
-      req.onerror = () => {
-        db.close();
-        reject(req.error);
-      };
-    });
-  } catch (e) {
-    console.warn('position_cache.loadPositions: failed', e);
+    const raw = sessionStorage.getItem(_key(accountHash));
+    if (raw === null) return null;
+    return JSON.parse(raw);
+  } catch {
     return null;
   }
 }
 
 /**
- * Delete all records from the positions store.
- * @returns {Promise<void>}
+ * Remove cached positions for the given account hash.
+ * @param {string|null} accountHash
  */
-export async function clearPositions() {
-  try {
-    const db = await openDB();
-    return new Promise((resolve, reject) => {
-      const tx = db.transaction(STORE_NAME, 'readwrite');
-      const store = tx.objectStore(STORE_NAME);
-      const req = store.clear();
-      req.onsuccess = () => resolve();
-      req.onerror = () => reject(req.error);
-      tx.oncomplete = () => db.close();
-    });
-  } catch (e) {
-    console.warn('position_cache.clearPositions: failed', e);
-  }
+export function clearPositions(accountHash) {
+  sessionStorage.removeItem(_key(accountHash));
 }
