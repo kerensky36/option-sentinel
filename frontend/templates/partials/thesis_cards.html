@@ -62,18 +62,18 @@
       {# Stats row #}
       <div class="flex items-center gap-4 flex-shrink-0 text-right">
         <div class="flex flex-col items-end gap-0.5">
-          <span class="text-gray-600 uppercase tracking-wider" style="font-size:14px">Positions</span>
+          <span class="text-gray-600 uppercase tracking-wider" style="font-size:15px">Positions</span>
           <span class="text-gray-300" style="font-size:18px">{{ card.position_count }}</span>
         </div>
         <div class="flex flex-col items-end gap-0.5">
-          <span class="text-gray-600 uppercase tracking-wider" style="font-size:14px">Avg Score</span>
+          <span class="text-gray-600 uppercase tracking-wider" style="font-size:15px">Avg Score</span>
           <span style="font-size:18px">{{ score_cell(card.avg_exit_proximity_score) }}</span>
         </div>
         <div class="flex flex-col items-end gap-0.5">
-          <span class="text-gray-600 uppercase tracking-wider" style="font-size:14px">P&amp;L</span>
+          <span class="text-gray-600 uppercase tracking-wider" style="font-size:15px">P&amp;L</span>
           <span class="{{ pnl_class(card.combined_pnl) }}" style="font-size:18px">{{ pnl_fmt(card.combined_pnl) }}</span>
         </div>
-        <span class="text-gray-600 group-open:rotate-90 transition-transform" style="font-size:16px">▶</span>
+        <span class="text-gray-600 group-open:rotate-90 transition-transform" style="font-size:15px">▶</span>
       </div>
 
     </summary>
@@ -88,6 +88,6 @@
 
   </details>
 {% else %}
-  <div class="text-gray-600 py-6 text-center uppercase tracking-widest" style="font-size:16px">No open positions</div>
+  <div class="text-gray-600 py-6 text-center uppercase tracking-widest" style="font-size:15px">No open positions</div>
 {% endfor %}
 </div>

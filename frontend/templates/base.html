@@ -16,6 +16,15 @@
           fontFamily: {
             sans: ['"JetBrains Mono"', 'Consolas', 'ui-monospace', 'monospace'],
             mono: ['"JetBrains Mono"', 'Consolas', 'ui-monospace', 'monospace'],
+          },
+          fontSize: {
+            'xs':   ['15px', { lineHeight: '1.5' }],
+            'sm':   ['18px', { lineHeight: '1.5' }],
+            'base': ['20px', { lineHeight: '1.5' }],
+            'lg':   ['22px', { lineHeight: '1.5' }],
+            'xl':   ['24px', { lineHeight: '1.5' }],
+            '2xl':  ['28px', { lineHeight: '1.5' }],
+            '3xl':  ['33px', { lineHeight: '1.4' }],
           }
         }
       }
@@ -248,12 +257,12 @@
   <div class="flex md:hidden border-b border-gray-800" style="background:#12121e">
     <a href="/"
        class="flex flex-1 items-center justify-center gap-2 py-2 px-3 text-center {% if current_page == 'thesis_monitor' %}nav-active{% endif %}"
-       style="font-size:16px; letter-spacing:0.04em; text-decoration:none; color:{% if current_page == 'thesis_monitor' %}#d0d0f0{% else %}#7070a0{% endif %}; border-bottom:2px solid {% if current_page == 'thesis_monitor' %}#6699dd{% else %}transparent{% endif %}; margin:4px 4px 0; border-radius:2px 2px 0 0;">
+       style="font-size:15px; letter-spacing:0.04em; text-decoration:none; color:{% if current_page == 'thesis_monitor' %}#d0d0f0{% else %}#7070a0{% endif %}; border-bottom:2px solid {% if current_page == 'thesis_monitor' %}#6699dd{% else %}transparent{% endif %}; margin:4px 4px 0; border-radius:2px 2px 0 0;">
       <span class="pill pill-red"></span> Positions
     </a>
     <a href="/screener"
        class="flex flex-1 items-center justify-center gap-2 py-2 px-3 text-center {% if current_page == 'covered_call_screener' %}nav-active{% endif %}"
-       style="font-size:16px; letter-spacing:0.04em; text-decoration:none; color:{% if current_page == 'covered_call_screener' %}#d0d0f0{% else %}#7070a0{% endif %}; border-bottom:2px solid {% if current_page == 'covered_call_screener' %}#6699dd{% else %}transparent{% endif %}; margin:4px 4px 0; border-radius:2px 2px 0 0;">
+       style="font-size:15px; letter-spacing:0.04em; text-decoration:none; color:{% if current_page == 'covered_call_screener' %}#d0d0f0{% else %}#7070a0{% endif %}; border-bottom:2px solid {% if current_page == 'covered_call_screener' %}#6699dd{% else %}transparent{% endif %}; margin:4px 4px 0; border-radius:2px 2px 0 0;">
       <span class="pill pill-blue"></span> CC Screener
     </a>
   </div>
@@ -280,7 +289,7 @@
       <!-- Spacer pushes future items to bottom -->
       <div class="flex-1"></div>
       <div class="border-t border-gray-800" style="margin:0 10px; opacity:0.4"></div>
-      <div class="nav-section-label" style="padding-bottom:10px; font-size:14px; color:#252532">
+      <div class="nav-section-label" style="padding-bottom:10px; font-size:15px; color:#252532">
         OPTION SENTINEL
       </div>
     </aside>
