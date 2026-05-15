@@ -46,6 +46,7 @@ class ScreenerResultView(BaseModel):
 
     ticker: str
     shares: int
+    contracts: int = 0
     stock_price: float
     iv_rank: float | None = None
     recommended_strike: float | None = None

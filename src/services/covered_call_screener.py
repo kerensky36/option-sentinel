@@ -135,10 +135,16 @@ async def run_screener(
         iv_rank     = _iv_rank_from_chain(pos.get("volatility"))
         dte_earnings = _days_to_earnings(ticker)
 
+        if shares <= 0 or shares % 100 != 0:
+            continue
+
+        contracts = shares // 100
+
         if ticker in tickers_with_call:
             results.append(ScreenerResultView(
                 ticker=ticker,
                 shares=shares,
+                contracts=contracts,
                 stock_price=stock_price,
                 iv_rank=iv_rank,
                 days_to_earnings=dte_earnings,
@@ -156,6 +162,7 @@ async def run_screener(
             results.append(ScreenerResultView(
                 ticker=ticker,
                 shares=shares,
+                contracts=contracts,
                 stock_price=stock_price,
                 iv_rank=iv_rank,
                 days_to_earnings=dte_earnings,
@@ -177,6 +184,7 @@ async def run_screener(
         results.append(ScreenerResultView(
             ticker=ticker,
             shares=shares,
+            contracts=contracts,
             stock_price=stock_price,
             iv_rank=iv_rank,
             recommended_strike=best["strike"],
