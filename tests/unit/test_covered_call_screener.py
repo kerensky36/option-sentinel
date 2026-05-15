@@ -142,3 +142,45 @@ class TestLotSizeFilter:
         ]
         results = await _run_with_positions(positions)
         assert results == []
+
+
+class TestFractionalSharesFloor:
+    async def test_fractional_100_point_5_floors_to_100_eligible(self):
+        """Raw longQuantity=100.5 floors to 100 — eligible, 1 contract."""
+        from src.services.covered_call_screener import _fetch_stock_positions
+
+        client = _make_client()
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = {
+            "securitiesAccount": {
+                "positions": [{
+                    "instrument": {"assetType": "EQUITY", "symbol": "FRAC"},
+                    "longQuantity": 100.5,
+                    "marketValue": 15000.0,
+                }]
+            }
+        }
+        client.get_account = AsyncMock(return_value=mock_resp)
+        positions = await _fetch_stock_positions(client, "abc123")
+        assert len(positions) == 1
+        assert positions[0]["shares"] == 100
+
+    async def test_fractional_150_point_9_floors_to_150_ineligible(self):
+        """Raw longQuantity=150.9 floors to 150 — ineligible (150 % 100 != 0)."""
+        from src.services.covered_call_screener import _fetch_stock_positions
+
+        client = _make_client()
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = {
+            "securitiesAccount": {
+                "positions": [{
+                    "instrument": {"assetType": "EQUITY", "symbol": "FRAC"},
+                    "longQuantity": 150.9,
+                    "marketValue": 22500.0,
+                }]
+            }
+        }
+        client.get_account = AsyncMock(return_value=mock_resp)
+        positions = await _fetch_stock_positions(client, "abc123")
+        assert len(positions) == 1
+        assert positions[0]["shares"] == 150

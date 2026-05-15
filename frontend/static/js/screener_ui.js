@@ -3,7 +3,8 @@
  */
 
 import { fetchWithAuth, isAuthenticated } from './auth.js';
-import { withAccountHash } from './account_picker.js';
+import { withAccountHash, getSelectedAccountHash } from './account_picker.js';
+import { saveScreenerResults, loadScreenerResults } from './screener_cache.js';
 
 const TABLE_ID = 'screener-table';
 const REFRESH_BTN_ID = 'screener-refresh-btn';
@@ -27,12 +28,12 @@ function fmt(val, decimals = 2) {
 function statusBadge(status) {
   switch (status) {
     case 'recommended':
-      return '<span class="bg-green-900 text-green-300 px-1.5 py-0.5 uppercase tracking-wider" style="font-size:9px; border-radius:1px">Recommended</span>';
+      return '<span class="bg-green-900 text-green-300 px-1.5 py-0.5 uppercase tracking-wider text-xs">Recommended</span>';
     case 'suppressed':
-      return '<span class="bg-amber-900 text-amber-300 px-1.5 py-0.5 uppercase tracking-wider" style="font-size:9px; border-radius:1px">Suppressed</span>';
+      return '<span class="bg-amber-900 text-amber-300 px-1.5 py-0.5 uppercase tracking-wider text-xs">Suppressed</span>';
     case 'insufficient_data':
     default:
-      return '<span class="bg-gray-800 text-gray-500 px-1.5 py-0.5 uppercase tracking-wider" style="font-size:9px; border-radius:1px">No Data</span>';
+      return '<span class="bg-gray-800 text-gray-500 px-1.5 py-0.5 uppercase tracking-wider text-xs">No Data</span>';
   }
 }
 
@@ -46,7 +47,7 @@ export function renderScreener(results) {
 
   if (!results || results.length === 0) {
     container.innerHTML = `
-      <div class="text-gray-500 text-center py-8" style="font-size:12px">
+      <div class="text-gray-500 text-center py-8 text-sm">
         No screener results. Click <strong>Refresh</strong> to fetch live data.
       </div>`;
     return;
@@ -54,7 +55,7 @@ export function renderScreener(results) {
 
   const rows = results.map((r) => `
     <tr class="border-b border-gray-800 hover:bg-gray-900\/40 transition-colors ${r.recommendation_status === 'suppressed' ? 'opacity-60' : ''}">
-      <td class="px-2 py-1 text-gray-200 font-mono" style="font-size:11px">${r.ticker}</td>
+      <td class="px-2 py-1 text-gray-200 font-mono">${r.ticker}</td>
       <td class="px-2 py-1 text-right text-gray-300">${r.shares.toLocaleString()}</td>
       <td class="px-2 py-1 text-right text-gray-200">$${fmt(r.stock_price)}</td>
       <td class="px-2 py-1 text-right text-gray-200">${r.iv_rank !== null && r.iv_rank !== undefined ? fmt(r.iv_rank, 1) : '—'}</td>
@@ -72,7 +73,7 @@ export function renderScreener(results) {
     <div class="overflow-x-auto">
       <table class="w-full text-left">
         <thead>
-          <tr class="border-b border-gray-700 text-gray-500 uppercase" style="font-size:10px; letter-spacing:0.10em;">
+          <tr class="border-b border-gray-700 text-gray-500 uppercase text-xs tracking-wider">
             <th class="px-2 py-1">Ticker</th>
             <th class="px-2 py-1 text-right">Shares</th>
             <th class="px-2 py-1 text-right">Price</th>
@@ -117,13 +118,14 @@ async function refreshScreener() {
     }
 
     const results = await resp.json();
+    saveScreenerResults(results, getSelectedAccountHash());
     renderScreener(results);
   } catch (err) {
     console.error('screener_ui: refresh failed', err);
     const container = document.getElementById(TABLE_ID);
     if (container) {
       container.innerHTML = `
-        <div class="text-red-400 text-center py-4" style="font-size:12px">
+        <div class="text-red-400 text-center py-4 text-sm">
           Failed to refresh screener: ${err.message}
         </div>`;
     }
@@ -136,14 +138,30 @@ async function refreshScreener() {
 }
 
 /**
- * Initialise: wire up Refresh button and auto-fetch on first visit.
+ * Handle account selection: load account-scoped cache or fetch fresh data.
+ * @param {string} accountHash
  */
-async function init() {
+async function handleAccountChange(accountHash) {
+  const cached = loadScreenerResults(accountHash);
+  if (cached !== null) {
+    renderScreener(cached);
+    return;
+  }
+  await refreshScreener();
+}
+
+/**
+ * Initialise: wire up Refresh button and wait for account to resolve.
+ * Data is fetched/rendered once the accountchange event fires.
+ */
+function init() {
   const btn = document.getElementById(REFRESH_BTN_ID);
   if (btn) {
     btn.addEventListener('click', refreshScreener);
   }
-  await refreshScreener();
+  document.addEventListener('accountchange', (e) => {
+    handleAccountChange(e.detail.accountHash);
+  });
 }
 
 init();

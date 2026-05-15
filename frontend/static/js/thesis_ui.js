@@ -33,21 +33,20 @@ export function renderThesisList() {
 
   const groups = getThesisGroups();
   if (groups.length === 0) {
-    container.innerHTML = `<p class="text-gray-500" style="font-size:11px">No thesis groups yet. Add one above.</p>`;
+    container.innerHTML = `<p class="text-gray-500 text-sm">No thesis groups yet. Add one above.</p>`;
     return;
   }
 
   const items = groups.map((g) => `
     <div class="flex items-center justify-between bg-gray-800 border border-gray-700 px-3 py-1.5 mb-1" style="border-radius:1px">
       <div>
-        <span class="text-gray-200" style="font-size:12px">${escapeHtml(g.name)}</span>
-        <span class="text-gray-500 ml-2" style="font-size:10px; letter-spacing:0.08em;">${escapeHtml(g.template_type)}</span>
-        ${g.description ? `<span class="text-gray-400 ml-2" style="font-size:11px">${escapeHtml(g.description)}</span>` : ''}
+        <span class="text-gray-200 text-sm">${escapeHtml(g.name)}</span>
+        <span class="text-gray-500 ml-2 text-xs" style="letter-spacing:0.08em;">${escapeHtml(g.template_type)}</span>
+        ${g.description ? `<span class="text-gray-400 ml-2 text-sm">${escapeHtml(g.description)}</span>` : ''}
       </div>
       <button
         data-delete-thesis="${g.id}"
-        class="text-red-400 hover:text-red-300 px-2 py-0.5 uppercase tracking-wider transition-colors"
-        style="font-size:10px">
+        class="text-red-400 hover:text-red-300 px-2 py-0.5 uppercase tracking-wider transition-colors text-xs"
         ✕
       </button>
     </div>`).join('');

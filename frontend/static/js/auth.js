@@ -8,7 +8,6 @@
  */
 
 const ACCESS_TOKEN_KEY = 'schwab_access_token';
-const DB_NAME = 'option-sentinel';
 
 /**
  * Read the raw access token string from sessionStorage.
@@ -38,7 +37,7 @@ export function isAuthenticated() {
 export async function fetchWithAuth(url, options = {}) {
   const token = getAccessToken();
   if (!token) {
-    await eraseAll();
+    eraseAll();
     return null;
   }
 
@@ -51,7 +50,7 @@ export async function fetchWithAuth(url, options = {}) {
   });
 
   if (resp.status === 401) {
-    await eraseAll();
+    eraseAll();
     return null;
   }
 
@@ -59,28 +58,12 @@ export async function fetchWithAuth(url, options = {}) {
 }
 
 /**
- * Erase all trader data from the browser:
- *  1. sessionStorage (token)
- *  2. localStorage (thesis groups, assignments, exit goals)
- *  3. IndexedDB option-sentinel database (position cache)
- *  4. Redirect to /auth/login
- *
- * This is a client-side-only operation; no server request is made.
+ * Erase all trader data from the browser and redirect to login.
+ * sessionStorage (all caches + token) and localStorage (thesis data) are cleared.
+ * This is a failsafe — all session data already clears automatically on tab close.
  */
-export async function eraseAll() {
+export function eraseAll() {
   sessionStorage.clear();
   localStorage.clear();
-
-  try {
-    await new Promise((resolve, reject) => {
-      const req = indexedDB.deleteDatabase(DB_NAME);
-      req.onsuccess = resolve;
-      req.onerror = reject;
-      req.onblocked = resolve;
-    });
-  } catch (e) {
-    console.warn('auth.eraseAll: IndexedDB delete failed (continuing)', e);
-  }
-
   window.location.replace('/auth/login');
 }

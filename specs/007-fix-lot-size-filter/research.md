@@ -29,6 +29,22 @@ rather than leave the derivation implicit or push it to the frontend.
 - Add a `@property` / computed field on ScreenerResultView: Rejected — Pydantic v2 computed
   fields add complexity; a plain `int` field set at construction is simpler.
 
+## Decision 4: Screener result cache storage medium
+
+**Decision**: sessionStorage under key `screener_results`.
+
+**Rationale**: `eraseAll()` in `auth.js` already calls `sessionStorage.clear()` — logout
+invalidation requires zero new code. sessionStorage survives same-tab navigation so the
+cache is warm when the user navigates away from and back to the screener within a session.
+The data is tab-scoped (no cross-tab bleed), which is consistent with Principle I. A
+sessionStorage read + JSON.parse + DOM render completes in <50ms, satisfying the sub-second
+target for cached loads.
+
+**Alternatives considered**:
+- IndexedDB: Overkill for a single array; async API adds complexity. Reserved for positions.
+- In-memory module variable: Lost on page navigation within the same origin.
+- localStorage: Persists across logout. Rejected — violates Principle I (session-local only).
+
 ## Decision 3: Empty-state handling
 
 **Decision**: When `run_screener()` returns an empty list (all positions filtered), the

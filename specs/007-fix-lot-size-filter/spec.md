@@ -30,16 +30,21 @@ As a trader reviewing covered call opportunities, I only want to see positions w
 - Position with exactly 0 shares: must not appear.
 - Short positions (negative share count): must not appear.
 - Portfolio with a mix of eligible and ineligible positions: only eligible positions are shown; ineligible ones are silently filtered with no error.
-- The available contracts count must always equal shares ÷ 100 with no rounding up.
+- The available contracts count must always equal floor(shares) ÷ 100 with no rounding up.
+- Fractional share quantities (e.g., 100.5): floor to integer first, then apply divisibility check. A position with 100.5 shares yields 1 contract; a position with 150.9 shares is ineligible.
+- Multi-account portfolios: lot-size eligibility is evaluated per account independently. Shares are never aggregated across accounts — a position must meet the 100-share threshold within its own account to be eligible.
 
 ## Requirements *(mandatory)*
 
 ### Functional Requirements
 
-- **FR-001**: The screener MUST exclude any position where the number of shares held is not a positive multiple of 100.
+- **FR-001**: The screener MUST exclude any position where floor(shares held) is not a positive multiple of 100. For fractional share quantities, the integer part is used; the raw fractional quantity is never compared directly against the threshold.
 - **FR-002**: For eligible positions, the screener MUST display the number of available contracts as shares ÷ 100 (integer division, no rounding up).
 - **FR-003**: When no positions meet the lot-size requirement, the screener MUST display a clear message indicating there are no eligible positions rather than an empty or broken view.
 - **FR-004**: The lot-size filter MUST be applied before any covered call calculations to avoid presenting misleading premium or return figures on ineligible positions.
+- **FR-005**: The screener MUST NOT display any intermediate or partial results while loading. All results are held until the full lot-size check is complete; only eligible positions are then rendered atomically.
+- **FR-006**: After the initial load, portfolio position data MUST be cached in memory for the duration of the session. Subsequent screener loads MUST use the cached data (no re-fetch from Schwab) unless the user explicitly triggers a refresh or erases all data.
+- **FR-007**: The in-memory portfolio cache MUST be cleared on logout. It MUST also be invalidated when the user clicks the refresh control or erases all data.
 
 ### Key Entities
 
@@ -54,10 +59,23 @@ As a trader reviewing covered call opportunities, I only want to see positions w
 - **SC-002**: The available contracts count shown for every result equals shares ÷ 100 exactly — no rounding up or approximation.
 - **SC-003**: Zero screener results appear for positions with share counts not divisible by 100, verified across all test portfolio configurations.
 - **SC-004**: When all positions are ineligible, the screener displays a non-empty "no eligible positions" message within the same response time as a normal result.
+- **SC-005**: After initial load, subsequent screener renders (using cached portfolio data) complete in under 1 second with no Schwab API call.
+- **SC-006**: The portfolio cache is absent (cleared) immediately after logout. Verifiable by inspecting in-memory state or confirming a fresh Schwab fetch occurs on next login.
 
 ## Assumptions
 
 - Standard options contracts are always 100 shares. Mini-options (10-share lots) are out of scope.
-- "Shares held" refers to the long share quantity in the position; short positions and fractional shares are treated as ineligible.
+- "Shares held" refers to the long share quantity in the position. Short positions are ineligible. Fractional share quantities are not rejected — the integer part (floor) is used: if floor(shares) is a positive multiple of 100, the position is eligible and available contracts = floor(shares) ÷ 100.
 - The fix applies to the screener logic only; no changes to UI layout are required beyond reflecting the corrected contract counts and the empty-state message.
 - Positions with lot-sized share counts that have other issues (e.g., no options chain available) may still be excluded by existing screener logic — this fix only adds the lot-size gate.
+- Schwab's API does not provide server-side lot-size filtering; the 100-share divisibility check is implemented entirely in the application's screener service layer.
+
+## Clarifications
+
+### Session 2026-05-15
+
+- Q: Where should the lot-size filter be enforced (backend, frontend, or both)? → A: Backend/screener service layer only, scoped strictly to the covered call screener. This rule does not apply globally across all pages or features — only where the 100-share lot requirement is relevant (i.e., covered call eligibility checks).
+- Q: For multi-account portfolios, should lot-size eligibility be evaluated per account or by aggregating shares across accounts? → A: Per account — each account's position is evaluated independently; shares are never combined across accounts.
+- Q: How should fractional share quantities (e.g., 100.5) be handled — reject or truncate? → A: Eligible if floor(shares) is a positive multiple of 100; integer part is used for contract count. E.g., 100.5 → 1 contract, 150.9 → ineligible.
+- Q: Should ineligible positions be visible temporarily during loading, or held until the full filter runs? → A: Hold all results until lot-size check is complete; only eligible positions are rendered atomically — no intermediate state shown.
+- Q: What is the latency target for screener loads? → A: Initial load has no strict ceiling (Schwab API round-trip). After initial load, portfolio is cached in memory; subsequent renders must be sub-second. Cache is invalidated on: user-triggered refresh, erase all data, or logout.

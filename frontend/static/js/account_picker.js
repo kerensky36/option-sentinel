@@ -38,6 +38,7 @@ export function withAccountHash(url) {
 function _setSelection(hash) {
   _selectedHash = hash;
   sessionStorage.setItem(ACCOUNT_HASH_KEY, hash);
+  document.dispatchEvent(new CustomEvent('accountchange', { detail: { accountHash: hash } }));
 }
 
 async function init() {
