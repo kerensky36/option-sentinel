@@ -25,7 +25,7 @@
     *, *::before, *::after { box-sizing: border-box; }
     body {
       font-family: 'JetBrains Mono', Consolas, 'Courier New', monospace;
-      font-size: 13px;
+      font-size: 26px;
       line-height: 1.5;
       letter-spacing: 0.01em;
       -webkit-font-smoothing: antialiased;
@@ -56,7 +56,7 @@
     <div class="flex flex-col items-center mb-8 gap-3">
       <img src="/static/sentinel.svg" class="w-14 h-14 drop-shadow-[0_0_12px_rgba(255,34,0,0.4)]" alt="Sentinel">
       <span class="text-sm font-semibold tracking-widest uppercase text-gray-200">Option Sentinel</span>
-      <span class="text-gray-400 tracking-wider" style="font-size:10px; letter-spacing:0.18em;">PERSONAL TRADING DASHBOARD</span>
+      <span class="text-gray-400 tracking-wider" style="font-size:20px; letter-spacing:0.18em;">PERSONAL TRADING DASHBOARD</span>
     </div>
 
     <!-- Card -->
@@ -64,23 +64,23 @@
 
       <!-- Error message (if redirected back with error) -->
       {% if request.query_params.get('error') %}
-      <div class="mb-4 bg-red-900 border border-red-800 text-red-200 px-3 py-2" style="font-size:12px; border-radius:1px">
+      <div class="mb-4 bg-red-900 border border-red-800 text-red-200 px-3 py-2" style="font-size:24px; border-radius:1px">
         Authentication failed. Please try again.
       </div>
       {% endif %}
 
-      <h1 class="text-white font-semibold tracking-wider uppercase mb-2" style="font-size:14px; letter-spacing:0.12em;">
+      <h1 class="text-white font-semibold tracking-wider uppercase mb-2" style="font-size:28px; letter-spacing:0.12em;">
         Connect Your Account
       </h1>
 
-      <p class="text-gray-300 mb-5" style="font-size:12px; line-height:1.7;">
+      <p class="text-gray-300 mb-5" style="font-size:24px; line-height:1.7;">
         Option Sentinel connects to your Schwab account using OAuth.
         Your token is stored <strong class="text-green-400">only in your browser's sessionStorage</strong>
         and is never sent to any server log or database.
         It is automatically cleared when you close the tab.
       </p>
 
-      <ul class="text-gray-400 mb-6 space-y-1" style="font-size:11px; list-style:none; padding:0;">
+      <ul class="text-gray-400 mb-6 space-y-1" style="font-size:22px; list-style:none; padding:0;">
         <li><span class="text-green-400">✓</span> Token lives in your browser only</li>
         <li><span class="text-green-400">✓</span> Server never stores or logs your token</li>
         <li><span class="text-green-400">✓</span> Closing the tab clears all credentials</li>
@@ -89,21 +89,21 @@
 
       <a href="/auth/start"
          class="block w-full text-center bg-indigo-800 hover:bg-indigo-700 text-indigo-100 px-4 py-2.5 uppercase tracking-widest font-semibold transition-colors"
-         style="font-size:12px; letter-spacing:0.14em; border-radius:1px; text-decoration:none;">
+         style="font-size:24px; letter-spacing:0.14em; border-radius:1px; text-decoration:none;">
         Connect Schwab Account
       </a>
 
       {% if dev_login_available %}
       <a href="/auth/dev-login"
          class="block w-full text-center mt-3 border border-amber-800 text-amber-400 hover:bg-amber-950 px-4 py-2 uppercase tracking-widest transition-colors"
-         style="font-size:10px; letter-spacing:0.14em; border-radius:1px; text-decoration:none;">
+         style="font-size:20px; letter-spacing:0.14em; border-radius:1px; text-decoration:none;">
         Dev Login (local token)
       </a>
       {% endif %}
 
     </div>
 
-    <p class="text-center text-gray-400 mt-4" style="font-size:10px; letter-spacing:0.08em;">
+    <p class="text-center text-gray-400 mt-4" style="font-size:20px; letter-spacing:0.08em;">
       OPTION SENTINEL — DATA STAYS IN YOUR BROWSER
     </p>
 

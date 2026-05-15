@@ -28,7 +28,7 @@
 
     body {
       font-family: 'JetBrains Mono', Consolas, 'Courier New', monospace;
-      font-size: 13px;
+      font-size: 26px;
       line-height: 1.5;
       letter-spacing: 0.01em;
       -webkit-font-smoothing: antialiased;
@@ -85,8 +85,8 @@
     nav { border-bottom-width: 1px; }
 
     /* ── Tables: denser, TOS-compact ── */
-    table           { font-size: 12px; border-collapse: collapse; }
-    table th        { font-size: 10px !important; letter-spacing: 0.12em !important; font-weight: 600; }
+    table           { font-size: 24px; border-collapse: collapse; }
+    table th        { font-size: 20px !important; letter-spacing: 0.12em !important; font-weight: 600; }
     table td, table th { padding-top: 4px !important; padding-bottom: 4px !important; }
 
     /* ── Details/summary cards: no transition flash ── */
@@ -117,7 +117,7 @@
     /* ── Inputs/selects: TOS style ── */
     input[type="number"], input[type="text"], select {
       font-family: inherit;
-      font-size: 12px;
+      font-size: 24px;
     }
 
     /* ── Large score number in gauge ── */
@@ -132,7 +132,7 @@
     /* ── Left sidebar nav ── */
     .nav-section-label {
       padding: 14px 12px 6px;
-      font-size: 10px;
+      font-size: 20px;
       letter-spacing: 0.14em;
       text-transform: uppercase;
       color: #3a3a52;
@@ -144,7 +144,7 @@
       gap: 9px;
       margin: 3px 8px;
       padding: 9px 12px;
-      font-size: 12px;
+      font-size: 24px;
       letter-spacing: 0.03em;
       color: #9090b8;
       text-decoration: none;
@@ -220,24 +220,24 @@
       <img src="/static/sentinel.svg" class="w-7 h-7 drop-shadow-[0_0_5px_rgba(255,34,0,0.5)]" alt="Sentinel">
       <span class="text-sm font-semibold tracking-widest uppercase text-gray-200">Option Sentinel</span>
     </div>
-    <div class="flex items-center gap-4 text-gray-400" style="font-size:12px">
+    <div class="flex items-center gap-4 text-gray-400" style="font-size:24px">
       <select
         id="account-picker"
         title="Select active Schwab account"
-        style="font-size:10px; background:#1c1c24; color:#90909c; border:1px solid #22222e; padding:2px 6px; font-family:inherit; letter-spacing:0.05em; outline:none; cursor:pointer; border-radius:1px; min-width:100px;">
+        style="font-size:20px; background:#1c1c24; color:#90909c; border:1px solid #22222e; padding:2px 6px; font-family:inherit; letter-spacing:0.05em; outline:none; cursor:pointer; border-radius:1px; min-width:100px;">
         <option value="" disabled selected>Loading…</option>
       </select>
       <button
         id="erase-all-btn"
         class="flex items-center gap-1 bg-red-900 hover:bg-red-800 text-red-300 px-2 py-1 transition-colors uppercase tracking-wider"
-        style="font-size:10px"
+        style="font-size:20px"
         title="Wipe all browser storage: token, position cache, thesis groups">
         Erase All Data
       </button>
       <form method="post" action="/auth/logout" style="display:inline">
         <button type="submit"
           class="flex items-center gap-1 bg-gray-800 hover:bg-gray-700 text-gray-300 px-2 py-1 transition-colors uppercase tracking-wider"
-          style="font-size:10px">
+          style="font-size:20px">
           Disconnect
         </button>
       </form>
@@ -248,12 +248,12 @@
   <div class="flex md:hidden border-b border-gray-800" style="background:#12121e">
     <a href="/"
        class="flex flex-1 items-center justify-center gap-2 py-2 px-3 text-center {% if current_page == 'thesis_monitor' %}nav-active{% endif %}"
-       style="font-size:11px; letter-spacing:0.04em; text-decoration:none; color:{% if current_page == 'thesis_monitor' %}#d0d0f0{% else %}#7070a0{% endif %}; border-bottom:2px solid {% if current_page == 'thesis_monitor' %}#6699dd{% else %}transparent{% endif %}; margin:4px 4px 0; border-radius:2px 2px 0 0;">
+       style="font-size:22px; letter-spacing:0.04em; text-decoration:none; color:{% if current_page == 'thesis_monitor' %}#d0d0f0{% else %}#7070a0{% endif %}; border-bottom:2px solid {% if current_page == 'thesis_monitor' %}#6699dd{% else %}transparent{% endif %}; margin:4px 4px 0; border-radius:2px 2px 0 0;">
       <span class="pill pill-red"></span> Positions
     </a>
     <a href="/screener"
        class="flex flex-1 items-center justify-center gap-2 py-2 px-3 text-center {% if current_page == 'covered_call_screener' %}nav-active{% endif %}"
-       style="font-size:11px; letter-spacing:0.04em; text-decoration:none; color:{% if current_page == 'covered_call_screener' %}#d0d0f0{% else %}#7070a0{% endif %}; border-bottom:2px solid {% if current_page == 'covered_call_screener' %}#6699dd{% else %}transparent{% endif %}; margin:4px 4px 0; border-radius:2px 2px 0 0;">
+       style="font-size:22px; letter-spacing:0.04em; text-decoration:none; color:{% if current_page == 'covered_call_screener' %}#d0d0f0{% else %}#7070a0{% endif %}; border-bottom:2px solid {% if current_page == 'covered_call_screener' %}#6699dd{% else %}transparent{% endif %}; margin:4px 4px 0; border-radius:2px 2px 0 0;">
       <span class="pill pill-blue"></span> CC Screener
     </a>
   </div>
@@ -280,7 +280,7 @@
       <!-- Spacer pushes future items to bottom -->
       <div class="flex-1"></div>
       <div class="border-t border-gray-800" style="margin:0 10px; opacity:0.4"></div>
-      <div class="nav-section-label" style="padding-bottom:10px; font-size:9px; color:#252532">
+      <div class="nav-section-label" style="padding-bottom:10px; font-size:18px; color:#252532">
         OPTION SENTINEL
       </div>
     </aside>
