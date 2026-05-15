@@ -19,5 +19,5 @@ async def positions_partial(request: Request):
     return templates.TemplateResponse(
         request,
         "partials/positions_table.html",
-        {},
+        {"csp_nonce": getattr(request.state, "csp_nonce", "")},
     )

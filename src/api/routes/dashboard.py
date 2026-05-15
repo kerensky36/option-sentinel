@@ -20,7 +20,10 @@ async def dashboard(request: Request):
     return templates.TemplateResponse(
         request,
         "dashboard.html",
-        {"current_page": "thesis_monitor"},
+        {
+            "current_page": "thesis_monitor",
+            "csp_nonce": getattr(request.state, "csp_nonce", ""),
+        },
     )
 
 

@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 
 from src.api.deps import get_schwab_client
-from src.api.main import templates
+from src.api.main import limiter, log_security_event, templates
 from src.services.covered_call_screener import run_screener
 
 router = APIRouter()
@@ -17,12 +17,17 @@ async def screener(request: Request):
     return templates.TemplateResponse(
         request,
         "screener.html",
-        {"current_page": "covered_call_screener"},
+        {
+            "current_page": "covered_call_screener",
+            "csp_nonce": getattr(request.state, "csp_nonce", ""),
+        },
     )
 
 
 @router.get("/api/screener/refresh")
+@limiter.limit("60/minute")
 async def screener_refresh(
+    request: Request,
     account_hash: str | None = None,
     schwab_client=Depends(get_schwab_client),
 ):
@@ -41,5 +46,6 @@ async def screener_refresh(
     try:
         results = await run_screener(schwab_client, account_hash=account_hash)
     except ValueError as exc:
+        log_security_event("422_invalid_account_hash", request)
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     return JSONResponse(content=[r.model_dump(mode="json") for r in results])

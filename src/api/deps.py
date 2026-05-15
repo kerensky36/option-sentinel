@@ -1,11 +1,21 @@
 """FastAPI dependency injectors for the stateless multi-user architecture."""
 from __future__ import annotations
 
+import hashlib
+import hmac
+import logging
 import os
 import time
 
 import schwab
 from fastapi import HTTPException, Request
+
+_security_log = logging.getLogger("security")
+
+
+def _hash_ip(ip: str) -> str:
+    pepper = os.getenv("LOG_PEPPER", "sentinel-pepper")
+    return hmac.new(pepper.encode(), ip.encode(), hashlib.sha256).hexdigest()[:16]
 
 
 def get_current_token(request: Request) -> str:
@@ -15,9 +25,21 @@ def get_current_token(request: Request) -> str:
     """
     authorization = request.headers.get("Authorization", "")
     if not authorization.startswith("Bearer "):
+        ip = request.client.host if request.client else "unknown"
+        _security_log.warning(
+            "SECURITY 401_invalid_token path=%s ip=%s",
+            request.url.path,
+            _hash_ip(ip),
+        )
         raise HTTPException(status_code=401, detail="Missing or invalid token")
     token = authorization.removeprefix("Bearer ").strip()
     if not token:
+        ip = request.client.host if request.client else "unknown"
+        _security_log.warning(
+            "SECURITY 401_invalid_token path=%s ip=%s",
+            request.url.path,
+            _hash_ip(ip),
+        )
         raise HTTPException(status_code=401, detail="Missing or invalid token")
     return token
 

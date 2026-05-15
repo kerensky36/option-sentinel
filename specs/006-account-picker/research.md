@@ -1,76 +1,108 @@
-# Research: Account Picker Dropdown
+# Research: Security Hardening (Constitution v3.1.0 Compliance)
 
-**Feature**: 006-account-picker
+**Feature**: 006-account-picker (security hardening phase)
 **Date**: 2026-05-14
 
 ---
 
-## Decision 1: Browser Storage for Selected Account
+## Decision 1: Content Security Policy — Nonce vs Hash
 
-**Decision**: Store the selected account hash in `sessionStorage` under the key `schwab_selected_account`.
+**Decision**: Use a per-request **nonce** injected via Starlette middleware and passed through Jinja2 template context.
 
-**Rationale**: The access token is already stored in `sessionStorage` (cleared when the tab closes). Storing the account selection in the same place keeps the two pieces of state lifecycle-identical — if the token is gone, the account selection is gone. `eraseAll()` calls `sessionStorage.clear()`, which already covers this key without any code change. Using `localStorage` would cause the account selection to outlive the token, creating a stale state on next login.
+**Rationale**: `base.html` contains two inline `<script>` blocks (Tailwind config and Erase All handler) and the auth callback template has an inline script that writes to sessionStorage. Hashes require computing a SHA-256 of each script body at build time and updating the CSP on every content change — fragile in development. A nonce generated per request is the industry standard and works without content freezing. The middleware generates a 16-byte URL-safe nonce, stores it in `request.state.csp_nonce`, and adds the CSP header after the response. Route handlers that return HTML must include `csp_nonce` in the template context; templates apply `nonce="{{ csp_nonce }}"` to each `<script>` block.
+
+**Nonce policy**:
+- `default-src 'self'`
+- `script-src 'self' https://cdn.tailwindcss.com 'nonce-{nonce}'` — allows Tailwind CDN and local modules
+- `style-src 'self' https://fonts.googleapis.com 'unsafe-inline'` — inline styles are pervasive in templates; removing them requires a full template audit (deferred)
+- `font-src 'self' https://fonts.gstatic.com`
+- `img-src 'self' data:`
+- `connect-src 'self'` — XHR/fetch only to own origin
+- `frame-ancestors 'none'` — equivalent to X-Frame-Options: DENY
+- `base-uri 'self'`
+- `form-action 'self'`
 
 **Alternatives considered**:
-- `localStorage`: Survives tab close; rejected because it outlives the token and requires explicit cleanup.
-- `IndexedDB`: More complex with no benefit over sessionStorage for a single string value.
+- Hash-based CSP: No per-request overhead but breaks on any script edit. Rejected.
+- `unsafe-inline`: Nullifies CSP protection entirely. Rejected.
+- Move all inline scripts to external files: Correct long-term, but requires template restructuring beyond this feature's scope. Deferred.
 
 ---
 
-## Decision 2: How the Frontend Passes Account Hash to the Backend
+## Decision 2: Rate Limiting Approach
 
-**Decision**: Pass the selected account hash as a URL query parameter `?account_hash=<hash>` on account-specific API requests (`/api/screener/refresh`, `/api/positions/refresh`).
+**Decision**: Use **`slowapi`** (a FastAPI-native rate limiting library) with in-memory storage per Cloud Run instance.
 
-**Rationale**: The backend is stateless — there is no session or cookie to read. A query parameter is the simplest, most transparent mechanism that requires no new headers and is easy to inspect in browser devtools. The account hash is not a secret (it is already sent to Schwab by the backend on behalf of the authenticated token holder), so there is no security concern with it appearing in the URL.
+**Rationale**: Cloud Run is currently configured with `--min-instances=0 --max-instances=1`. With a single instance, in-memory rate limiting is effective and needs no external coordination (no Redis required). `slowapi` integrates directly with FastAPI's dependency injection and Starlette middleware. Limits: 60 requests/minute for authenticated API endpoints; 10 requests/minute for OAuth flow endpoints (`/auth/start`, `/auth/callback`).
+
+**Future path**: When `max-instances` is raised above 1, per-instance limits provide per-instance protection (sufficient for basic abuse prevention). For coordinated rate limiting at scale, Cloud Armor (GCP WAF) should be added in front of Cloud Run — no code changes needed.
 
 **Alternatives considered**:
-- Custom request header (e.g., `X-Account-Hash`): Slightly cleaner but requires changes to `fetchWithAuth` or a separate wrapper; no material benefit.
-- Part of the request body (POST): Would require changing GET endpoints to POST; unnecessary complexity.
+- Cloud Armor only: Requires GCP IAP/WAF configuration outside the codebase. Not self-contained. Deferred as a production enhancement.
+- `redis`-backed slowapi: Correct for multi-instance, but adds an external dependency. Not needed at current scale.
 
 ---
 
-## Decision 3: Backend Fallback When `account_hash` Is Absent or Invalid
+## Decision 3: CORS Policy
 
-**Decision**: If `account_hash` is not provided, the backend uses the first account returned by `list_accounts()`. If the provided hash is not found in the account list, return `422 Unprocessable Entity` with a clear message rather than silently using a default.
+**Decision**: Add FastAPI `CORSMiddleware` with `allow_origins` configured from `ALLOWED_ORIGIN` env var. No wildcard. Default (dev) origin: `http://localhost:8000`.
 
-**Rationale**: Silently falling back to a wrong account is worse than an error. A missing `account_hash` (e.g., single-account user, first page load before picker is ready) is handled gracefully by using the first account — consistent with current behaviour. An invalid hash means something went wrong client-side and should surface as an error.
+**Rationale**: The app currently has no CORS policy. Browsers do not enforce SOP for same-origin requests, but API endpoints can be called cross-origin by attacker-controlled pages if CORS is open. Locking CORS to the app's own origin prevents cross-origin requests from harvesting data from logged-in users. The production origin (Firebase Hosting domain) is set via `ALLOWED_ORIGIN` env var in Cloud Run.
 
 **Alternatives considered**:
-- Always require `account_hash`: Forces clients to always call `/api/accounts` first; adds a required round-trip even for single-account users.
-- Always fall back silently: Masks bugs; rejected.
+- Wildcard `*`: Forbidden by constitution. Rejected.
+- Hardcoded origin: Would require code changes to update for new domains. Rejected in favour of env var.
 
 ---
 
-## Decision 4: Account Display Format
+## Decision 4: Security Response Headers Middleware
 
-**Decision**: Display accounts as masked number: last 4 digits only, e.g. `...1234`. If multiple accounts share the same last 4 digits, show more digits to disambiguate.
+**Decision**: Single `SecurityHeadersMiddleware` Starlette class added to `create_app()` that mutates every response to add the required headers.
 
-**Rationale**: Schwab's `accountNumber` field is a raw numeric string. Showing only the last 4 digits is consistent with standard financial UI conventions (credit/debit card display). Full account numbers should not be displayed in a UI that may be screen-shared.
+**Headers applied**:
+| Header | Value |
+|--------|-------|
+| `X-Frame-Options` | `DENY` |
+| `X-Content-Type-Options` | `nosniff` |
+| `Referrer-Policy` | `strict-origin-when-cross-origin` |
+| `Strict-Transport-Security` | `max-age=31536000; includeSubDomains` (production only, gated on `HTTPS_ONLY=true` env var) |
+| `Cache-Control` | `no-store` (API routes only; static assets excluded) |
+| `Content-Security-Policy` | Nonce-based policy (see Decision 1) |
 
 **Alternatives considered**:
-- Account nickname: Schwab doesn't reliably provide nicknames via the API.
-- Full account number: Privacy risk in a screen-share context.
+- Configuring headers at Cloud Run / Firebase Hosting level: Correct for static assets, but doesn't cover dynamic API responses. Both layers needed; middleware covers the app layer.
 
 ---
 
-## Decision 5: Account Picker Location in the UI
+## Decision 5: Security Event Audit Logging
 
-**Decision**: Add the picker to the **top navigation bar** (`base.html`) between the logo and the action buttons (Erase All / Disconnect). It is rendered as a `<select>` element styled to match the TOS/dark theme.
+**Decision**: Use Python `logging` to emit structured log lines to `stderr` for the following events: invalid/missing Bearer token (401), invalid `account_hash` (422), OAuth state mismatch, OAuth state expiry, Schwab API 4xx/5xx responses. Log format includes timestamp, event type, endpoint path, and hashed IP — never token or account values.
 
-**Rationale**: The top nav is shared by all authenticated views and is the single place where global session context is displayed. The left sidebar is view-navigation only. Placing the picker in the top nav means it appears consistently without requiring changes to individual page templates.
+**Rationale**: Cloud Run captures `stderr` in Cloud Logging. No third-party logging service is needed; no additional dependencies. Hashing the IP with a pepper prevents exact IP storage while still allowing anomaly correlation.
 
 **Alternatives considered**:
-- Left sidebar: Would need to scroll on mobile and is meant for page navigation, not session context.
-- Per-page header: Would require changes to each page template and risk inconsistency.
+- Structured JSON logging library (structlog): Better for parsing but adds a dependency. Deferred.
+- External SIEM integration: Out of scope for this phase.
 
 ---
 
-## Decision 6: When to Fetch the Account List
+## Decision 6: Generic Production Error Handler
 
-**Decision**: Fetch `/api/accounts` once on page load (in a new `account_picker.js` module imported by `base.html`). Cache the result in a module-level JS variable for the page lifetime. Repopulate the `<select>` with the fetched options and restore the previously stored selection from `sessionStorage`.
+**Decision**: Register a FastAPI exception handler for `Exception` that returns `{"detail": "Internal server error"}` with status 500 in production (`DEBUG=false`). In development (`DEBUG=true`), the default FastAPI error handling (with stack traces) remains active.
 
-**Rationale**: One fetch per page load is cheap. Caching in a JS variable (not storage) is sufficient because the account list is only needed for the duration of the page session. If the fetch fails, show an error state in the picker and leave data views in their pre-fetch state (no auto-load).
+**Rationale**: FastAPI's default unhandled exception response can include stack traces, file paths, and internal identifiers. These must not reach clients in production. The handler is gated on an env var to preserve developer experience.
 
 **Alternatives considered**:
-- Fetch on every Refresh click: Over-fetches; account list rarely changes mid-session.
-- Cache in `sessionStorage`: Not needed; the list is fetched fresh each page load and the stored value is just the selected hash.
+- Always generic: Harms developer experience with no upside in dev. Rejected.
+
+---
+
+## Decision 7: pip-audit Integration
+
+**Decision**: Add a `make audit` / `scripts/audit.sh` script running `pip-audit --require-hashes -r requirements.txt` and document it as a required step before every release. Pin all dependencies to exact versions (`==`) in `requirements.txt`.
+
+**Rationale**: `pip-audit` is the Python ecosystem's standard CVE scanner, maintained by PyPA. It checks against the OSV and PyPI Advisory databases. `--require-hashes` ensures no dependency substitution. Running on every PR is the constitution's requirement; the script makes this easy to add to CI.
+
+**Alternatives considered**:
+- Dependabot / Renovate: Good for automated PRs but doesn't block releases. Complementary, not a replacement.
+- Safety (PyUp): Alternative scanner. pip-audit is PyPA-maintained and open source. Preferred.

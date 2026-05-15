@@ -50,15 +50,68 @@ Open `http://localhost:8000`. After connecting your Schwab token, the account pi
 
 ---
 
+## Verifying Security Controls (Constitution v3.1.0)
+
+### Content Security Policy
+
+```bash
+curl -s -o /dev/null -D - http://localhost:8000/ | grep -i content-security-policy
+```
+
+Expected: `Content-Security-Policy: default-src 'self'; script-src 'self' https://cdn.tailwindcss.com 'nonce-<...>'; ...`
+
+Verify the nonce value changes on each request (run curl twice and compare).
+
+### Security Response Headers
+
+```bash
+curl -s -o /dev/null -D - http://localhost:8000/ | grep -iE 'x-frame-options|x-content-type-options|referrer-policy|strict-transport-security|cache-control'
+```
+
+Expected headers:
+- `X-Frame-Options: DENY`
+- `X-Content-Type-Options: nosniff`
+- `Referrer-Policy: strict-origin-when-cross-origin`
+- `Strict-Transport-Security: max-age=31536000; includeSubDomains` (production only, requires `HTTPS_ONLY=true`)
+- `Cache-Control: no-store` (on API routes)
+
+### CORS
+
+```bash
+curl -s -o /dev/null -D - -H "Origin: https://evil.example.com" http://localhost:8000/api/accounts
+```
+
+Expected: No `Access-Control-Allow-Origin` header returned for unauthorized origins.
+
+### Rate Limiting
+
+```bash
+for i in {1..65}; do curl -s -o /dev/null -w "%{http_code}\n" http://localhost:8000/api/screener/refresh -H "Authorization: Bearer test"; done
+```
+
+Expected: First 60 return `401` (unauthenticated), subsequent requests within the same minute return `429 Too Many Requests`.
+
+### pip-audit
+
+```bash
+bash scripts/audit.sh
+```
+
+Expected: `No known vulnerabilities found` or a list of CVEs that must be resolved before release.
+
+---
+
 ## Running Tests
 
 ```bash
 pytest tests/ -v
 ```
 
-New tests are in:
-- `tests/contract/test_accounts_api.py` — contract tests for `GET /api/accounts`
-- `tests/unit/test_account_picker.py` — unit tests for `account_hash` resolution logic
+Test files:
+- `tests/contract/test_accounts_api.py` — contract tests for `GET /api/accounts` and account_hash validation
+- `tests/unit/test_account_hash.py` — unit tests for `account_hash` resolution logic
+- `tests/contract/test_security_headers.py` — contract tests for CSP, X-Frame-Options, CORS, rate limiting
+- `tests/unit/test_security_middleware.py` — unit tests for nonce generation, header values, error handler
 
 ---
 
@@ -68,13 +121,16 @@ New tests are in:
 |------|--------|
 | `src/api/routes/accounts.py` | New — `GET /api/accounts` endpoint |
 | `src/api/routes/screener.py` | Add `account_hash` query param |
-| `src/api/main.py` | Register accounts router |
+| `src/api/main.py` | Register accounts router; add CSP, security headers, CORS, rate limiting, error handler |
 | `src/services/schwab_client.py` | Accept `account_hash` in `_fetch_positions` |
 | `src/services/covered_call_screener.py` | Accept `account_hash`, pass to client |
 | `frontend/static/js/account_picker.js` | New — picker init, storage, helper exports |
-| `frontend/static/js/auth.js` | Add `ACCOUNT_HASH_KEY` export (or keep internal to account_picker.js) |
 | `frontend/static/js/screener_ui.js` | Use `withAccountHash()` on refresh URL |
 | `frontend/static/js/positions_ui.js` | Use `withAccountHash()` on refresh URL |
-| `frontend/templates/base.html` | Add `<select id="account-picker">` to top nav |
-| `tests/contract/test_accounts_api.py` | New — contract tests |
-| `tests/unit/test_account_picker.py` | New — unit tests |
+| `frontend/templates/base.html` | Add account picker to nav; add `nonce="{{ csp_nonce }}"` to inline scripts |
+| `scripts/audit.sh` | New — pip-audit dependency CVE scan |
+| `requirements.txt` | Add `slowapi`, `limits`; confirm all deps exact-versioned |
+| `tests/contract/test_accounts_api.py` | New — contract tests (account picker) |
+| `tests/unit/test_account_hash.py` | New — unit tests (account hash) |
+| `tests/contract/test_security_headers.py` | New — security header contract tests |
+| `tests/unit/test_security_middleware.py` | New — security middleware unit tests |

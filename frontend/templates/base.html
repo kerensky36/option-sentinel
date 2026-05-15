@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
-  <script>
+  <script nonce="{{ csp_nonce }}">
     tailwind.config = {
       theme: {
         extend: {
@@ -296,7 +296,7 @@
   <script type="module" src="/static/js/account_picker.js"></script>
 
   <!-- Erase All Data handler -->
-  <script type="module">
+  <script type="module" nonce="{{ csp_nonce }}">
     import { eraseAll } from '/static/js/auth.js';
     const btn = document.getElementById('erase-all-btn');
     if (btn) {

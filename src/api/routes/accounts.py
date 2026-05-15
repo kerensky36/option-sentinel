@@ -1,9 +1,10 @@
 """Accounts route — returns all Schwab accounts for the current Bearer token."""
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 
 from src.api.deps import get_schwab_client
+from src.api.main import limiter, log_security_event
 
 router = APIRouter(prefix="/api")
 
@@ -18,7 +19,8 @@ def _mask_account_number(account_number: str, all_numbers: list[str]) -> str:
 
 
 @router.get("/accounts")
-async def list_accounts_endpoint(schwab_client=Depends(get_schwab_client)):
+@limiter.limit("60/minute")
+async def list_accounts_endpoint(request: Request, schwab_client=Depends(get_schwab_client)):
     """Return all Schwab accounts accessible via the current Bearer token.
 
     Account numbers are masked (last 4 digits minimum, disambiguated if needed).
@@ -28,6 +30,7 @@ async def list_accounts_endpoint(schwab_client=Depends(get_schwab_client)):
     try:
         accounts = await list_accounts(schwab_client)
     except Exception as exc:
+        log_security_event("schwab_api_error", request)
         raise HTTPException(status_code=502, detail="Failed to fetch accounts") from exc
 
     all_numbers = [a.get("accountNumber", "") for a in accounts]

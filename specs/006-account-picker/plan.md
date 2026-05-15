@@ -1,38 +1,36 @@
-# Implementation Plan: Account Picker Dropdown
+# Implementation Plan: Security Hardening (Constitution v3.1.0 Compliance)
 
-**Branch**: `006-account-picker` | **Date**: 2026-05-14 | **Spec**: [spec.md](spec.md)
+**Branch**: `006-account-picker` | **Date**: 2026-05-14 | **Spec**: `specs/006-account-picker/spec.md`
+**Input**: Feature specification from `specs/006-account-picker/spec.md`; security controls mandated by `.specify/memory/constitution.md` v3.1.0
 
 ## Summary
 
-Add a persistent account picker dropdown to the top navigation bar so users with multiple Schwab brokerage accounts can select which account to operate on. The selected account hash is stored in `sessionStorage` and passed as a query param on all account-specific API calls. A new `GET /api/accounts` endpoint feeds the picker on page load.
-
----
+Implement all mandatory security controls introduced in constitution v3.1.0 (Security-First Principle II). Controls cover: Content Security Policy (nonce-based), security response headers, CORS lock-down, API rate limiting via slowapi, security event audit logging, generic production error handler, and pip-audit dependency scanning. These controls are non-negotiable gates for production deployment alongside the account picker (US1–US3), which is already implemented.
 
 ## Technical Context
 
-**Language/Version**: Python 3.11 (backend) · Vanilla ES Modules (frontend)
-**Primary Dependencies**: FastAPI, schwab-py, Jinja2 (backend); no new frontend libraries
-**Storage**: `sessionStorage` (browser-only, key: `schwab_selected_account`); no server-side storage
-**Testing**: pytest (backend contract + unit tests); manual browser testing (frontend)
-**Target Platform**: Cloud Run (backend) · Firebase Hosting (frontend)
-**Project Type**: Web application (stateless backend + Jinja2/JS frontend)
-**Performance Goals**: Account list fetches in < 2s on a normal connection; no additional latency added to positions/screener calls
-**Constraints**: No server-side session; account selection state lives entirely in the browser; `eraseAll()` must wipe selection without code change
-**Scale/Scope**: Single trader, 1–10 accounts per OAuth token
-
----
+**Language/Version**: Python 3.11  
+**Primary Dependencies**: FastAPI, Starlette, Jinja2, httpx, slowapi, limits  
+**Storage**: N/A — stateless per-request; no persistent storage layer  
+**Testing**: pytest (contract + unit)  
+**Target Platform**: Cloud Run (single-instance at max-instances=1), Firebase Hosting (static)  
+**Project Type**: Web service (Python backend + HTML/JS frontend)  
+**Performance Goals**: p95 < 2s for all API endpoints; security middleware must add < 5ms overhead  
+**Constraints**: Single Cloud Run instance (in-memory rate limiting viable); no Redis or external coordination; no external logging services  
+**Scale/Scope**: Multi-user, stateless; each request is independently isolated
 
 ## Constitution Check
 
+*GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
+
 | Principle | Status | Notes |
 |-----------|--------|-------|
-| I. Privacy-First | ✅ Pass | Account hashes are not persisted server-side; stored only in browser `sessionStorage` alongside the token. `eraseAll()` clears both. |
-| II. Spec-Before-Code | ✅ Pass | Spec and plan committed before any `src/` or `frontend/` changes. |
-| III. Test-First | ✅ Pass | Contract and unit tests written before implementation begins (enforced in tasks). |
-| IV. Simplicity Boundary | ⚠️ Violation — justified below | Principle IV states "single brokerage account." This feature adds multi-account selection. See Complexity Tracking. |
-| V. Visual & Responsive UI | ✅ Pass | Picker added to top nav; styled to match TOS theme; must render correctly on mobile. |
-
----
+| I. Privacy-First | ✅ PASS | No new storage; security logging hashes IPs, never logs tokens or hashes |
+| II. Security-First | ✅ IMPLEMENTING | This plan is the implementation of Principle II controls |
+| III. Spec-Before-Code | ✅ PASS | This plan precedes implementation |
+| IV. Test-First | ✅ PASS | RED tests must be written and confirmed failing before Phase 3 |
+| V. Simplicity Boundary | ✅ PASS | No abstractions beyond the stated security requirements |
+| VI. Visual & Responsive UI | ✅ PASS | No UI changes in this plan |
 
 ## Project Structure
 
@@ -40,52 +38,57 @@ Add a persistent account picker dropdown to the top navigation bar so users with
 
 ```text
 specs/006-account-picker/
-├── plan.md              ← this file
-├── spec.md
-├── research.md
-├── data-model.md
-├── quickstart.md
+├── plan.md              # This file
+├── research.md          # 7 security decisions (nonce CSP, slowapi, CORS, headers, logging, error handler, pip-audit)
+├── data-model.md        # Account entity + selected-account session state
+├── quickstart.md        # Setup, test scenarios, security verification
 ├── contracts/
-│   └── http.md
-├── checklists/
-│   └── requirements.md
-└── tasks.md             ← generated by /speckit-tasks
+│   └── http.md          # API contracts including security header contract
+└── tasks.md             # Phase 2 output (generated by /speckit-tasks)
 ```
 
-### Source Code Changes
+### Source Code (repository root)
 
 ```text
 src/
 ├── api/
-│   ├── main.py                      (register accounts router)
+│   ├── main.py              # 3 new middleware classes: CSPNonceMiddleware, SecurityHeadersMiddleware; CORSMiddleware config; slowapi limiter; generic exception handler
 │   └── routes/
-│       ├── accounts.py              (NEW — GET /api/accounts)
-│       └── screener.py              (add account_hash query param)
-├── services/
-│   ├── schwab_client.py             (accept account_hash in _fetch_positions)
-│   └── covered_call_screener.py     (thread account_hash through)
+│       ├── accounts.py      # GET /api/accounts — already implemented (account picker US1)
+│       ├── screener.py      # account_hash param — already implemented
+│       └── positions.py     # account_hash param — already implemented
+└── services/
+    ├── schwab_client.py     # account_hash threading — already implemented
+    └── covered_call_screener.py  # account_hash threading — already implemented
 
 frontend/
 ├── static/js/
-│   ├── account_picker.js            (NEW — picker init, storage helpers)
-│   ├── screener_ui.js               (use withAccountHash())
-│   └── positions_ui.js              (use withAccountHash())
+│   ├── account_picker.js    # Already implemented (account picker US1–US3)
+│   ├── screener_ui.js       # Already updated (withAccountHash)
+│   └── positions_ui.js      # Already updated (withAccountHash)
 └── templates/
-    └── base.html                    (add <select id="account-picker"> to top nav)
+    └── base.html            # Will need nonce="{{ csp_nonce }}" on each inline <script> block
+
+scripts/
+└── audit.sh                 # pip-audit --require-hashes -r requirements.txt
+
+requirements.txt             # Pin slowapi and limits; confirm all deps exact-versioned
 
 tests/
 ├── contract/
-│   └── test_accounts_api.py         (NEW — GET /api/accounts contract tests)
+│   ├── test_accounts_api.py      # Already written (account picker)
+│   └── test_security_headers.py  # NEW — CSP, X-Frame-Options, CORS, rate limiting
 └── unit/
-    └── test_account_picker.py       (NEW — account_hash resolution logic)
+    ├── test_account_hash.py      # Already written (account picker)
+    └── test_security_middleware.py  # NEW — nonce generation, header values, error handler
 ```
 
-**Structure Decision**: Single project layout (Option 1). No new top-level directories required.
-
----
+**Structure Decision**: Single project (backend + frontend co-located). Security middleware lives in `src/api/main.py` alongside existing middleware. No new packages or directories required beyond `scripts/`.
 
 ## Complexity Tracking
 
+> No constitution violations — this plan reduces security debt by implementing Principle II controls.
+
 | Violation | Why Needed | Simpler Alternative Rejected Because |
-|-----------|------------|--------------------------------------|
-| ~~Principle IV: "single brokerage account"~~ **RESOLVED** (constitution v2.1.0) | Schwab OAuth tokens inherently grant access to all accounts for a given user. The current hardcoded `accounts[0]` is non-deterministic — account ordering from Schwab is not guaranteed. Without a picker, a user with two accounts may see the wrong account's data with no indication. This is a correctness fix, not a feature expansion. | Hardcoding `accounts[0]` is the current behaviour and causes silent data confusion for multi-account users. There is no simpler way to make the account selection deterministic. |
+|-----------|------------|-------------------------------------|
+| N/A | — | — |
