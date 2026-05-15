@@ -1,22 +1,19 @@
-import os
+"""Stateless Schwab client helpers.
+
+All functions return plain Pydantic model instances or dicts — no DB, no session.
+"""
+from __future__ import annotations
+
 from datetime import date, datetime, timezone
 from decimal import Decimal
 
-import httpx
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
-
-from src.data.models import Greeks, Position, PositionStatus, SourceEnum
+from src.data.models import PositionView
 from src.services.greeks_service import build_greeks
-
-ACCOUNT_ID = os.getenv("SCHWAB_ACCOUNT_ID", "")
-
 
 def _parse_occ_symbol(symbol: str) -> tuple[str, date, str, float] | None:
     """Parse OCC symbol e.g. 'QQQ   260618P00650000' → (underlying, expiry, option_type, strike)."""
     try:
         s = symbol.strip()
-        # Underlying: up to 6 chars (padded), then 6-digit date, 1 char type, 8-digit strike
         underlying = s[:-15].strip()
         date_str = s[-15:-9]   # YYMMDD
         type_char = s[-9]      # P or C
@@ -29,11 +26,20 @@ def _parse_occ_symbol(symbol: str) -> tuple[str, date, str, float] | None:
         return None
 
 
-async def _fetch_positions(client=None) -> list[dict]:
-    if client is None:
-        from src.auth.schwab_oauth import get_schwab_client
-        client = await get_schwab_client()
-    resp = await client.get_account(ACCOUNT_ID, fields=[client.Account.Fields.POSITIONS])
+async def _fetch_positions(client, account_hash: str | None = None) -> list[dict]:
+    """Fetch raw option positions from the Schwab account."""
+    from src.auth.account_resolver import list_accounts
+    accounts = await list_accounts(client)
+    if not accounts:
+        return []
+    if account_hash is None:
+        resolved_hash = accounts[0]["hashValue"]
+    else:
+        known = {a["hashValue"] for a in accounts}
+        if account_hash not in known:
+            raise ValueError(f"Account hash '{account_hash[:8]}...' not found on this token")
+        resolved_hash = account_hash
+    resp = await client.get_account(resolved_hash, fields=[client.Account.Fields.POSITIONS])
     data = resp.json()
     positions = data.get("securitiesAccount", {}).get("positions", [])
     result = []
@@ -53,32 +59,25 @@ async def _fetch_positions(client=None) -> list[dict]:
         contracts = abs(quantity)
         market_value = float(pos.get("marketValue", 0))
         mark = abs(market_value) / (contracts * 100) if contracts > 0 else 0.0
-        # For short positions market value is negative; mark is still positive price
-        if quantity < 0:
-            mark = abs(market_value) / (contracts * 100)
 
         result.append({
             "symbol": symbol,
             "underlying_symbol": instrument.get("underlyingSymbol", underlying),
             "option_type": option_type,
             "strike": strike,
-            "expiry_date": expiry.isoformat(),
+            "expiry_date": expiry,
             "quantity": quantity,
             "mark": mark,
             "cost": float(pos.get("averagePrice", 0)),
-            "account_id": ACCOUNT_ID,
         })
     return result
 
 
-async def _fetch_greeks(symbols: list[str], client=None) -> dict[str, dict]:
+async def _fetch_greeks(symbols: list[str], client) -> dict[str, dict]:
+    """Fetch Greeks for a list of OCC symbols via the option chain endpoint."""
     if not symbols:
         return {}
-    if client is None:
-        from src.auth.schwab_oauth import get_schwab_client
-        client = await get_schwab_client()
 
-    # Deduplicate by underlying so we make one chain call per underlying
     underlying_to_symbols: dict[str, list[str]] = {}
     for symbol in symbols:
         underlying = symbol[:6].strip()
@@ -99,7 +98,6 @@ async def _fetch_greeks(symbols: list[str], client=None) -> dict[str, dict]:
                     for strike_opts in exp_strikes.values():
                         for opt in strike_opts:
                             opt_symbol = opt.get("symbol", "").strip()
-                            # Match against each requested symbol (strip both for robustness)
                             for req_sym in sym_list:
                                 if opt_symbol == req_sym.strip():
                                     greeks_by_symbol[req_sym] = {
@@ -115,111 +113,78 @@ async def _fetch_greeks(symbols: list[str], client=None) -> dict[str, dict]:
     return greeks_by_symbol
 
 
-async def sync_positions_and_greeks(session: AsyncSession, schwab_client=None) -> None:
-    raw_positions = await _fetch_positions(schwab_client)
+async def fetch_positions_and_greeks(
+    schwab_client,
+    account_hash: str | None = None,
+) -> list[PositionView]:
+    """Fetch live positions and Greeks from Schwab; return a list of PositionView.
+
+    No database reads or writes. Each call fetches fresh data from Schwab.
+
+    Args:
+        schwab_client: An authenticated async schwab-py client.
+        account_hash: Optional Schwab account hash. If None, uses the first account.
+            Raises ValueError if provided hash is not found on the token.
+
+    Returns:
+        List of PositionView objects with Greeks populated (from API or Black-Scholes).
+    """
+    raw_positions = await _fetch_positions(schwab_client, account_hash=account_hash)
     symbols = [p["symbol"] for p in raw_positions]
     raw_greeks = await _fetch_greeks(symbols, schwab_client)
 
-    now = datetime.now(timezone.utc).replace(tzinfo=None)
-    seen_symbols: set[str] = set()
+    today = date.today()
+    views: list[PositionView] = []
 
     for raw in raw_positions:
         symbol = raw["symbol"]
-        account_id = raw["account_id"]
-        seen_symbols.add(symbol)
-
-        result = await session.execute(
-            select(Position).where(
-                Position.symbol == symbol,
-                Position.schwab_account_id == account_id,
-                Position.status == PositionStatus.open,
-            )
-        )
-        position = result.scalar_one_or_none()
-
-        expiry = date.fromisoformat(raw["expiry_date"])
-        dte = (expiry - date.today()).days
+        expiry: date = raw["expiry_date"]
+        dte = (expiry - today).days
         mark = Decimal(str(round(raw["mark"], 4)))
         cost = Decimal(str(round(raw["cost"], 4)))
         qty = raw["quantity"]
         pnl = (mark - cost) * qty * 100
 
-        if position is None:
-            position = Position(
-                schwab_account_id=account_id,
-                symbol=symbol,
-                underlying_symbol=raw["underlying_symbol"],
-                option_type=raw["option_type"],
-                strike=Decimal(str(raw["strike"])),
-                expiry_date=expiry,
-                quantity=qty,
-                opening_credit_debit=cost,
-                current_mark=mark,
-                unrealised_pnl=pnl,
-                days_to_expiry=dte,
-                status=PositionStatus.open,
-                last_updated=now,
-                created_at=now,
-            )
-            session.add(position)
-            await session.flush()
-        else:
-            position.current_mark = mark
-            position.unrealised_pnl = pnl
-            position.days_to_expiry = dte
-            position.last_updated = now
-
-        greeks_data = raw_greeks.get(symbol, {})
-        greeks_row = await session.execute(
-            select(Greeks).where(Greeks.position_id == position.id)
-        )
-        greeks = greeks_row.scalar_one_or_none()
-
-        built = build_greeks(
-            position=position,
-            raw=greeks_data,
+        greeks_raw = raw_greeks.get(symbol, {})
+        greeks = build_greeks(
+            strike=float(raw["strike"]),
+            option_type=raw["option_type"],
+            days_to_expiry=dte,
+            raw=greeks_raw,
         )
 
-        if greeks is None:
-            greeks = Greeks(position_id=position.id, **built, computed_at=now)
-            session.add(greeks)
-        else:
-            for k, v in built.items():
-                setattr(greeks, k, v)
-            greeks.computed_at = now
+        # Map source values: SourceEnum → Literal
+        def _map_source(val):
+            if val is None:
+                return None
+            src = str(val)
+            if src in ("api", "SourceEnum.api"):
+                return "api"
+            if src in ("calculated", "SourceEnum.calculated"):
+                return "calculated"
+            return None
 
-    # Determine which account IDs were queried this cycle
-    fetched_account_ids = {p["account_id"] for p in raw_positions}
-    if not fetched_account_ids and ACCOUNT_ID:
-        fetched_account_ids.add(ACCOUNT_ID)
-    # If still empty, fall back to all account IDs that have open positions in DB
-    if not fetched_account_ids:
-        acct_result = await session.execute(
-            select(Position.schwab_account_id)
-            .where(Position.status == PositionStatus.open)
-            .distinct()
-        )
-        fetched_account_ids = set(acct_result.scalars().all())
+        views.append(PositionView(
+            symbol=symbol,
+            underlying_symbol=raw["underlying_symbol"],
+            option_type=raw["option_type"],
+            strike=Decimal(str(raw["strike"])),
+            expiry_date=expiry,
+            quantity=qty,
+            cost=cost,
+            current_mark=mark,
+            unrealised_pnl=pnl,
+            days_to_expiry=dte,
+            delta=greeks.get("delta"),
+            gamma=greeks.get("gamma"),
+            theta=greeks.get("theta"),
+            vega=greeks.get("vega"),
+            implied_volatility=greeks.get("implied_volatility"),
+            delta_source=_map_source(greeks.get("delta_source")),
+            gamma_source=_map_source(greeks.get("gamma_source")),
+            theta_source=_map_source(greeks.get("theta_source")),
+            vega_source=_map_source(greeks.get("vega_source")),
+            iv_source=_map_source(greeks.get("iv_source")),
+        ))
 
-    # Close positions that were not returned in this poll cycle
-    for acct_id in fetched_account_ids:
-        open_result = await session.execute(
-            select(Position).where(
-                Position.schwab_account_id == acct_id,
-                Position.status == PositionStatus.open,
-            )
-        )
-        for pos in open_result.scalars().all():
-            if pos.symbol not in seen_symbols:
-                pos.status = PositionStatus.closed
-                pos.last_updated = now
-
-    # Update thesis health snapshots for all open positions with a thesis
-    from src.services.thesis_health import upsert_snapshot
-    open_result = await session.execute(
-        select(Position).where(Position.status == PositionStatus.open, Position.thesis_id.isnot(None))
-    )
-    for pos in open_result.scalars().all():
-        await upsert_snapshot(session, pos)
-
-    await session.commit()
+    return views

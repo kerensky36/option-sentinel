@@ -100,40 +100,55 @@ src/
 │   ├── binary_event.py   # Binary event exit alert
 │   └── exit_scoring.py   # Exit proximity score computation (0–100)
 └── services/
-    ├── schwab_client.py  # Position + quote fetcher (schwab-py + raw httpx for Greeks)
-    ├── greeks_service.py # Schwab Greeks parser + Black-Scholes fallback
-    ├── bs_calculator.py  # ~100-line scipy Black-Scholes implementation
-    └── poll_scheduler.py # APScheduler 5-min job wiring
+    ├── schwab_client.py          # Position + quote fetcher (schwab-py + raw httpx for Greeks)
+    ├── greeks_service.py         # Schwab Greeks parser + Black-Scholes fallback
+    ├── bs_calculator.py          # ~100-line scipy Black-Scholes implementation
+    ├── poll_scheduler.py         # APScheduler 5-min job wiring
+    └── covered_call_screener.py  # CC screener: fetch stock positions → rank by composite score
 
 frontend/
 ├── templates/
-│   ├── base.html         # Layout shell: nav, banner, footer
-│   ├── dashboard.html    # Main page (extends base)
+│   ├── base.html         # Layout shell: top nav + left sidebar + main content block
+│   ├── dashboard.html    # Thesis Monitor view (extends base) — thesis cards + positions
+│   ├── screener.html     # Covered Call Screener view (extends base)
 │   └── partials/
 │       ├── positions_table.html  # HTMX-swappable positions grid
 │       ├── position_row.html     # Single position row (HTMX OOB swap target)
-│       ├── thesis_panel.html     # Thesis group sidebar
-│       └── binary_banner.html   # Binary event flag banner
+│       ├── thesis_panel.html     # Thesis group sidebar (create/delete)
+│       ├── thesis_cards.html     # Thesis Monitor health cards (HTMX-swappable)
+│       ├── binary_banner.html    # Binary event flag banner
+│       └── screener_table.html   # Covered Call Screener ranked results table
 └── static/
-    └── favicon.ico       # Minimal static assets; CSS/JS from CDN
+    └── sentinel.svg      # Minimal static assets; CSS/JS from CDN
 
 tests/
 ├── unit/
-│   ├── test_bs_calculator.py     # Black-Scholes Greeks accuracy
-│   ├── test_exit_scoring.py      # Score computation correctness
-│   ├── test_profit_target.py     # Alert rule logic
-│   └── test_expiry_warning.py    # Alert tier logic
+│   ├── test_bs_calculator.py          # Black-Scholes Greeks accuracy
+│   ├── test_exit_scoring.py           # Score computation correctness
+│   ├── test_profit_target.py          # Alert rule logic
+│   ├── test_expiry_warning.py         # Alert tier logic
+│   └── test_covered_call_screener.py  # CC composite score + suppression rules
 ├── integration/
 │   ├── test_alert_pipeline.py    # Alert fire → log → retry pipeline
 │   ├── test_polling_cycle.py     # Poll → update → score cycle
 │   └── test_thesis_assignment.py # Thesis CRUD + position assignment
 └── contract/
-    └── test_api_contracts.py     # FastAPI endpoint contract tests
+    └── test_api_contracts.py     # FastAPI endpoint contract tests (all routes)
 ```
 
 **Structure Decision**: Web application layout. Backend in `src/`, server-rendered
 templates in `frontend/templates/`, tests in `tests/`. No `backend/` prefix — the
 project has a single Python package root at `src/`.
+
+## New Routes (US6–US8)
+
+| Route | Handler | Purpose |
+|---|---|---|
+| `GET /` | `dashboard.py` | Thesis Monitor view (existing, refocused to thesis cards) |
+| `GET /screener` | `screener.py` | Covered Call Screener view |
+| `POST /screener/refresh` | `screener.py` | Re-fetch option chains and re-rank on demand |
+
+`current_page` context variable injected by every page route so `base.html` can highlight the active sidebar item.
 
 ## Complexity Tracking
 

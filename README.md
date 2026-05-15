@@ -2,8 +2,8 @@
 
 > A personal options position monitor built with Claude Pro, spec-driven from day one.
 
-![Status](https://img.shields.io/badge/status-planning%20complete-blue)
-![Stack](https://img.shields.io/badge/stack-FastAPI%20%2B%20HTMX%20%2B%20SQLite-informational)
+![Status](https://img.shields.io/badge/status-complete-brightgreen)
+![Stack](https://img.shields.io/badge/stack-FastAPI%20%2B%20Vanilla%20JS%20%2B%20IndexedDB-informational)
 ![Auth](https://img.shields.io/badge/brokerage-Charles%20Schwab-4a7c59)
 ![License](https://img.shields.io/badge/license-MIT-lightgrey)
 
@@ -15,44 +15,123 @@ Option Sentinel connects to your Charles Schwab account and gives you a **live, 
 
 | Capability | Detail |
 |---|---|
-| **Live positions** | Pulls all open options legs from Schwab every 5 minutes during market hours |
-| **Greeks** | Delta, gamma, theta, vega, IV — sourced from Schwab API, with Black-Scholes fallback |
-| **Thesis groups** | Group positions by named thesis (IV crush, earnings fade, directional, etc.) |
-| **Exit scoring** | Automatic proximity score (0–100) against P&L %, DTE, and price targets |
-| **Alerts** | Email when a spread hits 50% profit, at 14/7/3 DTE, or on binary event flag |
+| **Live positions** | On-demand refresh from Schwab — one button, immediate update |
+| **Greeks** | Delta, gamma, theta, vega, IV — sourced from Schwab API, Black-Scholes fallback |
+| **Thesis groups** | Group positions by named thesis — stored in your browser only |
+| **Covered call screener** | Ranks long stock positions by covered-call income opportunity |
 | **Mobile-ready** | Visual-first responsive dashboard — readable on your phone mid-session |
+| **Erase All** | One button wipes every piece of your data from the browser instantly |
 
 <img width="1284" height="535" alt="image" src="https://github.com/user-attachments/assets/2bcfa959-d30a-4996-aa1b-130d7a3069a9" />
+<img width="1456" height="695" alt="image" src="https://github.com/user-attachments/assets/e2408fd7-4df0-4bc4-9a87-9c8e9be83f40" />
 
 ---
 
-## Architecture at a glance
+## Privacy & Data Handling
+
+This section explains exactly where your data lives, how it flows, and how to erase it. No hand-waving.
+
+### The core guarantee
+
+> **Your Schwab token and position data never reside on the server.** The server forwards your token to Schwab and returns raw data. It stores nothing. Logs nothing sensitive.
+
+### Login flow — step by step
 
 ```
-Schwab API
-    │
-    ▼  (every 5 min, market hours)
-APScheduler poll job
-    │
-    ├── schwab-py  ──── positions
-    ├── httpx      ──── option chains + Greeks
-    └── scipy      ──── Black-Scholes fallback
-    │
-    ▼
-SQLite (local)     ←── all data stays on your machine
-    │
-    ▼
-FastAPI + Jinja2
-    │
-    ▼
-HTMX + Tailwind CSS  ──── Server-Sent Events (5-min push updates)
-    │
-    ▼
-Browser  (localhost:8000)
+1. You click "Connect Schwab Account"
+   └─ You are redirected to Schwab's own login page (api.schwabapi.com)
+      Option Sentinel never sees your Schwab username or password.
+
+2. You log in and approve the app at Schwab
+   └─ Schwab redirects you back to Option Sentinel with a one-time auth code.
+
+3. Option Sentinel exchanges that code for a token
+   └─ This step requires your App Secret and must happen server-side.
+      The token is returned to your browser via an inline <script> tag
+      in the callback page response.
+      The server discards the token immediately after sending the response.
+      The token is never written to a database, file, or log.
+
+4. Your browser stores the token in sessionStorage
+   └─ sessionStorage is tab-local — it is automatically cleared when
+      you close the tab or browser. It cannot be accessed by any
+      other website or browser tab.
+
+5. Every Refresh request sends the token as an Authorization header
+   └─ The server reads the header, forwards it to Schwab, returns
+      the raw JSON response. It does not log the Authorization header
+      value. It does not store it. It is only in memory for the
+      milliseconds of that request.
+
+6. Your browser caches position data in IndexedDB
+   └─ IndexedDB is local to your browser on your device.
+      Position data is available instantly on page reload from this
+      cache — no network request needed until you click Refresh again.
 ```
 
-No cloud sync. No third-party analytics. No native mobile app.
-Everything runs locally and the only outbound destination is the Schwab API.
+### Where each piece of data lives
+
+| Data | Location | Cleared when |
+|---|---|---|
+| Schwab token | Browser `sessionStorage` | Tab/browser closed, Logout, or Erase All |
+| Cached positions | Browser `IndexedDB` | Erase All, or manual browser data clear |
+| Thesis groups & assignments | Browser `localStorage` | Erase All, or manual browser data clear |
+| Spread definitions | Browser `localStorage` | Erase All, or manual browser data clear |
+| Exit goals | Browser `localStorage` | Erase All, or manual browser data clear |
+| **Server storage** | **None** | **N/A — nothing is stored server-side** |
+
+### What Cloud Run sees
+
+Cloud Run (the server) sees:
+- The URL path of each request (e.g., `/api/positions/refresh`)
+- The `Authorization: Bearer` header — **value forwarded to Schwab, not logged**
+- Standard HTTP metadata (timestamps, response codes)
+
+Cloud Run never sees or stores:
+- Your Schwab credentials
+- Your position data at rest
+- Your thesis groups, spreads, or exit goals
+- Any data from a previous session
+
+### Erase All Data
+
+The **"Erase All Data"** button is available in the navigation on every page. Clicking it (after a confirmation prompt) runs the following in your browser:
+
+```javascript
+sessionStorage.clear()              // removes Schwab token
+localStorage.clear()                // removes thesis groups, spreads, exit goals
+indexedDB.deleteDatabase('option-sentinel')  // removes cached positions
+window.location.replace('/auth/login')       // returns to login screen
+```
+
+The server receives no request during this operation. After erasing, the app is in exactly the same state as a fresh install.
+
+### Two-browser / two-device behaviour
+
+Because all data is browser-local, your data on one device is not available on another. If you log in on your phone, your desktop session is unaffected (and vice versa). This is a privacy feature, not a limitation — nothing syncs through any server.
+
+---
+
+## Architecture
+
+```
+Browser                          Cloud Run (stateless)          Schwab API
+  │                                      │                           │
+  │  [you click Refresh]                 │                           │
+  │  fetch('/api/positions/refresh')     │                           │
+  │  Authorization: Bearer <token>      │                           │
+  ├─────────────────────────────────────►│                           │
+  │                                      ├── GET /accounts (token) ─►│
+  │                                      │◄─ positions JSON ─────────┤
+  │◄─ positions JSON ────────────────────┤   (token never stored)    │
+  │                                      │                           │
+  │  IndexedDB.put(positions)            │                           │
+  │  render table from JSON              │                           │
+  │  apply thesis labels from            │                           │
+  │  localStorage                        │                           │
+```
+
+The server is a thin, stateless forwarder. It holds no data between requests.
 
 ---
 
@@ -60,21 +139,19 @@ Everything runs locally and the only outbound destination is the Schwab API.
 
 | Layer | Choice | Why |
 |---|---|---|
-| Backend | Python 3.11 + FastAPI | Async, clean, the obvious Python web choice |
-| Frontend | HTMX + Tailwind CSS (CDN) | No build pipeline; server renders everything; SSE for live updates |
-| Database | SQLite → Postgres-switchable | Config-only migration path; local default |
-| ORM | SQLAlchemy 2.x + Alembic | Standard; migrations keep the Postgres switch effortless |
-| Scheduler | APScheduler | Lightest fit for a 5-min cron + daily check; no Celery/Redis needed |
-| Schwab client | schwab-py + httpx | schwab-py for OAuth; raw httpx for Greeks from `/chains` |
-| Greeks fallback | scipy + numpy (custom ~100 lines) | No third-party BS lib; full control; py_vollib is dormant |
-| Alerts | aiosmtplib | Async SMTP; retry logic built in |
-| Tests | pytest + pytest-asyncio | Integration tests hit real SQLite; no mocks |
+| Backend | Python 3.11 + FastAPI | Async, clean, minimal cold start |
+| Frontend | Vanilla JS ES modules | No build pipeline; no framework cold-start cost |
+| Client storage | sessionStorage + IndexedDB + localStorage | Token, position cache, and user metadata stay in the browser |
+| Schwab client | schwab-py + httpx | schwab-py for OAuth exchange; forwarded as Bearer on each request |
+| Greeks fallback | scipy + numpy | Black-Scholes; no third-party BS library needed |
+| Deployment | GCP Cloud Run | Scale-to-zero; min-instances=0; max-instances=1 |
+| Tests | pytest + pytest-asyncio | Fast, no DB fixtures needed |
 
 ---
 
 ## Quickstart
 
-Full setup instructions are in [`.speckit/quickstart.md`](.speckit/quickstart.md).
+Full setup instructions: [`specs/004-stateless-ephemeral-refactor/quickstart.md`](specs/004-stateless-ephemeral-refactor/quickstart.md)
 
 Short version:
 
@@ -83,111 +160,52 @@ Short version:
 pip install -r requirements.txt
 
 # 2. Configure
-cp .env.example .env   # fill in Schwab credentials + SMTP
+cp .env.example .env   # fill in Schwab credentials
 
-# 3. Initialise DB
-alembic upgrade head
-
-# 4. Authenticate with Schwab (one-time, then every 7 days)
-python -m src.auth.schwab_oauth
-
-# 5. Run
+# 3. Run (no DB setup needed)
 uvicorn src.api.main:app --reload
 # → open http://localhost:8000
+# → click "Connect Schwab Account"
 ```
 
 ---
 
 ## Project governance
 
-This project has a ratified [constitution](.specify/memory/constitution.md) (v1.1.0) that governs every implementation decision. The six principles:
+This project has a ratified [constitution](.specify/memory/constitution.md) (v2.0.0) that governs every implementation decision.
 
 | # | Principle | Non-negotiable |
 |---|---|---|
-| I | **Local-First Privacy** | All data on your machine; only Schwab API receives outbound traffic |
+| I | **Privacy-First Data Handling** | Token and position data never persisted server-side; token only in browser sessionStorage |
 | II | **Spec-Before-Code** | Spec commits precede app commits — always |
 | III | **Test-First** | Tests written and failing before implementation begins |
-| IV | **Alert Reliability** | Every alert delivers or logs a retry; idempotent by design |
-| V | **Simplicity Boundary** | Single user, single account; no scope creep |
-| VI | **Visual & Responsive UI** | Visual-first dashboard; fully functional on mobile viewports |
+| IV | **Simplicity Boundary** | Single user, single account; no scope creep |
+| V | **Visual & Responsive UI** | Visual-first dashboard; fully functional on mobile viewports |
 
 ---
 
 ## How this is being built: Claude Pro + Speckit
 
-Option Sentinel is being developed entirely through a spec-driven workflow using
-**[Speckit](https://github.com/github/spec-kit)** and **Claude Pro**. The approach
-replaces ad-hoc vibe-coding with a structured sequence:
+Option Sentinel is developed through a spec-driven workflow using
+**[Speckit](https://github.com/github/spec-kit)** and **Claude Pro**:
 
 ```
 specify  →  clarify  →  plan  →  tasks  →  implement
 ```
 
-Each step is a slash command. Claude drives the work; the spec is the source of truth.
-
-### The workflow in practice
-
-| Step | Command | What happens |
-|---|---|---|
-| 1 | `/speckit-specify` | Write or update the feature spec from a description |
-| 2 | `/speckit-clarify` | Claude asks ≤5 targeted questions; answers encoded into spec |
-| 3 | `/speckit-plan` | Architecture, data model, contracts, quickstart generated |
-| 4 | `/speckit-tasks` | 59 ordered tasks with file paths, test-first enforced |
-| 5 | `/speckit-implement` | Claude executes tasks sequentially, committing as it goes |
-
-All planning artifacts live in [`.speckit/`](.speckit/):
+Planning artifacts live in [`specs/004-stateless-ephemeral-refactor/`](specs/004-stateless-ephemeral-refactor/):
 
 ```
-.speckit/
+specs/004-stateless-ephemeral-refactor/
 ├── spec.md          ← source of truth for requirements
 ├── plan.md          ← stack, structure, constitution check
 ├── research.md      ← technology decisions + rationale
-├── data-model.md    ← all 8 entities with fields + constraints
+├── data-model.md    ← entities, token flow diagram
 ├── contracts/
-│   └── http.md      ← 11 FastAPI endpoint contracts
+│   └── http.md      ← API endpoint contracts
 ├── quickstart.md    ← setup guide
-└── tasks.md         ← 59 implementation tasks
+└── tasks.md         ← 58 implementation tasks (45 + 13 Phase 10)
 ```
-
-### Spec-before-code: why commit order matters
-
-One of the constitution's governing rules is that **spec changes are committed before
-app changes** in every session. This means the git history tells a coherent story:
-
-```
-spec: add credit spread profit target rule
-feat: implement profit target alert engine
-spec: add thesis group model
-feat: implement thesis CRUD + assignment routes
-```
-
-This makes the Gource visualisation meaningful — you can watch the spec evolve and
-the app materalise in response.
-
----
-
-## Reducing token churn with Codesight
-
-As the codebase grows, starting a new Claude session without context is expensive —
-the agent has to re-read files it has already understood. **Codesight** solves this
-by generating a compressed `.codesight/KNOWLEDGE.md` snapshot of the codebase that
-Claude reads at the start of every session instead of crawling the tree.
-
-Setup (once codesight is configured):
-
-```bash
-# Regenerate after significant changes
-codesight generate
-```
-
-Then in `.claude/settings.json` or `CLAUDE.md`:
-
-```
-Always read .codesight/KNOWLEDGE.md before starting any task if it exists.
-```
-
-The result: Claude starts each session with accurate codebase context in a fraction
-of the tokens, and you spend your Pro quota on implementation rather than orientation.
 
 ---
 
@@ -195,28 +213,62 @@ of the tokens, and you spend your Pro quota on implementation rather than orient
 
 | Phase | Status |
 |---|---|
-| Constitution ratified (v1.1.0) | ✅ Done |
-| Spec written + clarified | ✅ Done |
+| Constitution ratified (v2.0.0) | ✅ Done |
+| Stateless architecture spec | ✅ Done |
 | Plan + research + data model | ✅ Done |
-| 59 tasks generated | ✅ Done |
-| Implementation | ⬜ Ready to start (`/speckit-implement`) |
+| 45 tasks generated | ✅ Done |
+| Phase 1 — Teardown (delete DB/scheduler/alerts) | ✅ Done |
+| Phase 2 — Foundational (Pydantic models, deps, OAuth) | ✅ Done |
+| Phase 3 — OAuth login (sessionStorage token delivery) | ✅ Done |
+| Phase 4 — Positions dashboard (Refresh button, IndexedDB cache) | ✅ Done |
+| Phase 5 — Erase All Data | ✅ Done |
+| Phase 6 — Thesis groups (localStorage) | ✅ Done |
+| Phase 7 — Covered call screener (stateless) | ✅ Done |
+| Phase 8 — Dockerfile + Cloud Run | ✅ Done |
+| Phase 9 — Test cleanup + documentation | ✅ Done |
+| Phase 10 — Multi-user OAuth (stateless PKCE, dynamic accounts) | ✅ Done |
 
-**MVP target**: User Story 1 (tasks T001–T026) — live dashboard with Schwab positions
-and Greeks. Everything else builds on that foundation.
+**All 45/45 tasks complete. Phase 10 (multi-user OAuth) also complete.** App is deployed and stateless.
 
 ---
 
-## Feature roadmap
+## Deployment (Cloud Run + Firebase Hosting)
 
-The spec covers five user stories in priority order:
+Backend runs on GCP Cloud Run (stateless, scale-to-zero). Frontend is served from Firebase Hosting CDN, with `/api/**` and `/auth/**` proxied to Cloud Run.
 
-1. **P1 — Live Position Dashboard** — positions, mark price, P&L, DTE, Greeks
-2. **P2 — Credit Spread Profit Target Alert** — email when spread hits 50% profit
-3. **P2 — Expiry Warning Escalation** — email at 14, 7, and 3 DTE
-4. **P2 — Binary Event Exit Protocol** — one-button full-portfolio exit alert
-5. **P3 — Thesis Groups & Position Scoring** — group by thesis, exit proximity score
+**Required env vars**: `GCP_PROJECT_ID`, `SCHWAB_CLIENT_ID`, `SCHWAB_CLIENT_SECRET`, `SCHWAB_REDIRECT_URI`, `SCHWAB_AUTH_URL`, `SCHWAB_TOKEN_URL`
 
-SMS alerts via Twilio are a stretch goal after the core is stable.
+```bash
+# One-command deploy (backend + frontend)
+export GCP_PROJECT_ID=your-project-id
+export SCHWAB_CLIENT_ID=...
+export SCHWAB_CLIENT_SECRET=...
+export SCHWAB_REDIRECT_URI=https://your-project.web.app/auth/callback
+export SCHWAB_AUTH_URL=https://api.schwabapi.com/v1/oauth/authorize
+export SCHWAB_TOKEN_URL=https://api.schwabapi.com/v1/oauth/token
+
+bash scripts/deploy.sh
+```
+
+Or deploy individually:
+```bash
+bash scripts/deploy_backend.sh    # Cloud Run only
+bash scripts/deploy_frontend.sh   # Firebase Hosting only
+```
+
+Full setup instructions: [`specs/005-cloudrun-firebase-deploy/quickstart.md`](specs/005-cloudrun-firebase-deploy/quickstart.md)
+
+No database, no volume mounts, no Redis. Cold start target: under 3 seconds. `max-instances=1` required (PKCE state is in-memory).
+
+---
+
+## Reducing token churn with Codesight
+
+As the codebase grows, **Codesight** generates a compressed `.codesight/KNOWLEDGE.md` snapshot that Claude reads at the start of every session instead of crawling the tree.
+
+```bash
+codesight generate   # regenerate after significant changes
+```
 
 ---
 
