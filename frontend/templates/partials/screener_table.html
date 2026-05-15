@@ -1,12 +1,12 @@
 {% macro status_badge(status) %}
   {% if status == 'ranked' %}
-    <span class="px-1.5 py-0.5 bg-green-900 text-green-400 uppercase tracking-wider" style="font-size:10px; border-radius:1px">Ranked</span>
+    <span class="px-1.5 py-0.5 bg-green-900 text-green-400 uppercase tracking-wider" style="font-size:15px; border-radius:1px">Ranked</span>
   {% elif status == 'earnings_risk' %}
-    <span class="px-1.5 py-0.5 bg-amber-900 text-amber-300 uppercase tracking-wider" style="font-size:10px; border-radius:1px">⚠ Earnings Risk</span>
+    <span class="px-1.5 py-0.5 bg-amber-900 text-amber-300 uppercase tracking-wider" style="font-size:15px; border-radius:1px">⚠ Earnings Risk</span>
   {% elif status == 'call_written' %}
-    <span class="px-1.5 py-0.5 bg-gray-800 text-gray-400 uppercase tracking-wider" style="font-size:10px; border-radius:1px">Call Written</span>
+    <span class="px-1.5 py-0.5 bg-gray-800 text-gray-400 uppercase tracking-wider" style="font-size:15px; border-radius:1px">Call Written</span>
   {% elif status == 'no_liquid_options' %}
-    <span class="px-1.5 py-0.5 bg-gray-800 text-gray-600 uppercase tracking-wider" style="font-size:10px; border-radius:1px">No Liquid Options</span>
+    <span class="px-1.5 py-0.5 bg-gray-800 text-gray-600 uppercase tracking-wider" style="font-size:15px; border-radius:1px">No Liquid Options</span>
   {% endif %}
 {% endmacro %}
 
@@ -25,19 +25,19 @@
 {%- endmacro %}
 
 {% if last_refreshed_at %}
-<div class="mb-2 text-gray-600 uppercase tracking-wider" style="font-size:10px">
+<div class="mb-2 text-gray-600 uppercase tracking-wider" style="font-size:15px">
   Last refreshed {{ last_refreshed_at.strftime('%H:%M:%S') }} UTC · auto-refresh every 15 min during market hours
 </div>
 {% elif not screener_error %}
-<div class="mb-2 text-amber-400 uppercase tracking-wider" style="font-size:10px">
+<div class="mb-2 text-amber-400 uppercase tracking-wider" style="font-size:15px">
   No cached data — click Refresh to load
 </div>
 {% endif %}
 
 {% if screener_error %}
 <div class="border border-red-900 bg-gray-900 px-4 py-4 max-w-2xl" style="border-radius:2px">
-  <div class="text-red-400 uppercase tracking-widest mb-1" style="font-size:10px">Screener Error</div>
-  <p class="text-gray-300" style="font-size:12px">{{ screener_error }}</p>
+  <div class="text-red-400 uppercase tracking-widest mb-1" style="font-size:15px">Screener Error</div>
+  <p class="text-gray-300" style="font-size:18px">{{ screener_error }}</p>
 </div>
 {% elif candidates %}
 <div class="overflow-x-auto">
@@ -95,7 +95,7 @@
 </table>
 </div>
 {% else %}
-<div class="text-gray-600 py-6 text-center uppercase tracking-widest" style="font-size:11px">
+<div class="text-gray-600 py-6 text-center uppercase tracking-widest" style="font-size:16px">
   No positions found in account
 </div>
 {% endif %}
