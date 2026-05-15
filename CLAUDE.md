@@ -11,5 +11,5 @@ read the current plan at `specs/006-account-picker/plan.md`. Supporting artifact
 - `specs/006-account-picker/quickstart.md` — setup and test instructions
 - `specs/006-account-picker/spec.md` — feature specification (source of truth)
 - `specs/005-cloudrun-firebase-deploy/plan.md` — prior feature (Cloud Run + Firebase deploy)
-- `.specify/memory/constitution.md` — project constitution v3.0.0
+- `.specify/memory/constitution.md` — project constitution v3.1.0
 <!-- SPECKIT END -->
