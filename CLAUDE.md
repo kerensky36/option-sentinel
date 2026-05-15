@@ -4,11 +4,9 @@ Model: Sonnet for all tasks unless specified.
 
 <!-- SPECKIT START -->
 For context on technologies, project structure, and implementation approach,
-read the current plan at `specs/008-tos-ui-redesign/plan.md`. Supporting artifacts:
-- `specs/008-tos-ui-redesign/research.md` — technology decisions and rationale
-- `specs/008-tos-ui-redesign/data-model.md` — type scale entity definition
-- `specs/008-tos-ui-redesign/quickstart.md` — browser verification steps
-- `specs/008-tos-ui-redesign/spec.md` — feature specification (source of truth)
-- `specs/007-fix-lot-size-filter/plan.md` — prior feature (lot-size filter + screener cache)
+read the current plan at `specs/009-update-readme-sessionstorage/plan.md`. Supporting artifacts:
+- `specs/009-update-readme-sessionstorage/research.md` — stale vs. correct storage audit
+- `specs/009-update-readme-sessionstorage/spec.md` — feature specification (source of truth)
+- `specs/008-tos-ui-redesign/plan.md` — prior feature (TOS UI redesign)
 - `.specify/memory/constitution.md` — project constitution v3.2.0
 <!-- SPECKIT END -->

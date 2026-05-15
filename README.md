@@ -3,7 +3,7 @@
 > A personal options position monitor built with Claude Pro, spec-driven from day one.
 
 ![Status](https://img.shields.io/badge/status-complete-brightgreen)
-![Stack](https://img.shields.io/badge/stack-FastAPI%20%2B%20Vanilla%20JS%20%2B%20IndexedDB-informational)
+![Stack](https://img.shields.io/badge/stack-FastAPI%20%2B%20Vanilla%20JS%20%2B%20sessionStorage-informational)
 ![Auth](https://img.shields.io/badge/brokerage-Charles%20Schwab-4a7c59)
 ![License](https://img.shields.io/badge/license-MIT-lightgrey)
 
@@ -63,10 +63,11 @@ This section explains exactly where your data lives, how it flows, and how to er
       value. It does not store it. It is only in memory for the
       milliseconds of that request.
 
-6. Your browser caches position data in IndexedDB
-   └─ IndexedDB is local to your browser on your device.
-      Position data is available instantly on page reload from this
-      cache — no network request needed until you click Refresh again.
+6. Your browser caches position data in sessionStorage
+   └─ sessionStorage is tab-local — it is automatically cleared when
+      you close the tab or browser. Position data is available for
+      the duration of the tab session without additional network
+      requests until you click Refresh again.
 ```
 
 ### Where each piece of data lives
@@ -74,10 +75,9 @@ This section explains exactly where your data lives, how it flows, and how to er
 | Data | Location | Cleared when |
 |---|---|---|
 | Schwab token | Browser `sessionStorage` | Tab/browser closed, Logout, or Erase All |
-| Cached positions | Browser `IndexedDB` | Erase All, or manual browser data clear |
+| Cached positions | Browser `sessionStorage` | Tab/browser closed, or Erase All |
+| Screener cache | Browser `sessionStorage` | Tab/browser closed, or Erase All |
 | Thesis groups & assignments | Browser `localStorage` | Erase All, or manual browser data clear |
-| Spread definitions | Browser `localStorage` | Erase All, or manual browser data clear |
-| Exit goals | Browser `localStorage` | Erase All, or manual browser data clear |
 | **Server storage** | **None** | **N/A — nothing is stored server-side** |
 
 ### What Cloud Run sees
@@ -98,9 +98,8 @@ Cloud Run never sees or stores:
 The **"Erase All Data"** button is available in the navigation on every page. Clicking it (after a confirmation prompt) runs the following in your browser:
 
 ```javascript
-sessionStorage.clear()              // removes Schwab token
-localStorage.clear()                // removes thesis groups, spreads, exit goals
-indexedDB.deleteDatabase('option-sentinel')  // removes cached positions
+sessionStorage.clear()              // removes Schwab token, cached positions, screener cache
+localStorage.clear()                // removes thesis groups and assignments
 window.location.replace('/auth/login')       // returns to login screen
 ```
 
@@ -125,7 +124,7 @@ Browser                          Cloud Run (stateless)          Schwab API
   │                                      │◄─ positions JSON ─────────┤
   │◄─ positions JSON ────────────────────┤   (token never stored)    │
   │                                      │                           │
-  │  IndexedDB.put(positions)            │                           │
+  │  sessionStorage.setItem(positions)   │                           │
   │  render table from JSON              │                           │
   │  apply thesis labels from            │                           │
   │  localStorage                        │                           │
@@ -141,7 +140,7 @@ The server is a thin, stateless forwarder. It holds no data between requests.
 |---|---|---|
 | Backend | Python 3.11 + FastAPI | Async, clean, minimal cold start |
 | Frontend | Vanilla JS ES modules | No build pipeline; no framework cold-start cost |
-| Client storage | sessionStorage + IndexedDB + localStorage | Token, position cache, and user metadata stay in the browser |
+| Client storage | sessionStorage + localStorage | Token and position/screener caches (sessionStorage, tab-scoped); thesis groups (localStorage, persists across tabs) |
 | Schwab client | schwab-py + httpx | schwab-py for OAuth exchange; forwarded as Bearer on each request |
 | Greeks fallback | scipy + numpy | Black-Scholes; no third-party BS library needed |
 | Deployment | GCP Cloud Run | Scale-to-zero; min-instances=0; max-instances=1 |
@@ -220,7 +219,7 @@ specs/004-stateless-ephemeral-refactor/
 | Phase 1 — Teardown (delete DB/scheduler/alerts) | ✅ Done |
 | Phase 2 — Foundational (Pydantic models, deps, OAuth) | ✅ Done |
 | Phase 3 — OAuth login (sessionStorage token delivery) | ✅ Done |
-| Phase 4 — Positions dashboard (Refresh button, IndexedDB cache) | ✅ Done |
+| Phase 4 — Positions dashboard (Refresh button, sessionStorage cache) | ✅ Done |
 | Phase 5 — Erase All Data | ✅ Done |
 | Phase 6 — Thesis groups (localStorage) | ✅ Done |
 | Phase 7 — Covered call screener (stateless) | ✅ Done |
