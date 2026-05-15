@@ -221,6 +221,12 @@
       <span class="text-sm font-semibold tracking-widest uppercase text-gray-200">Option Sentinel</span>
     </div>
     <div class="flex items-center gap-4 text-gray-400" style="font-size:12px">
+      <select
+        id="account-picker"
+        title="Select active Schwab account"
+        style="font-size:10px; background:#1c1c24; color:#90909c; border:1px solid #22222e; padding:2px 6px; font-family:inherit; letter-spacing:0.05em; outline:none; cursor:pointer; border-radius:1px; min-width:100px;">
+        <option value="" disabled selected>Loading…</option>
+      </select>
       <button
         id="erase-all-btn"
         class="flex items-center gap-1 bg-red-900 hover:bg-red-800 text-red-300 px-2 py-1 transition-colors uppercase tracking-wider"
@@ -285,6 +291,9 @@
     </main>
 
   </div>
+
+  <!-- Account picker (loads on every authenticated page) -->
+  <script type="module" src="/static/js/account_picker.js"></script>
 
   <!-- Erase All Data handler -->
   <script type="module">

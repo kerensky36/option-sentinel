@@ -3,6 +3,7 @@
  */
 
 import { fetchWithAuth, isAuthenticated } from './auth.js';
+import { withAccountHash } from './account_picker.js';
 
 const TABLE_ID = 'screener-table';
 const REFRESH_BTN_ID = 'screener-refresh-btn';
@@ -107,7 +108,7 @@ async function refreshScreener() {
   }
 
   try {
-    const resp = await fetchWithAuth('/api/screener/refresh');
+    const resp = await fetchWithAuth(withAccountHash('/api/screener/refresh'));
 
     if (!resp) return; // eraseAll() already called by fetchWithAuth on 401
 

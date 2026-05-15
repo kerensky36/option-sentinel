@@ -4,12 +4,12 @@ Model: Sonnet for all tasks unless specified.
 
 <!-- SPECKIT START -->
 For context on technologies, project structure, and implementation approach,
-read the current plan at `specs/005-cloudrun-firebase-deploy/plan.md`. Supporting artifacts:
-- `specs/005-cloudrun-firebase-deploy/research.md` — technology decisions and rationale
-- `specs/005-cloudrun-firebase-deploy/data-model.md` — entity definitions and relationships
-- `specs/005-cloudrun-firebase-deploy/contracts/deploy.md` — deploy script and Firebase config contracts
-- `specs/005-cloudrun-firebase-deploy/quickstart.md` — setup and deploy instructions
-- `specs/005-cloudrun-firebase-deploy/spec.md` — feature specification (source of truth)
-- `specs/004-stateless-ephemeral-refactor/plan.md` — prior feature (stateless refactor, fully implemented)
+read the current plan at `specs/006-account-picker/plan.md`. Supporting artifacts:
+- `specs/006-account-picker/research.md` — technology decisions and rationale
+- `specs/006-account-picker/data-model.md` — entity definitions and relationships
+- `specs/006-account-picker/contracts/http.md` — HTTP API contracts (new + modified endpoints)
+- `specs/006-account-picker/quickstart.md` — setup and test instructions
+- `specs/006-account-picker/spec.md` — feature specification (source of truth)
+- `specs/005-cloudrun-firebase-deploy/plan.md` — prior feature (Cloud Run + Firebase deploy)
 - `.specify/memory/constitution.md` — project constitution v2.0.0
 <!-- SPECKIT END -->

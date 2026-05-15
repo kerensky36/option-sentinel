@@ -7,6 +7,7 @@
  */
 
 import { fetchWithAuth, isAuthenticated } from './auth.js';
+import { withAccountHash } from './account_picker.js';
 import { savePositions, loadPositions } from './position_cache.js';
 import { getAssignments } from './thesis_store.js';
 
@@ -153,7 +154,7 @@ async function refreshPositions() {
   }
 
   try {
-    const resp = await fetchWithAuth('/api/positions/refresh');
+    const resp = await fetchWithAuth(withAccountHash('/api/positions/refresh'));
 
     if (!resp) return; // eraseAll() already called by fetchWithAuth on 401
 

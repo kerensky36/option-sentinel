@@ -26,14 +26,20 @@ def _parse_occ_symbol(symbol: str) -> tuple[str, date, str, float] | None:
         return None
 
 
-async def _fetch_positions(client) -> list[dict]:
+async def _fetch_positions(client, account_hash: str | None = None) -> list[dict]:
     """Fetch raw option positions from the Schwab account."""
     from src.auth.account_resolver import list_accounts
     accounts = await list_accounts(client)
     if not accounts:
         return []
-    account_hash = accounts[0]["hashValue"]
-    resp = await client.get_account(account_hash, fields=[client.Account.Fields.POSITIONS])
+    if account_hash is None:
+        resolved_hash = accounts[0]["hashValue"]
+    else:
+        known = {a["hashValue"] for a in accounts}
+        if account_hash not in known:
+            raise ValueError(f"Account hash '{account_hash[:8]}...' not found on this token")
+        resolved_hash = account_hash
+    resp = await client.get_account(resolved_hash, fields=[client.Account.Fields.POSITIONS])
     data = resp.json()
     positions = data.get("securitiesAccount", {}).get("positions", [])
     result = []
@@ -107,18 +113,23 @@ async def _fetch_greeks(symbols: list[str], client) -> dict[str, dict]:
     return greeks_by_symbol
 
 
-async def fetch_positions_and_greeks(schwab_client) -> list[PositionView]:
+async def fetch_positions_and_greeks(
+    schwab_client,
+    account_hash: str | None = None,
+) -> list[PositionView]:
     """Fetch live positions and Greeks from Schwab; return a list of PositionView.
 
     No database reads or writes. Each call fetches fresh data from Schwab.
 
     Args:
         schwab_client: An authenticated async schwab-py client.
+        account_hash: Optional Schwab account hash. If None, uses the first account.
+            Raises ValueError if provided hash is not found on the token.
 
     Returns:
         List of PositionView objects with Greeks populated (from API or Black-Scholes).
     """
-    raw_positions = await _fetch_positions(schwab_client)
+    raw_positions = await _fetch_positions(schwab_client, account_hash=account_hash)
     symbols = [p["symbol"] for p in raw_positions]
     raw_greeks = await _fetch_greeks(symbols, schwab_client)
 

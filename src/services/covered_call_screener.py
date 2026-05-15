@@ -92,11 +92,16 @@ def _annualised_yield(bid: float, stock_price: float, dte: int) -> float:
 
 # ── Main screener entry point ─────────────────────────────────────────────────
 
-async def run_screener(client=None) -> list[ScreenerResultView]:
+async def run_screener(
+    client=None,
+    account_hash: str | None = None,
+) -> list[ScreenerResultView]:
     """Fetch stock positions and option chains; return ranked ScreenerResultView list.
 
     Args:
         client: Authenticated async schwab-py client. If None, raises ValueError.
+        account_hash: Optional Schwab account hash. If None, uses the first account.
+            Raises ValueError if provided hash is not found on the token.
 
     Returns:
         List of ScreenerResultView objects sorted by composite_score descending.
@@ -109,7 +114,12 @@ async def run_screener(client=None) -> list[ScreenerResultView]:
     if not accounts:
         logger.warning("No accounts found on token — screener returning empty results")
         return []
-    account_hash = accounts[0]["hashValue"]
+    if account_hash is None:
+        account_hash = accounts[0]["hashValue"]
+    else:
+        known = {a["hashValue"] for a in accounts}
+        if account_hash not in known:
+            raise ValueError(f"Account hash '{account_hash[:8]}...' not found on this token")
 
     stock_positions = await _fetch_stock_positions(client, account_hash)
     open_calls      = await _fetch_open_calls(client, account_hash)
