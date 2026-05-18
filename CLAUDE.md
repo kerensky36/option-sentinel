@@ -4,9 +4,10 @@ Model: Sonnet for all tasks unless specified.
 
 <!-- SPECKIT START -->
 For context on technologies, project structure, and implementation approach,
-read the current plan at `specs/009-update-readme-sessionstorage/plan.md`. Supporting artifacts:
-- `specs/009-update-readme-sessionstorage/research.md` — stale vs. correct storage audit
-- `specs/009-update-readme-sessionstorage/spec.md` — feature specification (source of truth)
-- `specs/008-tos-ui-redesign/plan.md` — prior feature (TOS UI redesign)
+read the current plan at `specs/012-async-greeks-fetch/plan.md`. Supporting artifacts:
+- `specs/012-async-greeks-fetch/research.md` — concurrency decisions and rationale
+- `specs/012-async-greeks-fetch/data-model.md` — confirms no new entities (pure internal refactor)
+- `specs/012-async-greeks-fetch/quickstart.md` — 8-scenario verification protocol
+- `specs/012-async-greeks-fetch/spec.md` — feature specification (source of truth)
 - `.specify/memory/constitution.md` — project constitution v3.2.0
 <!-- SPECKIT END -->

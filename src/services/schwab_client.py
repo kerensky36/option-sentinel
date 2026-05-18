@@ -4,6 +4,7 @@ All functions return plain Pydantic model instances or dicts — no DB, no sessi
 """
 from __future__ import annotations
 
+import asyncio
 from datetime import date, datetime, timezone
 from decimal import Decimal
 
@@ -83,8 +84,7 @@ async def _fetch_greeks(symbols: list[str], client) -> dict[str, dict]:
         underlying = symbol[:6].strip()
         underlying_to_symbols.setdefault(underlying, []).append(symbol)
 
-    greeks_by_symbol: dict[str, dict] = {}
-    for underlying, sym_list in underlying_to_symbols.items():
+    async def _fetch_one(underlying: str, sym_list: list[str]) -> dict[str, dict]:
         try:
             resp = await client.get_option_chain(
                 symbol=underlying,
@@ -93,6 +93,7 @@ async def _fetch_greeks(symbols: list[str], client) -> dict[str, dict]:
             )
             data = resp.json()
             underlying_price = data.get("underlyingPrice") or data.get("underlying", {}).get("last")
+            result: dict[str, dict] = {}
             for side in ("callExpDateMap", "putExpDateMap"):
                 for exp_strikes in data.get(side, {}).values():
                     for strike_opts in exp_strikes.values():
@@ -100,7 +101,7 @@ async def _fetch_greeks(symbols: list[str], client) -> dict[str, dict]:
                             opt_symbol = opt.get("symbol", "").strip()
                             for req_sym in sym_list:
                                 if opt_symbol == req_sym.strip():
-                                    greeks_by_symbol[req_sym] = {
+                                    result[req_sym] = {
                                         "delta": opt.get("delta"),
                                         "gamma": opt.get("gamma"),
                                         "theta": opt.get("theta"),
@@ -108,8 +109,18 @@ async def _fetch_greeks(symbols: list[str], client) -> dict[str, dict]:
                                         "implied_volatility": opt.get("volatility"),
                                         "underlying_price": underlying_price,
                                     }
+            return result
         except Exception:
-            pass
+            return {}
+
+    results = await asyncio.gather(
+        *[_fetch_one(u, s) for u, s in underlying_to_symbols.items()],
+        return_exceptions=True,
+    )
+    greeks_by_symbol: dict[str, dict] = {}
+    for r in results:
+        if not isinstance(r, Exception):
+            greeks_by_symbol.update(r)
     return greeks_by_symbol
 
 
