@@ -8,6 +8,15 @@
  */
 
 const ACCESS_TOKEN_KEY = 'schwab_access_token';
+const DEMO_MODE_KEY = 'demo_mode';
+
+/**
+ * Returns true when the current tab is running in demo mode.
+ * @returns {boolean}
+ */
+export function isDemoMode() {
+  return sessionStorage.getItem(DEMO_MODE_KEY) === 'true';
+}
 
 /**
  * Read the raw access token string from sessionStorage.
@@ -35,6 +44,11 @@ export function isAuthenticated() {
  * @returns {Promise<Response|null>}
  */
 export async function fetchWithAuth(url, options = {}) {
+  if (isDemoMode()) {
+    const { demoResponse } = await import('./demo_data.js');
+    return demoResponse(url);
+  }
+
   const token = getAccessToken();
   if (!token) {
     eraseAll();

@@ -127,6 +127,29 @@ async def auth_callback(request: Request):
     return HTMLResponse(content=html, status_code=200)
 
 
+@router.get("/demo-login", response_class=HTMLResponse)
+@limiter.limit("30/minute")
+async def demo_login(request: Request):
+    """Enter demo mode: sets demo_mode flag in sessionStorage, no Schwab OAuth required."""
+    nonce = getattr(request.state, "csp_nonce", "")
+    html = f"""<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><title>Demo Mode…</title></head>
+<body>
+<script nonce="{nonce}">
+  try {{
+    sessionStorage.setItem('demo_mode', 'true');
+  }} catch (e) {{
+    console.error('Failed to set demo mode:', e);
+  }}
+  window.location.replace('/');
+</script>
+<noscript><p>JavaScript is required. <a href="/">Continue</a></p></noscript>
+</body>
+</html>"""
+    return HTMLResponse(content=html, status_code=200)
+
+
 @router.get("/dev-login", response_class=HTMLResponse)
 async def dev_login(request: Request):
     """DEV ONLY: inject access token from schwab_token.json into sessionStorage."""

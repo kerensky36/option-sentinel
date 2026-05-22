@@ -223,6 +223,19 @@
 </head>
 <body class="bg-gray-950 text-gray-100 min-h-screen flex flex-col">
 
+  <!-- Demo mode banner — hidden by default, revealed by JS when demo_mode is set -->
+  <div id="demo-banner"
+       style="display:none; background:#c8a820; color:#0c0c10; text-align:center;
+              padding:4px 0; font-size:10px; font-weight:700; letter-spacing:0.18em;
+              font-family:'JetBrains Mono',monospace; flex-shrink:0;">
+    DEMO MODE — data is simulated and does not reflect real account balances
+  </div>
+  <script nonce="{{ csp_nonce }}">
+    if (sessionStorage.getItem('demo_mode') === 'true') {
+      document.getElementById('demo-banner').style.display = 'block';
+    }
+  </script>
+
   <!-- Top nav -->
   <nav class="bg-gray-900 border-b border-gray-800 px-4 py-1.5 flex items-center justify-between flex-shrink-0">
     <div class="flex items-center gap-2">
