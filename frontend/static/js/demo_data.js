@@ -120,59 +120,111 @@ export const DEMO_POSITIONS_EQUITY = [
   },
 ];
 
+// Candidate option contracts for demo screener results.
+// Three DTE buckets cover all risk profiles:
+//   21d → aggressive (7–30), 35d → balanced (30–45), 56d → conservative (30–60)
+const _AAPL_CANDIDATES = [
+  { dte: 21, delta: 0.31, bid: 2.60, strike: 220.0, expiry: '2026-06-12', open_interest: 2400 },
+  { dte: 21, delta: 0.20, bid: 1.90, strike: 225.0, expiry: '2026-06-12', open_interest: 1800 },
+  { dte: 35, delta: 0.27, bid: 3.30, strike: 220.0, expiry: '2026-06-26', open_interest: 1900 },
+  { dte: 35, delta: 0.18, bid: 2.50, strike: 225.0, expiry: '2026-06-26', open_interest: 1400 },
+  { dte: 56, delta: 0.24, bid: 3.90, strike: 220.0, expiry: '2026-07-17', open_interest: 1200 },
+  { dte: 56, delta: 0.15, bid: 2.80, strike: 225.0, expiry: '2026-07-17', open_interest: 900 },
+];
+const _AMD_CANDIDATES = [
+  { dte: 21, delta: 0.34, bid: 3.40, strike: 163.0, expiry: '2026-06-12', open_interest: 3100 },
+  { dte: 21, delta: 0.22, bid: 2.20, strike: 168.0, expiry: '2026-06-12', open_interest: 2200 },
+  { dte: 35, delta: 0.28, bid: 4.90, strike: 163.0, expiry: '2026-06-26', open_interest: 2000 },
+  { dte: 35, delta: 0.17, bid: 3.30, strike: 168.0, expiry: '2026-06-26', open_interest: 1500 },
+  { dte: 56, delta: 0.25, bid: 5.80, strike: 163.0, expiry: '2026-07-17', open_interest: 1400 },
+  { dte: 56, delta: 0.14, bid: 3.80, strike: 170.0, expiry: '2026-07-17', open_interest: 900 },
+];
+const _NVDA_CANDIDATES = [
+  { dte: 21, delta: 0.33, bid: 2.20, strike: 132.0, expiry: '2026-06-12', open_interest: 4200 },
+  { dte: 21, delta: 0.21, bid: 1.60, strike: 135.0, expiry: '2026-06-12', open_interest: 3100 },
+  { dte: 35, delta: 0.27, bid: 2.50, strike: 132.0, expiry: '2026-06-26', open_interest: 3000 },
+  { dte: 35, delta: 0.17, bid: 1.80, strike: 135.0, expiry: '2026-06-26', open_interest: 2100 },
+  { dte: 56, delta: 0.23, bid: 2.90, strike: 132.0, expiry: '2026-07-17', open_interest: 2000 },
+  { dte: 56, delta: 0.14, bid: 2.00, strike: 137.0, expiry: '2026-07-17', open_interest: 1200 },
+];
+const _META_CANDIDATES = [
+  { dte: 21, delta: 0.32, bid: 7.80, strike: 610.0, expiry: '2026-06-12', open_interest: 1100 },
+  { dte: 21, delta: 0.22, bid: 5.60, strike: 620.0, expiry: '2026-06-12', open_interest: 800 },
+  { dte: 35, delta: 0.26, bid: 8.40, strike: 610.0, expiry: '2026-06-26', open_interest: 900 },
+  { dte: 35, delta: 0.17, bid: 6.20, strike: 625.0, expiry: '2026-06-26', open_interest: 650 },
+  { dte: 56, delta: 0.22, bid: 9.60, strike: 615.0, expiry: '2026-07-17', open_interest: 700 },
+  { dte: 56, delta: 0.14, bid: 7.10, strike: 630.0, expiry: '2026-07-17', open_interest: 500 },
+];
+const _SPY_CANDIDATES = [
+  { dte: 21, delta: 0.30, bid: 2.90, strike: 568.0, expiry: '2026-06-12', open_interest: 9200 },
+  { dte: 21, delta: 0.20, bid: 1.90, strike: 574.0, expiry: '2026-06-12', open_interest: 7100 },
+  { dte: 35, delta: 0.25, bid: 3.60, strike: 568.0, expiry: '2026-06-26', open_interest: 6500 },
+  { dte: 35, delta: 0.16, bid: 2.50, strike: 574.0, expiry: '2026-06-26', open_interest: 5000 },
+  { dte: 56, delta: 0.22, bid: 4.20, strike: 568.0, expiry: '2026-07-17', open_interest: 4500 },
+  { dte: 56, delta: 0.14, bid: 3.00, strike: 576.0, expiry: '2026-07-17', open_interest: 3200 },
+];
+const _VOO_CANDIDATES = [
+  { dte: 21, delta: 0.28, bid: 2.30, strike: 514.0, expiry: '2026-06-12', open_interest: 900 },
+  { dte: 21, delta: 0.18, bid: 1.60, strike: 520.0, expiry: '2026-06-12', open_interest: 680 },
+  { dte: 35, delta: 0.23, bid: 3.00, strike: 514.0, expiry: '2026-06-26', open_interest: 720 },
+  { dte: 35, delta: 0.15, bid: 2.10, strike: 520.0, expiry: '2026-06-26', open_interest: 540 },
+  { dte: 56, delta: 0.20, bid: 3.50, strike: 514.0, expiry: '2026-07-17', open_interest: 480 },
+  { dte: 56, delta: 0.13, bid: 2.40, strike: 522.0, expiry: '2026-07-17', open_interest: 350 },
+];
+
 export const DEMO_SCREENER_RESULTS = [
   {
     ticker: 'AAPL', shares: 150, contracts: 1, stock_price: 213.50,
-    iv_rank: 42.0, recommended_strike: 220.00, recommended_expiry: '2025-06-20',
-    bid_premium: 3.20, annualised_yield: 0.18, call_delta: 0.28,
+    iv_rank: 42.0, recommended_strike: 220.00, recommended_expiry: '2026-06-26',
+    bid_premium: 3.30, annualised_yield: 0.18, call_delta: 0.27,
     days_to_earnings: 45, composite_score: 78.5,
-    recommendation_status: 'recommended', sort_order: 1, candidates: [],
+    recommendation_status: 'recommended', sort_order: 1, candidates: _AAPL_CANDIDATES,
   },
   {
     ticker: 'AMD', shares: 300, contracts: 2, stock_price: 158.40,
-    iv_rank: 61.0, recommended_strike: 175.00, recommended_expiry: '2025-06-20',
-    bid_premium: 4.80, annualised_yield: 0.36, call_delta: 0.32,
+    iv_rank: 61.0, recommended_strike: 163.00, recommended_expiry: '2026-06-26',
+    bid_premium: 4.90, annualised_yield: 0.34, call_delta: 0.28,
     days_to_earnings: 38, composite_score: 76.2,
-    recommendation_status: 'recommended', sort_order: 2, candidates: [],
+    recommendation_status: 'recommended', sort_order: 2, candidates: _AMD_CANDIDATES,
   },
   {
     ticker: 'NVDA', shares: 200, contracts: 1, stock_price: 127.60,
-    iv_rank: 58.0, recommended_strike: 135.00, recommended_expiry: '2025-06-20',
-    bid_premium: 2.45, annualised_yield: 0.23, call_delta: 0.30,
+    iv_rank: 58.0, recommended_strike: 132.00, recommended_expiry: '2026-06-26',
+    bid_premium: 2.50, annualised_yield: 0.21, call_delta: 0.27,
     days_to_earnings: 52, composite_score: 74.8,
-    recommendation_status: 'recommended', sort_order: 3, candidates: [],
+    recommendation_status: 'recommended', sort_order: 3, candidates: _NVDA_CANDIDATES,
   },
   {
     ticker: 'META', shares: 175, contracts: 1, stock_price: 592.30,
-    iv_rank: 46.0, recommended_strike: 620.00, recommended_expiry: '2025-06-20',
-    bid_premium: 8.20, annualised_yield: 0.17, call_delta: 0.29,
+    iv_rank: 46.0, recommended_strike: 610.00, recommended_expiry: '2026-06-26',
+    bid_premium: 8.40, annualised_yield: 0.17, call_delta: 0.26,
     days_to_earnings: 41, composite_score: 71.3,
-    recommendation_status: 'recommended', sort_order: 4, candidates: [],
+    recommendation_status: 'recommended', sort_order: 4, candidates: _META_CANDIDATES,
   },
   {
     ticker: 'SPY', shares: 250, contracts: 2, stock_price: 558.70,
-    iv_rank: 31.0, recommended_strike: 570.00, recommended_expiry: '2025-06-20',
-    bid_premium: 3.50, annualised_yield: 0.15, call_delta: 0.27,
+    iv_rank: 31.0, recommended_strike: 568.00, recommended_expiry: '2026-06-26',
+    bid_premium: 3.60, annualised_yield: 0.14, call_delta: 0.25,
     days_to_earnings: null, composite_score: 64.1,
-    recommendation_status: 'recommended', sort_order: 5, candidates: [],
+    recommendation_status: 'recommended', sort_order: 5, candidates: _SPY_CANDIDATES,
   },
   {
     ticker: 'VOO', shares: 150, contracts: 1, stock_price: 504.80,
-    iv_rank: 28.0, recommended_strike: 510.00, recommended_expiry: '2025-06-20',
-    bid_premium: 2.90, annualised_yield: 0.14, call_delta: 0.25,
+    iv_rank: 28.0, recommended_strike: 514.00, recommended_expiry: '2026-06-26',
+    bid_premium: 3.00, annualised_yield: 0.13, call_delta: 0.23,
     days_to_earnings: null, composite_score: 61.0,
-    recommendation_status: 'recommended', sort_order: 6, candidates: [],
+    recommendation_status: 'recommended', sort_order: 6, candidates: _VOO_CANDIDATES,
   },
   {
     ticker: 'AMZN', shares: 120, contracts: 0, stock_price: 218.90,
-    iv_rank: 39.0, recommended_strike: 225.00, recommended_expiry: '2025-06-20',
+    iv_rank: 39.0, recommended_strike: 225.00, recommended_expiry: '2026-06-26',
     bid_premium: 3.10, annualised_yield: 0.17, call_delta: 0.30,
     days_to_earnings: 8, composite_score: 52.4,
     recommendation_status: 'suppressed', sort_order: 7, candidates: [],
   },
   {
     ticker: 'MSFT', shares: 125, contracts: 0, stock_price: 421.10,
-    iv_rank: 55.0, recommended_strike: 430.00, recommended_expiry: '2025-06-20',
+    iv_rank: 55.0, recommended_strike: 430.00, recommended_expiry: '2026-06-26',
     bid_premium: 4.10, annualised_yield: 0.12, call_delta: 0.31,
     days_to_earnings: 12, composite_score: 49.8,
     recommendation_status: 'suppressed', sort_order: 8, candidates: [],

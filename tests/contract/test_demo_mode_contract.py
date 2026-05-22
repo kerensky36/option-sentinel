@@ -184,59 +184,93 @@ _DEMO_POSITIONS_EQUITY = [
 # Mirror of DEMO_SCREENER_RESULTS in frontend/static/js/demo_data.js
 # ---------------------------------------------------------------------------
 
+def _make_candidates(rows):
+    return [{"dte": r[0], "delta": r[1], "bid": r[2], "strike": r[3], "expiry": r[4], "open_interest": r[5]} for r in rows]
+
+_AAPL_CANDIDATES = _make_candidates([
+    (21, 0.31, 2.60, 220.0, "2026-06-12", 2400), (21, 0.20, 1.90, 225.0, "2026-06-12", 1800),
+    (35, 0.27, 3.30, 220.0, "2026-06-26", 1900), (35, 0.18, 2.50, 225.0, "2026-06-26", 1400),
+    (56, 0.24, 3.90, 220.0, "2026-07-17", 1200), (56, 0.15, 2.80, 225.0, "2026-07-17", 900),
+])
+_AMD_CANDIDATES = _make_candidates([
+    (21, 0.34, 3.40, 163.0, "2026-06-12", 3100), (21, 0.22, 2.20, 168.0, "2026-06-12", 2200),
+    (35, 0.28, 4.90, 163.0, "2026-06-26", 2000), (35, 0.17, 3.30, 168.0, "2026-06-26", 1500),
+    (56, 0.25, 5.80, 163.0, "2026-07-17", 1400), (56, 0.14, 3.80, 170.0, "2026-07-17", 900),
+])
+_NVDA_CANDIDATES = _make_candidates([
+    (21, 0.33, 2.20, 132.0, "2026-06-12", 4200), (21, 0.21, 1.60, 135.0, "2026-06-12", 3100),
+    (35, 0.27, 2.50, 132.0, "2026-06-26", 3000), (35, 0.17, 1.80, 135.0, "2026-06-26", 2100),
+    (56, 0.23, 2.90, 132.0, "2026-07-17", 2000), (56, 0.14, 2.00, 137.0, "2026-07-17", 1200),
+])
+_META_CANDIDATES = _make_candidates([
+    (21, 0.32, 7.80, 610.0, "2026-06-12", 1100), (21, 0.22, 5.60, 620.0, "2026-06-12", 800),
+    (35, 0.26, 8.40, 610.0, "2026-06-26", 900),  (35, 0.17, 6.20, 625.0, "2026-06-26", 650),
+    (56, 0.22, 9.60, 615.0, "2026-07-17", 700),  (56, 0.14, 7.10, 630.0, "2026-07-17", 500),
+])
+_SPY_CANDIDATES = _make_candidates([
+    (21, 0.30, 2.90, 568.0, "2026-06-12", 9200), (21, 0.20, 1.90, 574.0, "2026-06-12", 7100),
+    (35, 0.25, 3.60, 568.0, "2026-06-26", 6500), (35, 0.16, 2.50, 574.0, "2026-06-26", 5000),
+    (56, 0.22, 4.20, 568.0, "2026-07-17", 4500), (56, 0.14, 3.00, 576.0, "2026-07-17", 3200),
+])
+_VOO_CANDIDATES = _make_candidates([
+    (21, 0.28, 2.30, 514.0, "2026-06-12", 900), (21, 0.18, 1.60, 520.0, "2026-06-12", 680),
+    (35, 0.23, 3.00, 514.0, "2026-06-26", 720), (35, 0.15, 2.10, 520.0, "2026-06-26", 540),
+    (56, 0.20, 3.50, 514.0, "2026-07-17", 480), (56, 0.13, 2.40, 522.0, "2026-07-17", 350),
+])
+
 _DEMO_SCREENER_RESULTS = [
     {
         "ticker": "AAPL", "shares": 150, "contracts": 1, "stock_price": 213.50,
-        "iv_rank": 42.0, "recommended_strike": 220.00, "recommended_expiry": "2025-06-20",
-        "bid_premium": 3.20, "annualised_yield": 0.18, "call_delta": 0.28,
+        "iv_rank": 42.0, "recommended_strike": 220.00, "recommended_expiry": "2026-06-26",
+        "bid_premium": 3.30, "annualised_yield": 0.18, "call_delta": 0.27,
         "days_to_earnings": 45, "composite_score": 78.5,
-        "recommendation_status": "recommended", "sort_order": 1, "candidates": [],
+        "recommendation_status": "recommended", "sort_order": 1, "candidates": _AAPL_CANDIDATES,
     },
     {
         "ticker": "AMD", "shares": 300, "contracts": 2, "stock_price": 158.40,
-        "iv_rank": 61.0, "recommended_strike": 175.00, "recommended_expiry": "2025-06-20",
-        "bid_premium": 4.80, "annualised_yield": 0.36, "call_delta": 0.32,
+        "iv_rank": 61.0, "recommended_strike": 163.00, "recommended_expiry": "2026-06-26",
+        "bid_premium": 4.90, "annualised_yield": 0.34, "call_delta": 0.28,
         "days_to_earnings": 38, "composite_score": 76.2,
-        "recommendation_status": "recommended", "sort_order": 2, "candidates": [],
+        "recommendation_status": "recommended", "sort_order": 2, "candidates": _AMD_CANDIDATES,
     },
     {
         "ticker": "NVDA", "shares": 200, "contracts": 1, "stock_price": 127.60,
-        "iv_rank": 58.0, "recommended_strike": 135.00, "recommended_expiry": "2025-06-20",
-        "bid_premium": 2.45, "annualised_yield": 0.23, "call_delta": 0.30,
+        "iv_rank": 58.0, "recommended_strike": 132.00, "recommended_expiry": "2026-06-26",
+        "bid_premium": 2.50, "annualised_yield": 0.21, "call_delta": 0.27,
         "days_to_earnings": 52, "composite_score": 74.8,
-        "recommendation_status": "recommended", "sort_order": 3, "candidates": [],
+        "recommendation_status": "recommended", "sort_order": 3, "candidates": _NVDA_CANDIDATES,
     },
     {
         "ticker": "META", "shares": 175, "contracts": 1, "stock_price": 592.30,
-        "iv_rank": 46.0, "recommended_strike": 620.00, "recommended_expiry": "2025-06-20",
-        "bid_premium": 8.20, "annualised_yield": 0.17, "call_delta": 0.29,
+        "iv_rank": 46.0, "recommended_strike": 610.00, "recommended_expiry": "2026-06-26",
+        "bid_premium": 8.40, "annualised_yield": 0.17, "call_delta": 0.26,
         "days_to_earnings": 41, "composite_score": 71.3,
-        "recommendation_status": "recommended", "sort_order": 4, "candidates": [],
+        "recommendation_status": "recommended", "sort_order": 4, "candidates": _META_CANDIDATES,
     },
     {
         "ticker": "SPY", "shares": 250, "contracts": 2, "stock_price": 558.70,
-        "iv_rank": 31.0, "recommended_strike": 570.00, "recommended_expiry": "2025-06-20",
-        "bid_premium": 3.50, "annualised_yield": 0.15, "call_delta": 0.27,
+        "iv_rank": 31.0, "recommended_strike": 568.00, "recommended_expiry": "2026-06-26",
+        "bid_premium": 3.60, "annualised_yield": 0.14, "call_delta": 0.25,
         "days_to_earnings": None, "composite_score": 64.1,
-        "recommendation_status": "recommended", "sort_order": 5, "candidates": [],
+        "recommendation_status": "recommended", "sort_order": 5, "candidates": _SPY_CANDIDATES,
     },
     {
         "ticker": "VOO", "shares": 150, "contracts": 1, "stock_price": 504.80,
-        "iv_rank": 28.0, "recommended_strike": 510.00, "recommended_expiry": "2025-06-20",
-        "bid_premium": 2.90, "annualised_yield": 0.14, "call_delta": 0.25,
+        "iv_rank": 28.0, "recommended_strike": 514.00, "recommended_expiry": "2026-06-26",
+        "bid_premium": 3.00, "annualised_yield": 0.13, "call_delta": 0.23,
         "days_to_earnings": None, "composite_score": 61.0,
-        "recommendation_status": "recommended", "sort_order": 6, "candidates": [],
+        "recommendation_status": "recommended", "sort_order": 6, "candidates": _VOO_CANDIDATES,
     },
     {
         "ticker": "AMZN", "shares": 120, "contracts": 0, "stock_price": 218.90,
-        "iv_rank": 39.0, "recommended_strike": 225.00, "recommended_expiry": "2025-06-20",
+        "iv_rank": 39.0, "recommended_strike": 225.00, "recommended_expiry": "2026-06-26",
         "bid_premium": 3.10, "annualised_yield": 0.17, "call_delta": 0.30,
         "days_to_earnings": 8, "composite_score": 52.4,
         "recommendation_status": "suppressed", "sort_order": 7, "candidates": [],
     },
     {
         "ticker": "MSFT", "shares": 125, "contracts": 0, "stock_price": 421.10,
-        "iv_rank": 55.0, "recommended_strike": 430.00, "recommended_expiry": "2025-06-20",
+        "iv_rank": 55.0, "recommended_strike": 430.00, "recommended_expiry": "2026-06-26",
         "bid_premium": 4.10, "annualised_yield": 0.12, "call_delta": 0.31,
         "days_to_earnings": 12, "composite_score": 49.8,
         "recommendation_status": "suppressed", "sort_order": 8, "candidates": [],
@@ -332,3 +366,26 @@ class TestDemoScreenerResultsSchema:
         results = {ScreenerResultView(**r).ticker: ScreenerResultView(**r) for r in _DEMO_SCREENER_RESULTS}
         assert results["AMZN"].days_to_earnings <= 14
         assert results["MSFT"].days_to_earnings <= 14
+
+    def test_recommended_tickers_have_candidates(self):
+        for r in _DEMO_SCREENER_RESULTS:
+            if r["recommendation_status"] == "recommended":
+                assert len(r["candidates"]) > 0, f"{r['ticker']} recommended but has no candidates"
+
+    def test_candidates_cover_all_dte_buckets(self):
+        # Each risk profile needs at least one candidate in its DTE window:
+        #   aggressive: 7–30, balanced: 30–45, conservative: 30–60
+        for r in _DEMO_SCREENER_RESULTS:
+            if r["recommendation_status"] != "recommended":
+                continue
+            dtes = [c["dte"] for c in r["candidates"]]
+            assert any(7 <= d <= 30 for d in dtes), f"{r['ticker']} missing aggressive-bucket candidate (7–30 DTE)"
+            assert any(30 <= d <= 45 for d in dtes), f"{r['ticker']} missing balanced-bucket candidate (30–45 DTE)"
+            assert any(30 <= d <= 60 for d in dtes), f"{r['ticker']} missing conservative-bucket candidate (30–60 DTE)"
+
+    def test_candidate_fields_present(self):
+        required = {"dte", "delta", "bid", "strike", "expiry", "open_interest"}
+        for r in _DEMO_SCREENER_RESULTS:
+            for c in r["candidates"]:
+                missing = required - c.keys()
+                assert not missing, f"{r['ticker']} candidate missing fields: {missing}"
