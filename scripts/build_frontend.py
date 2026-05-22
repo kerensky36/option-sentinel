@@ -25,7 +25,12 @@ def build() -> None:
     env = Environment(loader=FileSystemLoader(str(templates_dir)), autoescape=True)
 
     # dashboard.html → dist/index.html
-    html = env.get_template("dashboard.html").render(current_page="thesis_monitor")
+    # csp_nonce is empty for static builds — Firebase Hosting does not send CSP
+    # headers, so nonce enforcement is not active for pre-rendered pages.
+    html = env.get_template("dashboard.html").render(
+        current_page="thesis_monitor",
+        csp_nonce="",
+    )
     (dist / "index.html").write_text(html, encoding="utf-8")
     print("✓ dist/index.html")
 
@@ -34,6 +39,7 @@ def build() -> None:
     html = env.get_template("screener.html").render(
         current_page="covered_call_screener",
         setup_required=False,
+        csp_nonce="",
     )
     (dist / "screener" / "index.html").write_text(html, encoding="utf-8")
     print("✓ dist/screener/index.html")

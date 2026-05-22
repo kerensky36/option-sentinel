@@ -5,7 +5,16 @@
     "trailingSlash": false,
     "headers": [
       {
-        "source": "/static/**",
+        "source": "/static/js/**",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache, must-revalidate"
+          }
+        ]
+      },
+      {
+        "source": "/static/!(js)**",
         "headers": [
           {
             "key": "Cache-Control",
