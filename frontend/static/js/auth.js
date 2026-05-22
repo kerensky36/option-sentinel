@@ -27,11 +27,11 @@ export function getAccessToken() {
 }
 
 /**
- * Check whether the user is currently authenticated.
+ * Check whether the user is currently authenticated (real token or demo mode).
  * @returns {boolean}
  */
 export function isAuthenticated() {
-  return !!getAccessToken();
+  return isDemoMode() || !!getAccessToken();
 }
 
 /**
