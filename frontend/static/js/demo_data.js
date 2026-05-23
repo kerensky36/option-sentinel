@@ -67,6 +67,39 @@ export const DEMO_POSITIONS_SPREADS = [
     delta_source: 'calculated', gamma_source: 'calculated',
     theta_source: 'calculated', vega_source: 'calculated', iv_source: 'calculated',
   },
+  // SPY iron condor (4 legs) — for US3 verification of multi-leg grouped spread graphs
+  {
+    symbol: 'SPY 250815P00530000', underlying_symbol: 'SPY', option_type: 'put',
+    strike: '530.00', expiry_date: '2025-08-15', quantity: 1,
+    cost: '1.40', current_mark: '1.60', unrealised_pnl: '-20.00', days_to_expiry: 86,
+    delta: -0.14, gamma: 0.022, theta: 0.05, vega: 0.12, implied_volatility: 0.18,
+    delta_source: 'calculated', gamma_source: 'calculated',
+    theta_source: 'calculated', vega_source: 'calculated', iv_source: 'calculated',
+  },
+  {
+    symbol: 'SPY 250815P00540000', underlying_symbol: 'SPY', option_type: 'put',
+    strike: '540.00', expiry_date: '2025-08-15', quantity: -1,
+    cost: '-2.20', current_mark: '-2.50', unrealised_pnl: '-30.00', days_to_expiry: 86,
+    delta: 0.21, gamma: 0.031, theta: -0.08, vega: 0.16, implied_volatility: 0.19,
+    delta_source: 'calculated', gamma_source: 'calculated',
+    theta_source: 'calculated', vega_source: 'calculated', iv_source: 'calculated',
+  },
+  {
+    symbol: 'SPY 250815C00575000', underlying_symbol: 'SPY', option_type: 'call',
+    strike: '575.00', expiry_date: '2025-08-15', quantity: -1,
+    cost: '-2.50', current_mark: '-2.20', unrealised_pnl: '30.00', days_to_expiry: 86,
+    delta: 0.23, gamma: 0.029, theta: -0.09, vega: 0.15, implied_volatility: 0.17,
+    delta_source: 'calculated', gamma_source: 'calculated',
+    theta_source: 'calculated', vega_source: 'calculated', iv_source: 'calculated',
+  },
+  {
+    symbol: 'SPY 250815C00585000', underlying_symbol: 'SPY', option_type: 'call',
+    strike: '585.00', expiry_date: '2025-08-15', quantity: 1,
+    cost: '1.60', current_mark: '1.40', unrealised_pnl: '20.00', days_to_expiry: 86,
+    delta: -0.16, gamma: 0.021, theta: 0.06, vega: 0.11, implied_volatility: 0.18,
+    delta_source: 'calculated', gamma_source: 'calculated',
+    theta_source: 'calculated', vega_source: 'calculated', iv_source: 'calculated',
+  },
 ];
 
 export const DEMO_POSITIONS_EQUITY = [
