@@ -201,6 +201,7 @@ export function closeOpenGraph() {
 
 /**
  * Wire payoff graph toggle handlers onto the positions table.
+ * SVGs are pre-computed at init time so click response is near-instant.
  *
  * @param {Element} container - The positions-table container element
  * @param {{ groups: Array, standalone: Array }} positionData
@@ -218,63 +219,55 @@ export function initPayoffGraphToggle(container, positionData) {
   const tbody = container.querySelector('tbody');
   if (!tbody) return;
 
+  // Pre-compute all SVGs now so clicks are instant (no computation on click path).
+  const svgCache = new Map();
+
+  for (const group of groups) {
+    if (!group.legs || group.legs.length === 0) continue;
+    const graphId = `payoff-${group.groupId}`;
+    const legs = group.legs.map(_toLeg);
+    svgCache.set(graphId, {
+      svg: buildPayoffSvg(legs, { title: group.groupName || '' }),
+      anchorId: group.groupId,
+    });
+  }
+
+  for (const pos of standalone) {
+    const graphId = `payoff-${encodeURIComponent(pos.symbol)}`;
+    const legs = [_toLeg(pos)];
+    svgCache.set(graphId, {
+      svg: buildPayoffSvg(legs, { title: `${pos.underlying_symbol} · ${pos.expiry_date}` }),
+      anchorId: pos.symbol,
+    });
+  }
+
+  function _showGraph(anchorRow, graphId) {
+    if (openGraphId === graphId) { closeOpenGraph(); return; }
+    closeOpenGraph();
+
+    const cached = svgCache.get(graphId);
+    if (!cached) return;
+
+    const graphRow = document.createElement('tr');
+    graphRow.id = graphId;
+    graphRow.className = 'payoff-graph-row';
+    graphRow.innerHTML = `<td colspan="15" class="px-4 py-3 bg-gray-900/60">${cached.svg}</td>`;
+    anchorRow.insertAdjacentElement('afterend', graphRow);
+    openGraphId = graphId;
+  }
+
   tbody.addEventListener('click', (e) => {
     // --- Spread group rows ---
     const spreadRow = e.target.closest('[data-spread-id]');
     if (spreadRow && !e.target.closest('[data-spread-toggle]')) {
-      const groupId = spreadRow.dataset.spreadId;
-      const graphId = `payoff-${groupId}`;
-
-      if (openGraphId === graphId) {
-        closeOpenGraph();
-        return;
-      }
-      closeOpenGraph();
-
-      const group = groups.find(g => g.groupId === groupId);
-      if (!group || !group.legs || group.legs.length === 0) return;
-
-      const legs = group.legs.map(_toLeg);
-      const title = group.groupName || '';
-      const svg = buildPayoffSvg(legs, { title });
-
-      const graphRow = document.createElement('tr');
-      graphRow.id = graphId;
-      graphRow.className = 'payoff-graph-row';
-      graphRow.innerHTML = `<td colspan="15" class="px-4 py-3 bg-gray-900/60">${svg}</td>`;
-
-      // Insert after the spread summary row (before leg rows)
-      spreadRow.insertAdjacentElement('afterend', graphRow);
-      openGraphId = graphId;
+      _showGraph(spreadRow, `payoff-${spreadRow.dataset.spreadId}`);
       return;
     }
 
     // --- Standalone option rows ---
     const standaloneRow = e.target.closest('[data-position-id]');
     if (standaloneRow) {
-      const symbol = standaloneRow.dataset.positionId;
-      const graphId = `payoff-${encodeURIComponent(symbol)}`;
-
-      if (openGraphId === graphId) {
-        closeOpenGraph();
-        return;
-      }
-      closeOpenGraph();
-
-      const pos = standalone.find(p => p.symbol === symbol);
-      if (!pos) return;
-
-      const legs = [_toLeg(pos)];
-      const title = `${pos.underlying_symbol} · ${pos.expiry_date}`;
-      const svg = buildPayoffSvg(legs, { title });
-
-      const graphRow = document.createElement('tr');
-      graphRow.id = graphId;
-      graphRow.className = 'payoff-graph-row';
-      graphRow.innerHTML = `<td colspan="15" class="px-4 py-3 bg-gray-900/60">${svg}</td>`;
-
-      standaloneRow.insertAdjacentElement('afterend', graphRow);
-      openGraphId = graphId;
+      _showGraph(standaloneRow, `payoff-${encodeURIComponent(standaloneRow.dataset.positionId)}`);
     }
   });
 }
