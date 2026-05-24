@@ -188,7 +188,7 @@ export function renderPositions(positions, timestamp) {
     const pnl = formatPnl(agg.pnl);
 
     const summaryRow = `
-    <tr class="border-b border-gray-700 bg-gray-800\/60 font-medium" data-spread-id="${group.groupId}">
+    <tr class="border-b border-gray-700 bg-gray-800\/60 font-medium hover:bg-gray-700\/60 transition-colors cursor-pointer" data-spread-id="${group.groupId}">
       <td class="px-2 py-1 text-gray-200 font-mono">
         <button data-spread-toggle="${group.groupId}" class="mr-1 text-gray-400 hover:text-gray-200 transition-colors text-xs leading-none cursor-pointer">▶</button>${escapeHtml(group.groupName)}
       </td>
