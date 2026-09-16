@@ -3,10 +3,19 @@ set -euo pipefail
 
 # Deploy Option Sentinel: backend to Cloud Run, then frontend to Firebase Hosting.
 # Usage: bash scripts/deploy.sh
-#
-# Required env vars: see deploy_backend.sh and deploy_frontend.sh
+# Reads credentials and config from .env in the repo root — no manual env var export needed.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(dirname "$SCRIPT_DIR")"
+
+# Load .env if present (won't override vars already set in the shell)
+if [[ -f "$REPO_ROOT/.env" ]]; then
+  set -a
+  # shellcheck disable=SC1091
+  source "$REPO_ROOT/.env"
+  set +a
+fi
+
 SERVICE="${CLOUD_RUN_SERVICE:-option-sentinel}"
 REGION="${CLOUD_RUN_REGION:-us-central1}"
 FIREBASE_PROJ="${FIREBASE_PROJECT:-${GCP_PROJECT_ID:-}}"
@@ -31,6 +40,5 @@ echo "=== Deploy complete ==="
 echo "  Backend:  $SERVICE_URL"
 echo "  Frontend: https://${FIREBASE_PROJ}.web.app"
 echo ""
-echo "⚠  Remember to update SCHWAB_REDIRECT_URI to:"
-echo "   https://${FIREBASE_PROJ}.web.app/auth/callback"
-echo "   and register it in your Schwab developer app."
+echo "⚠  Ensure https://${FIREBASE_PROJ}.web.app/auth/callback is registered"
+echo "   as an allowed callback URL in your Schwab developer app."

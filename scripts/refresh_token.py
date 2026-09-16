@@ -17,13 +17,13 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-APP_KEY = os.getenv("SCHWAB_APP_KEY", "")
-APP_SECRET = os.getenv("SCHWAB_APP_SECRET", "")
-CALLBACK_URL = os.getenv("SCHWAB_CALLBACK_URL", "https://127.0.0.1/auth/callback")
+APP_KEY = os.getenv("SCHWAB_CLIENT_ID", "")
+APP_SECRET = os.getenv("SCHWAB_CLIENT_SECRET", "")
+CALLBACK_URL = os.getenv("SCHWAB_REDIRECT_URI", "https://127.0.0.1/auth/callback")
 TOKEN_PATH = os.path.join(os.path.dirname(__file__), "..", "schwab_token.json")
 
 if not APP_KEY or not APP_SECRET:
-    print("ERROR: SCHWAB_APP_KEY and SCHWAB_APP_SECRET must be set in .env")
+    print("ERROR: SCHWAB_CLIENT_ID and SCHWAB_CLIENT_SECRET must be set in .env")
     sys.exit(1)
 
 import schwab

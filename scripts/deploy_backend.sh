@@ -20,6 +20,8 @@ set -euo pipefail
 SERVICE="${CLOUD_RUN_SERVICE:-option-sentinel}"
 REGION="${CLOUD_RUN_REGION:-us-central1}"
 RATE="${RISK_FREE_RATE:-0.045}"
+# Prefer the prod redirect URI when deploying; fall back to SCHWAB_REDIRECT_URI
+SCHWAB_REDIRECT_URI="${SCHWAB_REDIRECT_URI_PROD:-${SCHWAB_REDIRECT_URI:-}}"
 HTTPS_ONLY_VAL="${HTTPS_ONLY:-true}"
 DEBUG_VAL="${DEBUG:-false}"
 FIREBASE_PROJ="${FIREBASE_PROJECT:-${GCP_PROJECT_ID:-}}"
