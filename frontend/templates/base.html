@@ -118,19 +118,11 @@
     .bg-teal-900 { background-color: #0a1e1c !important; }
     .text-teal-300 { color: #2a9a90 !important; }
 
-    /* Indigo (thesis) */
-    .bg-indigo-900\/60 { background-color: rgba(18,16,42,0.6) !important; }
-    .text-indigo-300 { color: #7766cc !important; }
-    .border-indigo-800 { border-color: #2a2450 !important; }
-
     /* ── Inputs/selects: TOS style ── */
     input[type="number"], input[type="text"], select {
       font-family: inherit;
       font-size: 11px;
     }
-
-    /* ── Large score number in gauge ── */
-    .thesis-score { font-variant-numeric: tabular-nums; }
 
     /* ── Scrollbar: thin, dark ── */
     ::-webkit-scrollbar { width: 6px; height: 6px; }
@@ -252,7 +244,7 @@
       <button
         id="erase-all-btn"
         class="flex items-center gap-1 bg-red-900 hover:bg-red-800 text-red-300 px-2 py-1 transition-colors uppercase tracking-wider text-xs"
-        title="Wipe all browser storage: token, position cache, thesis groups">
+        title="Wipe all browser storage: token, position cache">
         Erase All Data
       </button>
       <form method="post" action="/auth/logout" style="display:inline">
@@ -267,8 +259,8 @@
   <!-- Mobile nav strip (visible below md) -->
   <div class="flex md:hidden border-b border-gray-800" style="background:#12121e">
     <a href="/"
-       class="flex flex-1 items-center justify-center gap-2 py-2 px-3 text-center text-xs {% if current_page == 'thesis_monitor' %}nav-active{% endif %}"
-       style="letter-spacing:0.04em; text-decoration:none; color:{% if current_page == 'thesis_monitor' %}#d0d0f0{% else %}#7070a0{% endif %}; border-bottom:2px solid {% if current_page == 'thesis_monitor' %}#6699dd{% else %}transparent{% endif %}; margin:4px 4px 0; border-radius:2px 2px 0 0;">
+       class="flex flex-1 items-center justify-center gap-2 py-2 px-3 text-center text-xs {% if current_page == 'positions' %}nav-active{% endif %}"
+       style="letter-spacing:0.04em; text-decoration:none; color:{% if current_page == 'positions' %}#d0d0f0{% else %}#7070a0{% endif %}; border-bottom:2px solid {% if current_page == 'positions' %}#6699dd{% else %}transparent{% endif %}; margin:4px 4px 0; border-radius:2px 2px 0 0;">
       <span class="pill pill-red"></span> Positions
     </a>
     <a href="/screener"
@@ -286,7 +278,7 @@
       <div class="nav-section-label">Views</div>
 
       <a href="/"
-         class="nav-item {% if current_page == 'thesis_monitor' %}nav-active{% endif %}">
+         class="nav-item {% if current_page == 'positions' %}nav-active{% endif %}">
         <span class="pill pill-red"></span>
         Positions
       </a>
@@ -324,8 +316,7 @@
         const confirmed = window.confirm(
           'Erase All Data?\n\nThis will clear:\n' +
           '• Your Schwab token (sessionStorage)\n' +
-          '• Position cache (IndexedDB)\n' +
-          '• Thesis groups and assignments (localStorage)\n\n' +
+          '• Position cache (IndexedDB)\n\n' +
           'You will need to reconnect your Schwab account.'
         );
         if (confirmed) {

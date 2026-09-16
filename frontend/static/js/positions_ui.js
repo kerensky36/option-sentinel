@@ -9,7 +9,6 @@
 import { fetchWithAuth, isAuthenticated } from './auth.js';
 import { withAccountHash, getSelectedAccountHash } from './account_picker.js';
 import { savePositions, loadPositions } from './position_cache.js';
-import { getAssignments } from './thesis_store.js';
 import { initPayoffGraphToggle, closeOpenGraph } from './payoff_graph.js';
 
 const TABLE_ID = 'positions-table';
@@ -152,16 +151,10 @@ export function renderPositions(positions, timestamp) {
     return;
   }
 
-  const assignments = getAssignments();
-  const assignMap = Object.fromEntries(assignments.filter((a) => a.thesis_group_id).map((a) => [a.symbol, a.thesis_group_id]));
   const { groups, standalone } = buildSpreadGroups(positions);
 
   const renderLegRow = (p) => {
     const pnl = formatPnl(p.unrealised_pnl);
-    const thesisId = assignMap[p.symbol];
-    const thesisBadge = thesisId
-      ? `<span class="bg-indigo-900\/60 text-indigo-300 border border-indigo-800 px-1 text-xs">${thesisId}</span>`
-      : '';
     return `
     <tr class="border-b border-gray-800 hover:bg-gray-900\/40 transition-colors cursor-pointer"
         data-position-id="${escapeHtml(p.symbol)}">
@@ -179,7 +172,6 @@ export function renderPositions(positions, timestamp) {
       <td class="px-2 py-1 text-right text-gray-200">${fmt(p.theta, 4)}${sourceBadge(p.theta_source)}</td>
       <td class="px-2 py-1 text-right text-gray-200">${fmt(p.vega, 4)}${sourceBadge(p.vega_source)}</td>
       <td class="px-2 py-1 text-right text-gray-200">${p.implied_volatility !== null && p.implied_volatility !== undefined ? (Number(p.implied_volatility) * 100).toFixed(1) + '%' : '—'}${sourceBadge(p.iv_source)}</td>
-      <td class="px-2 py-1">${thesisBadge}</td>
     </tr>`;
   };
 
@@ -205,7 +197,6 @@ export function renderPositions(positions, timestamp) {
       <td class="px-2 py-1 text-right text-gray-200">${agg.theta !== null ? fmt(agg.theta, 4) + sourceBadge(agg.hasBsGreek.theta ? 'calculated' : null) : '—'}</td>
       <td class="px-2 py-1 text-right text-gray-200">${agg.vega !== null ? fmt(agg.vega, 4) + sourceBadge(agg.hasBsGreek.vega ? 'calculated' : null) : '—'}</td>
       <td class="px-2 py-1 text-right text-gray-500">—</td>
-      <td class="px-2 py-1"></td>
     </tr>`;
 
     const legRows = group.legs.map((p) => {
@@ -226,7 +217,6 @@ export function renderPositions(positions, timestamp) {
       <td class="px-2 py-1 text-right text-gray-200">${fmt(p.theta, 4)}${sourceBadge(p.theta_source)}</td>
       <td class="px-2 py-1 text-right text-gray-200">${fmt(p.vega, 4)}${sourceBadge(p.vega_source)}</td>
       <td class="px-2 py-1 text-right text-gray-200">${p.implied_volatility !== null && p.implied_volatility !== undefined ? (Number(p.implied_volatility) * 100).toFixed(1) + '%' : '—'}${sourceBadge(p.iv_source)}</td>
-      <td class="px-2 py-1"></td>
     </tr>`;
     }).join('');
 
@@ -255,7 +245,6 @@ export function renderPositions(positions, timestamp) {
             <th class="px-2 py-1 text-right">Theta</th>
             <th class="px-2 py-1 text-right">Vega</th>
             <th class="px-2 py-1 text-right">IV</th>
-            <th class="px-2 py-1">Thesis</th>
           </tr>
         </thead>
         <tbody>${spreadRows}${standaloneRows}</tbody>

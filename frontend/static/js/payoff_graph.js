@@ -251,7 +251,7 @@ export function initPayoffGraphToggle(container, positionData) {
     const graphRow = document.createElement('tr');
     graphRow.id = graphId;
     graphRow.className = 'payoff-graph-row';
-    graphRow.innerHTML = `<td colspan="15" class="px-4 py-3 bg-gray-900/60">${cached.svg}</td>`;
+    graphRow.innerHTML = `<td colspan="14" class="px-4 py-3 bg-gray-900/60">${cached.svg}</td>`;
     anchorRow.insertAdjacentElement('afterend', graphRow);
     openGraphId = graphId;
   }

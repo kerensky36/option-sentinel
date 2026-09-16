@@ -15,13 +15,12 @@ async def dashboard(request: Request):
 
     Position data is NOT included in the server response — the page loads empty
     and JS triggers a positions refresh (or loads from IndexedDB cache).
-    Thesis assignments are applied client-side from localStorage.
     """
     return templates.TemplateResponse(
         request,
         "dashboard.html",
         {
-            "current_page": "thesis_monitor",
+            "current_page": "positions",
             "csp_nonce": getattr(request.state, "csp_nonce", ""),
         },
     )

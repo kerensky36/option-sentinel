@@ -73,7 +73,7 @@ export async function fetchWithAuth(url, options = {}) {
 
 /**
  * Erase all trader data from the browser and redirect to login.
- * sessionStorage (all caches + token) and localStorage (thesis data) are cleared.
+ * sessionStorage (all caches + token) and localStorage are cleared.
  * This is a failsafe — all session data already clears automatically on tab close.
  */
 export function eraseAll() {
