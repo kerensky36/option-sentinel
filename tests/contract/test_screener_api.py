@@ -111,6 +111,28 @@ class TestScreenerRefresh:
         assert statuses["QQQ"] == "recommended"
         assert statuses["AAPL"] == "suppressed"
 
+    def test_response_has_candidates_field(self, client):
+        """Each screener result must contain a 'candidates' key that is a list."""
+        with (
+            patch("src.api.deps.schwab") as mock_schwab,
+            patch("src.api.routes.screener.run_screener", new_callable=AsyncMock) as mock_run,
+        ):
+            mock_schwab.auth.client_from_access_functions.return_value = object()
+            mock_run.return_value = _FIXTURE_RESULTS
+
+            resp = client.get(
+                "/api/screener/refresh",
+                headers={"Authorization": _make_auth_header()},
+            )
+
+        assert resp.status_code == 200
+        data = resp.json()
+        for item in data:
+            assert "candidates" in item, f"Missing 'candidates' field in result for {item.get('ticker')}"
+            assert isinstance(item["candidates"], list), (
+                f"'candidates' must be a list for {item.get('ticker')}"
+            )
+
     def test_response_has_all_screener_fields(self, client):
         """Response objects include all ScreenerResultView fields."""
         with (

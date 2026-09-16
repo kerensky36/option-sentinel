@@ -144,6 +144,120 @@ class TestLotSizeFilter:
         assert results == []
 
 
+class TestRiskToleranceCandidates:
+    """Feature 013: wide DTE fetch window and candidates field on ScreenerResultView."""
+
+    async def test_fetch_call_chain_uses_wide_dte_window(self):
+        """_fetch_call_chain must call get_option_chain with from_date ≤ today+7 and to_date ≥ today+55."""
+        from datetime import date, timedelta
+        from unittest.mock import AsyncMock, MagicMock
+        from src.services.covered_call_screener import _fetch_call_chain
+
+        client = _make_client()
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = {"callExpDateMap": {}}
+        client.get_option_chain = AsyncMock(return_value=mock_resp)
+
+        await _fetch_call_chain(client, "AAPL")
+
+        call_kwargs = client.get_option_chain.call_args.kwargs
+        today = date.today()
+        assert call_kwargs["from_date"] <= today + timedelta(days=7), (
+            f"from_date {call_kwargs['from_date']} must be ≤ today+7 ({today + timedelta(days=7)})"
+        )
+        assert call_kwargs["to_date"] >= today + timedelta(days=55), (
+            f"to_date {call_kwargs['to_date']} must be ≥ today+55 ({today + timedelta(days=55)})"
+        )
+
+    async def test_screener_result_includes_candidates(self):
+        """Each ScreenerResultView must have a non-empty candidates list when liquid options exist."""
+        from src.services.covered_call_screener import run_screener
+
+        client = _make_client()
+        chain_options = [
+            {"dte": 35, "strike": 150.0, "expiry": "2026-06-20", "delta": 0.25, "bid": 1.50, "open_interest": 200},
+            {"dte": 20, "strike": 145.0, "expiry": "2026-06-06", "delta": 0.30, "bid": 1.80, "open_interest": 150},
+        ]
+
+        with (
+            patch("src.services.covered_call_screener._fetch_stock_positions",
+                  new=AsyncMock(return_value=[_make_position("AAPL", 100)])),
+            patch("src.services.covered_call_screener._fetch_open_calls",
+                  new=AsyncMock(return_value=[])),
+            patch("src.services.covered_call_screener._fetch_call_chain",
+                  new=AsyncMock(return_value=chain_options)),
+            patch("src.auth.account_resolver.list_accounts",
+                  new=AsyncMock(return_value=[{"hashValue": "abc123"}])),
+        ):
+            results = await run_screener(client=client, account_hash="abc123")
+
+        assert len(results) == 1
+        assert hasattr(results[0], "candidates"), "ScreenerResultView must have a 'candidates' field"
+        assert len(results[0].candidates) > 0, "candidates list must not be empty when liquid options exist"
+
+    async def test_candidates_are_liquid_only(self):
+        """Options with bid < 0.05 or OI < 100 must not appear in candidates."""
+        from src.services.covered_call_screener import run_screener
+
+        client = _make_client()
+        chain_options = [
+            {"dte": 35, "strike": 150.0, "expiry": "2026-06-20", "delta": 0.25, "bid": 1.50, "open_interest": 200},
+            {"dte": 35, "strike": 155.0, "expiry": "2026-06-20", "delta": 0.20, "bid": 0.03, "open_interest": 200},
+            {"dte": 35, "strike": 160.0, "expiry": "2026-06-20", "delta": 0.15, "bid": 1.00, "open_interest": 50},
+        ]
+
+        with (
+            patch("src.services.covered_call_screener._fetch_stock_positions",
+                  new=AsyncMock(return_value=[_make_position("AAPL", 100)])),
+            patch("src.services.covered_call_screener._fetch_open_calls",
+                  new=AsyncMock(return_value=[])),
+            patch("src.services.covered_call_screener._fetch_call_chain",
+                  new=AsyncMock(return_value=chain_options)),
+            patch("src.auth.account_resolver.list_accounts",
+                  new=AsyncMock(return_value=[{"hashValue": "abc123"}])),
+        ):
+            results = await run_screener(client=client, account_hash="abc123")
+
+        candidates = results[0].candidates
+        strikes = {c["strike"] for c in candidates}
+        assert 155.0 not in strikes, "Option with bid=0.03 must not be in candidates"
+        assert 160.0 not in strikes, "Option with OI=50 must not be in candidates"
+        assert 150.0 in strikes, "Liquid option (bid=1.50, OI=200) must appear in candidates"
+
+    async def test_balanced_score_matches_current_output(self):
+        """Balanced profile composite_score must match _compute_composite_score (regression guard)."""
+        from src.services.covered_call_screener import (
+            run_screener, _compute_composite_score, _annualised_yield, _iv_rank_from_chain
+        )
+
+        client = _make_client()
+        iv_raw = 0.3
+        chain_options = [
+            {"dte": 35, "strike": 150.0, "expiry": "2026-06-20", "delta": 0.25, "bid": 1.50, "open_interest": 200},
+        ]
+        pos = {"ticker": "AAPL", "shares": 100, "price": 150.0, "volatility": iv_raw, "days_to_earnings": None}
+
+        with (
+            patch("src.services.covered_call_screener._fetch_stock_positions",
+                  new=AsyncMock(return_value=[pos])),
+            patch("src.services.covered_call_screener._fetch_open_calls",
+                  new=AsyncMock(return_value=[])),
+            patch("src.services.covered_call_screener._fetch_call_chain",
+                  new=AsyncMock(return_value=chain_options)),
+            patch("src.auth.account_resolver.list_accounts",
+                  new=AsyncMock(return_value=[{"hashValue": "abc123"}])),
+        ):
+            results = await run_screener(client=client, account_hash="abc123")
+
+        result = results[0]
+        iv_rank = _iv_rank_from_chain(iv_raw) or 0.0
+        ann_yield = _annualised_yield(1.50, 150.0, 35)
+        expected = _compute_composite_score(iv_rank, ann_yield, 0.25)
+        assert result.composite_score == expected, (
+            f"Balanced score {result.composite_score} != expected {expected}"
+        )
+
+
 class TestFractionalSharesFloor:
     async def test_fractional_100_point_5_floors_to_100_eligible(self):
         """Raw longQuantity=100.5 floors to 100 — eligible, 1 contract."""

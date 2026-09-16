@@ -21,3 +21,11 @@ export function loadScreenerResults(accountHash) {
 export function clearScreenerResults(accountHash) {
   sessionStorage.removeItem(_key(accountHash));
 }
+
+export function saveScreenerProfile(name) {
+  sessionStorage.setItem('screener_profile', name);
+}
+
+export function loadScreenerProfile() {
+  return sessionStorage.getItem('screener_profile') || 'balanced';
+}

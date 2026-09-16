@@ -4,10 +4,81 @@
 
 import { fetchWithAuth, isAuthenticated } from './auth.js';
 import { withAccountHash, getSelectedAccountHash } from './account_picker.js';
-import { saveScreenerResults, loadScreenerResults } from './screener_cache.js';
+import { saveScreenerResults, loadScreenerResults, saveScreenerProfile, loadScreenerProfile } from './screener_cache.js';
 
 const TABLE_ID = 'screener-table';
 const REFRESH_BTN_ID = 'screener-refresh-btn';
+const PROFILE_TOGGLE_ID = 'screener-profile-toggle';
+
+const PROFILES = {
+  conservative: { targetDelta: 0.15, dteMin: 30, dteMax: 60, yieldWeight: 0.15, safetyWeight: 0.35 },
+  balanced:     { targetDelta: 0.25, dteMin: 30, dteMax: 45, yieldWeight: 0.30, safetyWeight: 0.20 },
+  aggressive:   { targetDelta: 0.35, dteMin:  7, dteMax: 30, yieldWeight: 0.40, safetyWeight: 0.10 },
+};
+
+let cachedResults = [];
+
+function rescoreResult(result, profile) {
+  if (result.recommendation_status === 'suppressed') return result;
+  const candidates = result.candidates;
+  if (!candidates || !candidates.length) return result;
+  const liquid = candidates.filter(c => c.dte >= profile.dteMin && c.dte <= profile.dteMax);
+  if (!liquid.length) {
+    return { ...result, recommendation_status: 'insufficient_data', composite_score: 0 };
+  }
+  const best = liquid.reduce((b, c) =>
+    Math.abs(c.delta - profile.targetDelta) < Math.abs(b.delta - profile.targetDelta) ? c : b
+  );
+  const annYield = (best.bid / result.stock_price) * (365 / best.dte) * 100;
+  const yieldScore = Math.min(100, annYield * 5);
+  const deltaSafety = Math.max(0, 100 - Math.abs(best.delta - profile.targetDelta) * 400);
+  const score = (result.iv_rank || 0) * 0.50 + yieldScore * profile.yieldWeight + deltaSafety * profile.safetyWeight;
+  return {
+    ...result,
+    recommended_strike: best.strike,
+    recommended_expiry: best.expiry,
+    bid_premium: best.bid,
+    annualised_yield: Math.round(annYield * 100) / 100,
+    call_delta: best.delta,
+    composite_score: Math.round(score * 10) / 10,
+    recommendation_status: 'recommended',
+  };
+}
+
+function applyProfile(results, profileOrName) {
+  const profile = typeof profileOrName === 'string' ? PROFILES[profileOrName] : profileOrName;
+  if (!profile) return;
+  const rescored = results.map(r => rescoreResult(r, profile));
+  const recommended = rescored
+    .filter(r => r.recommendation_status === 'recommended')
+    .sort((a, b) => b.composite_score - a.composite_score);
+  const other = rescored.filter(r => r.recommendation_status !== 'recommended');
+  const ordered = [...recommended, ...other].map((r, i) => ({ ...r, sort_order: i }));
+  renderScreener(ordered);
+}
+
+function renderProfileToggle(activeProfile) {
+  const container = document.getElementById(PROFILE_TOGGLE_ID);
+  if (!container) return;
+  const buttons = ['conservative', 'balanced', 'aggressive'].map(name => {
+    const label = name.charAt(0).toUpperCase() + name.slice(1);
+    const isActive = name === activeProfile;
+    const activeClass = isActive
+      ? 'bg-gray-600 text-gray-100'
+      : 'bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-gray-200';
+    return `<button data-profile="${name}" class="${activeClass} px-3 py-1 text-xs uppercase tracking-wider transition-colors">${label}</button>`;
+  }).join('');
+  container.innerHTML = `<div class="flex gap-1">${buttons}</div>`;
+  container.querySelectorAll('button[data-profile]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const name = btn.dataset.profile;
+      saveScreenerProfile(name);
+      renderProfileToggle(name);
+      _syncSlidersToProfile(PROFILES[name]);
+      applyProfile(cachedResults, name);
+    });
+  });
+}
 
 /**
  * Format a float value for display.
@@ -35,6 +106,50 @@ function statusBadge(status) {
     default:
       return '<span class="bg-gray-800 text-gray-500 px-1.5 py-0.5 uppercase tracking-wider text-xs">No Data</span>';
   }
+}
+
+function _syncSlidersToProfile(profile) {
+  const deltaSlider = document.getElementById('screener-delta-slider');
+  const dteSlider = document.getElementById('screener-dte-slider');
+  const yieldSlider = document.getElementById('screener-yield-weight-slider');
+  if (!deltaSlider) return;
+  const dteMid = Math.round((profile.dteMin + profile.dteMax) / 2);
+  deltaSlider.value = profile.targetDelta;
+  dteSlider.value = dteMid;
+  yieldSlider.value = Math.round(profile.yieldWeight * 200);
+  document.getElementById('screener-delta-label').textContent = Number(profile.targetDelta).toFixed(2);
+  document.getElementById('screener-dte-label').textContent = dteMid + 'd';
+  document.getElementById('screener-yield-weight-label').textContent = Math.round(profile.yieldWeight * 200) + '%';
+}
+
+function initAdvancedSliders() {
+  const deltaSlider = document.getElementById('screener-delta-slider');
+  const dteSlider = document.getElementById('screener-dte-slider');
+  const yieldSlider = document.getElementById('screener-yield-weight-slider');
+  if (!deltaSlider) return;
+
+  const activeProfile = PROFILES[loadScreenerProfile()] || PROFILES.balanced;
+  _syncSlidersToProfile(activeProfile);
+
+  function onSliderInput() {
+    const dteMid = parseInt(dteSlider.value, 10);
+    const sv = parseInt(yieldSlider.value, 10);
+    const customProfile = {
+      targetDelta: parseFloat(deltaSlider.value),
+      dteMin: Math.max(7, dteMid - 10),
+      dteMax: Math.min(60, dteMid + 10),
+      yieldWeight: sv / 200,
+      safetyWeight: (100 - sv) / 200,
+    };
+    document.getElementById('screener-delta-label').textContent = customProfile.targetDelta.toFixed(2);
+    document.getElementById('screener-dte-label').textContent = dteMid + 'd';
+    document.getElementById('screener-yield-weight-label').textContent = sv + '%';
+    applyProfile(cachedResults, customProfile);
+  }
+
+  deltaSlider.addEventListener('input', onSliderInput);
+  dteSlider.addEventListener('input', onSliderInput);
+  yieldSlider.addEventListener('input', onSliderInput);
 }
 
 /**
@@ -119,7 +234,10 @@ async function refreshScreener() {
 
     const results = await resp.json();
     saveScreenerResults(results, getSelectedAccountHash());
-    renderScreener(results);
+    cachedResults = results;
+    renderProfileToggle(loadScreenerProfile());
+    initAdvancedSliders();
+    applyProfile(cachedResults, loadScreenerProfile());
   } catch (err) {
     console.error('screener_ui: refresh failed', err);
     const container = document.getElementById(TABLE_ID);
@@ -144,7 +262,10 @@ async function refreshScreener() {
 async function handleAccountChange(accountHash) {
   const cached = loadScreenerResults(accountHash);
   if (cached !== null) {
-    renderScreener(cached);
+    cachedResults = cached;
+    renderProfileToggle(loadScreenerProfile());
+    initAdvancedSliders();
+    applyProfile(cachedResults, loadScreenerProfile());
     return;
   }
   await refreshScreener();

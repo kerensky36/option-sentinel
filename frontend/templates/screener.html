@@ -13,6 +13,8 @@
   </button>
 </div>
 
+<div id="screener-profile-toggle" class="mb-3"></div>
+
 <details class="mb-4 border border-gray-800 bg-gray-900 overflow-hidden" style="border-radius:2px">
   <summary class="list-none cursor-pointer select-none px-3 py-2 flex items-center gap-2 text-gray-500 hover:bg-gray-800 transition-colors uppercase tracking-widest text-xs">
     <span class="text-gray-700">▶</span>
@@ -52,6 +54,7 @@
       <div>
         <span class="text-gray-600 uppercase tracking-wider text-xs">Call Selection</span>
         <div class="text-gray-400 mt-0.5">30–45 DTE · bid ≥ $0.05 · OI ≥ 100 · closest delta to 0.25</div>
+        <div class="text-gray-500 mt-0.5">The active profile adjusts the target delta and DTE window used to select and score calls.</div>
       </div>
       <div>
         <span class="text-gray-600 uppercase tracking-wider text-xs">Score Thresholds</span>
@@ -70,12 +73,40 @@
   </div>
 </details>
 
+<details id="screener-advanced" class="mb-3 border border-gray-800 bg-gray-900 overflow-hidden" style="border-radius:2px">
+  <summary class="list-none cursor-pointer select-none px-3 py-2 flex items-center gap-2 text-gray-500 hover:bg-gray-800 transition-colors uppercase tracking-widest text-xs">
+    <span class="text-gray-700">▶</span>
+    <span>Advanced</span>
+  </summary>
+  <div class="border-t border-gray-800 px-4 py-3 grid gap-3 text-xs text-gray-400">
+
+    <div class="flex flex-wrap items-center gap-3">
+      <label class="w-28 text-gray-500 uppercase tracking-wider">Target Delta</label>
+      <input id="screener-delta-slider" type="range" min="0.10" max="0.45" step="0.01" class="flex-1 min-w-32 accent-gray-400">
+      <span id="screener-delta-label" class="w-12 text-right text-gray-300 font-mono">0.25</span>
+    </div>
+
+    <div class="flex flex-wrap items-center gap-3">
+      <label class="w-28 text-gray-500 uppercase tracking-wider">Target DTE</label>
+      <input id="screener-dte-slider" type="range" min="7" max="60" step="1" class="flex-1 min-w-32 accent-gray-400">
+      <span id="screener-dte-label" class="w-12 text-right text-gray-300 font-mono">37d</span>
+    </div>
+
+    <div class="flex flex-wrap items-center gap-3">
+      <label class="w-28 text-gray-500 uppercase tracking-wider">Safety↔Yield</label>
+      <input id="screener-yield-weight-slider" type="range" min="0" max="100" step="1" class="flex-1 min-w-32 accent-gray-400">
+      <span id="screener-yield-weight-label" class="w-12 text-right text-gray-300 font-mono">50%</span>
+    </div>
+
+  </div>
+</details>
+
 {# ── Screener table placeholder ── #}
 <div id="screener-table" class="border border-gray-800 bg-gray-900 min-h-24 flex items-center justify-center" style="border-radius:2px; min-height:100px">
   <span class="text-gray-500 text-sm">Click <strong>Refresh</strong> to fetch live screener data.</span>
 </div>
 
-<script type="module">
+<script type="module" nonce="{{ csp_nonce }}">
   import '/static/js/auth.js';
   import '/static/js/screener_ui.js';
 </script>

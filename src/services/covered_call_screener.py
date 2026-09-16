@@ -38,8 +38,10 @@ def _compute_composite_score(
 
 # ── Option selection ──────────────────────────────────────────────────────────
 
-_DTE_MIN = 30
-_DTE_MAX = 45
+_FETCH_DTE_MIN = 7
+_FETCH_DTE_MAX = 60
+_BALANCED_DTE_MIN = 30
+_BALANCED_DTE_MAX = 45
 _MIN_BID = 0.05
 _MIN_OI  = 100
 
@@ -48,7 +50,7 @@ def _find_best_call(options: list[dict]) -> dict | None:
     """Return the liquid call in the 30–45 DTE window whose delta is closest to 0.25."""
     liquid = [
         o for o in options
-        if _DTE_MIN <= o["dte"] <= _DTE_MAX
+        if _BALANCED_DTE_MIN <= o["dte"] <= _BALANCED_DTE_MAX
         and o["bid"] >= _MIN_BID
         and o["open_interest"] >= _MIN_OI
     ]
@@ -151,11 +153,24 @@ async def run_screener(
                 composite_score=0.0,
                 recommendation_status="suppressed",
                 sort_order=sort_order,
+                candidates=[],
             ))
             sort_order += 1
             continue
 
         chain_options = await _fetch_call_chain(client, ticker)
+        candidates = [
+            {
+                "delta": o["delta"],
+                "bid": o["bid"],
+                "dte": o["dte"],
+                "strike": o["strike"],
+                "expiry": o["expiry"],
+                "open_interest": o["open_interest"],
+            }
+            for o in chain_options
+            if o["bid"] >= _MIN_BID and o["open_interest"] >= _MIN_OI
+        ]
         best = _find_best_call(chain_options)
 
         if best is None:
@@ -169,6 +184,7 @@ async def run_screener(
                 composite_score=0.0,
                 recommendation_status="insufficient_data",
                 sort_order=sort_order,
+                candidates=candidates,
             ))
             sort_order += 1
             continue
@@ -196,6 +212,7 @@ async def run_screener(
             composite_score=score,
             recommendation_status=status,
             sort_order=sort_order,
+            candidates=candidates,
         ))
         sort_order += 1
 
@@ -261,8 +278,8 @@ async def _fetch_open_calls(client, account_hash: str) -> list[dict]:
 async def _fetch_call_chain(client, ticker: str) -> list[dict]:
     """Fetch call option chain for ticker; return flat list of option dicts."""
     today = datetime.now(timezone.utc).date()
-    from_date = today + timedelta(days=_DTE_MIN - 2)
-    to_date   = today + timedelta(days=_DTE_MAX + 2)
+    from_date = today + timedelta(days=_FETCH_DTE_MIN - 2)
+    to_date   = today + timedelta(days=_FETCH_DTE_MAX + 2)
 
     resp = await client.get_option_chain(
         ticker,

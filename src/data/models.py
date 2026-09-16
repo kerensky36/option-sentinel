@@ -58,3 +58,4 @@ class ScreenerResultView(BaseModel):
     composite_score: float = 0.0
     recommendation_status: Literal["recommended", "suppressed", "insufficient_data"] = "insufficient_data"
     sort_order: int = 0
+    candidates: list[dict] = []
