@@ -30,6 +30,7 @@ class PositionView(BaseModel):
     theta: float | None = None
     vega: float | None = None
     implied_volatility: float | None = None
+    underlying_price: Decimal | None = None
 
     delta_source: Literal["api", "calculated"] | None = None
     gamma_source: Literal["api", "calculated"] | None = None

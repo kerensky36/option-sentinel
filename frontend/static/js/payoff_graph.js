@@ -6,7 +6,8 @@
  *   closeOpenGraph() — closes any currently open graph row
  */
 
-import { analyzePayoff } from './payoff_math.js';
+import { analyzePayoff, combinedPayoff } from './payoff_math.js';
+import { CHECKPOINTS, availableCheckpoints, computeCheckpointCurve, combinedTheoreticalPayoff, isEligibleForOverlay } from './payoff_theoretical.js';
 
 // ---------------------------------------------------------------------------
 // Module state
@@ -40,10 +41,15 @@ function _fmt(n, dec = 2) {
  */
 function _toLeg(pos) {
   return {
-    strike:     parseFloat(pos.strike),
-    optionType: pos.option_type,
-    quantity:   pos.quantity,
-    cost:       parseFloat(pos.cost),
+    strike:            parseFloat(pos.strike),
+    optionType:        pos.option_type,
+    quantity:          pos.quantity,
+    cost:              parseFloat(pos.cost),
+    impliedVolatility: pos.implied_volatility,
+    daysToExpiry:      pos.days_to_expiry,
+    underlyingPrice:   pos.underlying_price !== null && pos.underlying_price !== undefined
+                          ? parseFloat(pos.underlying_price)
+                          : null,
   };
 }
 
@@ -61,7 +67,9 @@ const CHART_H = H - PAD.top - PAD.bottom;
 const C = {
   zero:       '#4b5563',  // gray-600
   strike:     '#6b7280',  // gray-500
-  curve:      '#e5e7eb',  // gray-200
+  curve:      '#e5e7eb',  // gray-200 — the Expiration reference curve (specs/015, unchanged)
+  today:      '#60a5fa',  // blue-400 — the checkpoint-controlled curve (016)
+  marker:     '#facc15',  // yellow-400 — current underlying price marker (016)
   gain:       '#4ade80',  // green-400
   loss:       '#f87171',  // red-400
   axis:       '#374151',  // gray-700
@@ -185,6 +193,139 @@ export function buildPayoffSvg(legs, opts = {}) {
   </svg>`;
 }
 
+/**
+ * Build the payoff SVG with the T+0 overlay: the existing Expiration curve
+ * (buildPayoffSvg, unchanged) as a fixed reference, plus a second curve
+ * reflecting whichever checkpoint is selected (defaults to "today").
+ *
+ * Falls back to buildPayoffSvg verbatim when the position is ineligible
+ * (missing/zero IV on any leg, or zero days to expiry — FR-008, and the
+ * zero-DTE edge case in spec.md).
+ *
+ * @param {Array} legs - PayoffLeg array, extended with impliedVolatility/daysToExpiry
+ * @param {{ title?: string }} opts
+ * @param {string} [checkpointId] - which CHECKPOINTS entry to draw as the second curve
+ * @returns {string} SVG markup
+ */
+export function buildOverlaySvg(legs, opts = {}, checkpointId = 'today') {
+  const baseSvg = buildPayoffSvg(legs, opts);
+  if (!isEligibleForOverlay(legs)) return baseSvg;
+
+  const analysis = analyzePayoff(legs);
+  const { maxGain, maxLoss, curve } = analysis;
+  const priceMin = curve[0].price;
+  const priceMax = curve[curve.length - 1].price;
+  const pnlMin = Math.min(maxLoss, 0) * 1.15;
+  const pnlMax = Math.max(maxGain, 0) * 1.15 || 1;
+  const xs = (p) => _xScale(p, priceMin, priceMax);
+  const ys = (v) => _yScale(v, pnlMin, pnlMax);
+
+  const checkpoint = CHECKPOINTS.find((c) => c.id === checkpointId) || CHECKPOINTS[0];
+  const checkpointCurve = computeCheckpointCurve(legs, checkpoint, curve);
+  const checkpointPoints = checkpointCurve
+    .map((pt) => `${xs(pt.price).toFixed(1)},${ys(pt.pnl).toFixed(1)}`)
+    .join(' ');
+
+  const legend = `
+    <text x="${(W - PAD.right - 72).toFixed(1)}" y="${(PAD.top - 6).toFixed(1)}" text-anchor="end"
+          font-family=${FONT} font-size="9" fill="${C.curve}">— Expiration</text>
+    <text x="${(W - PAD.right).toFixed(1)}" y="${(PAD.top - 6).toFixed(1)}" text-anchor="end"
+          font-family=${FONT} font-size="9" fill="${C.today}">— ${_esc(checkpoint.label)}</text>`;
+
+  const checkpointCurveSvg = `
+    <polyline points="${checkpointPoints}" fill="none" stroke="${C.today}" stroke-width="1.5"/>`;
+
+  const markerSvg = _buildMarkerSvg(legs, checkpoint, xs, ys);
+
+  return baseSvg.replace('</svg>', `${legend}${checkpointCurveSvg}${markerSvg}</svg>`);
+}
+
+/**
+ * Vertical marker at the current underlying price (when known), labeled with
+ * both the Expiration reference curve's P&L and the checkpoint-controlled
+ * curve's P&L at that exact price — evaluated directly, not read off the
+ * 200-point grid (FR-006, FR-007). Styled like the existing max-gain/max-loss
+ * annotations (circle + text) for visual consistency.
+ * @param {Array} legs
+ * @param {{label:string, offsetDays:number|null}} checkpoint
+ * @param {(price:number)=>number} xs
+ * @param {(pnl:number)=>number} ys
+ * @returns {string}
+ */
+function _buildMarkerSvg(legs, checkpoint, xs, ys) {
+  const underlyingPrice = legs[0].underlyingPrice;
+  if (underlyingPrice === null || underlyingPrice === undefined || Number.isNaN(underlyingPrice)) {
+    return '';
+  }
+
+  const referencePnl = combinedPayoff(legs, underlyingPrice);
+  const checkpointPnl = checkpoint.offsetDays === null
+    ? referencePnl
+    : combinedTheoreticalPayoff(legs, underlyingPrice, legs[0].daysToExpiry - checkpoint.offsetDays);
+
+  const mx = xs(underlyingPrice);
+  const dotRefY = ys(referencePnl);
+  const dotCkpY = ys(checkpointPnl);
+
+  // Anchor labels to where the dots actually land (not a fixed offset from
+  // the chart top) — a fixed offset collided with the legend and the
+  // existing max-gain/max-loss annotation whenever the current price sat
+  // near the top of the plotted range. Flip the label side when there
+  // isn't room on the right, mirroring the gain/loss label clamp pattern.
+  const onRight = mx < W - PAD.right - 80;
+  const labelX = onRight ? mx + 6 : mx - 6;
+  const anchor = onRight ? 'start' : 'end';
+
+  // Keep the two labels from overlapping each other when the two P&L
+  // values are close together, and keep both inside the plotted area.
+  const MIN_GAP = 11;
+  let refY = dotRefY;
+  let ckpY = dotCkpY;
+  if (Math.abs(refY - ckpY) < MIN_GAP) {
+    const mid = (refY + ckpY) / 2;
+    const spread = MIN_GAP / 2;
+    if (refY <= ckpY) { refY = mid - spread; ckpY = mid + spread; }
+    else { refY = mid + spread; ckpY = mid - spread; }
+  }
+  const clampY = (y) => Math.min(Math.max(y, PAD.top + 8), PAD.top + CHART_H - 4);
+  refY = clampY(refY);
+  ckpY = clampY(ckpY);
+
+  return `
+    <line x1="${mx.toFixed(1)}" y1="${PAD.top}" x2="${mx.toFixed(1)}" y2="${(PAD.top + CHART_H).toFixed(1)}"
+          stroke="${C.marker}" stroke-width="1" stroke-dasharray="2,3"/>
+    <circle cx="${mx.toFixed(1)}" cy="${dotRefY.toFixed(1)}" r="2.5" fill="${C.curve}"/>
+    <circle cx="${mx.toFixed(1)}" cy="${dotCkpY.toFixed(1)}" r="2.5" fill="${C.today}"/>
+    <text x="${labelX.toFixed(1)}" y="${(refY + 3).toFixed(1)}" text-anchor="${anchor}"
+          font-family=${FONT} font-size="9" fill="${C.curve}">Exp ${_esc(_fmt(referencePnl))}</text>
+    <text x="${labelX.toFixed(1)}" y="${(ckpY + 3).toFixed(1)}" text-anchor="${anchor}"
+          font-family=${FONT} font-size="9" fill="${C.today}">${_esc(checkpoint.label)} ${_esc(_fmt(checkpointPnl))}</text>`;
+}
+
+/**
+ * Build the "view as of" checkpoint button row. Unavailable checkpoints
+ * (FR-004) render disabled rather than being omitted, so their existence
+ * (and why they're greyed out — near expiration) stays visible.
+ * @param {number} daysToExpiry
+ * @param {string} activeId
+ * @returns {string}
+ */
+function _buildCheckpointButtonsHtml(daysToExpiry, activeId) {
+  const available = new Set(availableCheckpoints(daysToExpiry).map((c) => c.id));
+  const buttons = CHECKPOINTS.map((c) => {
+    const isAvailable = available.has(c.id);
+    const isActive = c.id === activeId;
+    const cls = !isAvailable
+      ? 'text-gray-700 cursor-not-allowed'
+      : isActive
+        ? 'text-blue-400 border-b border-blue-400 cursor-pointer'
+        : 'text-gray-500 hover:text-gray-300 cursor-pointer';
+    return `<button type="button" data-checkpoint="${c.id}" ${isAvailable ? '' : 'disabled'}
+              class="px-1.5 py-0.5 text-xs font-mono ${cls} transition-colors">${_esc(c.label)}</button>`;
+  }).join('');
+  return `<div class="payoff-checkpoint-row flex gap-1 mb-1">${buttons}</div>`;
+}
+
 // ---------------------------------------------------------------------------
 // DOM toggle
 // ---------------------------------------------------------------------------
@@ -226,8 +367,11 @@ export function initPayoffGraphToggle(container, positionData) {
     if (!group.legs || group.legs.length === 0) continue;
     const graphId = `payoff-${group.groupId}`;
     const legs = group.legs.map(_toLeg);
+    const opts = { title: group.groupName || '' };
     svgCache.set(graphId, {
-      svg: buildPayoffSvg(legs, { title: group.groupName || '' }),
+      svg: buildOverlaySvg(legs, opts, 'today'),
+      legs,
+      opts,
       anchorId: group.groupId,
     });
   }
@@ -235,8 +379,11 @@ export function initPayoffGraphToggle(container, positionData) {
   for (const pos of standalone) {
     const graphId = `payoff-${encodeURIComponent(pos.symbol)}`;
     const legs = [_toLeg(pos)];
+    const opts = { title: `${pos.underlying_symbol} · ${pos.expiry_date}` };
     svgCache.set(graphId, {
-      svg: buildPayoffSvg(legs, { title: `${pos.underlying_symbol} · ${pos.expiry_date}` }),
+      svg: buildOverlaySvg(legs, opts, 'today'),
+      legs,
+      opts,
       anchorId: pos.symbol,
     });
   }
@@ -248,12 +395,42 @@ export function initPayoffGraphToggle(container, positionData) {
     const cached = svgCache.get(graphId);
     if (!cached) return;
 
+    // Checkpoint always resets to "today" on open (FR-013) — never carried
+    // over from a previously opened graph's selection.
+    const eligible = isEligibleForOverlay(cached.legs);
+    const buttonsHtml = eligible
+      ? _buildCheckpointButtonsHtml(cached.legs[0].daysToExpiry, 'today')
+      : '';
+
     const graphRow = document.createElement('tr');
     graphRow.id = graphId;
     graphRow.className = 'payoff-graph-row';
-    graphRow.innerHTML = `<td colspan="14" class="px-4 py-3 bg-gray-900/60">${cached.svg}</td>`;
+    graphRow.dataset.checkpoint = 'today';
+    graphRow.innerHTML = `<td colspan="14" class="px-4 py-3 bg-gray-900/60">${buttonsHtml}<div class="payoff-svg-container">${cached.svg}</div></td>`;
     anchorRow.insertAdjacentElement('afterend', graphRow);
     openGraphId = graphId;
+
+    if (!eligible) return;
+
+    // Delegated from graphRow (not the button row itself) because the button
+    // row's outerHTML is replaced on every switch — a listener attached
+    // directly to it would be lost after the first click.
+    graphRow.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-checkpoint]');
+      if (!btn || btn.disabled) return;
+      const checkpointId = btn.dataset.checkpoint;
+      if (checkpointId === graphRow.dataset.checkpoint) return;
+
+      // Recompute is a cheap, direct call — no separate precomputed cache
+      // needed (benchmarked at ~0.27ms worst-case for a 4-leg position,
+      // well under any perceptible-delay threshold — FR-012).
+      const newSvg = buildOverlaySvg(cached.legs, cached.opts, checkpointId);
+      graphRow.querySelector('.payoff-svg-container').innerHTML = newSvg;
+      graphRow.dataset.checkpoint = checkpointId;
+
+      const newButtonsHtml = _buildCheckpointButtonsHtml(cached.legs[0].daysToExpiry, checkpointId);
+      graphRow.querySelector('.payoff-checkpoint-row').outerHTML = newButtonsHtml;
+    });
   }
 
   tbody.addEventListener('click', (e) => {

@@ -191,6 +191,11 @@ async def fetch_positions_and_greeks(
             theta=greeks.get("theta"),
             vega=greeks.get("vega"),
             implied_volatility=greeks.get("implied_volatility"),
+            underlying_price=(
+                Decimal(str(greeks_raw["underlying_price"]))
+                if greeks_raw.get("underlying_price")
+                else None
+            ),
             delta_source=_map_source(greeks.get("delta_source")),
             gamma_source=_map_source(greeks.get("gamma_source")),
             theta_source=_map_source(greeks.get("theta_source")),

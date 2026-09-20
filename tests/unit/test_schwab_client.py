@@ -6,9 +6,10 @@ asyncio.gather implementation is applied in Phase 3.
 from __future__ import annotations
 
 import asyncio
-from unittest.mock import MagicMock
+from decimal import Decimal
+from unittest.mock import AsyncMock, MagicMock, patch
 
-from src.services.schwab_client import _fetch_greeks
+from src.services.schwab_client import _fetch_greeks, fetch_positions_and_greeks
 
 # ---------------------------------------------------------------------------
 # OCC symbols used across tests
@@ -161,3 +162,69 @@ async def test_fetch_greeks_issues_calls_concurrently():
         f"(max_active=3), but max_active={max_active}. "
         f"A serial loop would give max_active=1."
     )
+
+
+# ---------------------------------------------------------------------------
+# 016-T008/T009: underlying_price flows from the option chain into PositionView
+# ---------------------------------------------------------------------------
+
+def _raw_position(symbol: str, long_qty: int, short_qty: int, market_value: float, average_price: float) -> dict:
+    return {
+        "instrument": {"assetType": "OPTION", "symbol": symbol, "underlyingSymbol": symbol[:4].strip()},
+        "longQuantity": long_qty,
+        "shortQuantity": short_qty,
+        "marketValue": market_value,
+        "averagePrice": average_price,
+    }
+
+
+async def test_fetch_positions_and_greeks_populates_underlying_price():
+    """PositionView.underlying_price comes from the same option-chain quote
+    already used for Greeks — no new Schwab API call, per research.md D-001."""
+    responses = {"AAPL": _chain(AAPL_SYM, underlying_price=190.0, delta=0.40)}
+    client = _client(responses)
+
+    account_data = {
+        "securitiesAccount": {
+            "positions": [_raw_position(AAPL_SYM, long_qty=0, short_qty=1, market_value=-320.0, average_price=-3.20)],
+        }
+    }
+    account_resp = MagicMock()
+    account_resp.json.return_value = account_data
+    client.get_account = AsyncMock(return_value=account_resp)
+    client.Account.Fields.POSITIONS = "positions"
+
+    with patch(
+        "src.auth.account_resolver.list_accounts",
+        new=AsyncMock(return_value=[{"hashValue": "hash1"}]),
+    ):
+        views = await fetch_positions_and_greeks(client)
+
+    assert len(views) == 1
+    assert views[0].underlying_price == Decimal("190.0")
+
+
+async def test_fetch_positions_and_greeks_underlying_price_none_when_unavailable():
+    """If the option chain never returns underlyingPrice, PositionView.underlying_price
+    is None rather than erroring (matches the graceful-degradation pattern used
+    elsewhere for optional fields)."""
+    client = _client({})  # no chain data registered for any underlying
+
+    account_data = {
+        "securitiesAccount": {
+            "positions": [_raw_position(AAPL_SYM, long_qty=0, short_qty=1, market_value=-320.0, average_price=-3.20)],
+        }
+    }
+    account_resp = MagicMock()
+    account_resp.json.return_value = account_data
+    client.get_account = AsyncMock(return_value=account_resp)
+    client.Account.Fields.POSITIONS = "positions"
+
+    with patch(
+        "src.auth.account_resolver.list_accounts",
+        new=AsyncMock(return_value=[{"hashValue": "hash1"}]),
+    ):
+        views = await fetch_positions_and_greeks(client)
+
+    assert len(views) == 1
+    assert views[0].underlying_price is None

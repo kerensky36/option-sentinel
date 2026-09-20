@@ -119,6 +119,7 @@ function aggregateLegs(legs) {
     underlying: sharedOrNull('underlying_symbol'),
     expiry: sharedOrNull('expiry_date'),
     dte: sharedOrNull('days_to_expiry'),
+    underlyingPrice: sharedOrNull('underlying_price'),
     delta: sumGreek('delta'),
     gamma: sumGreek('gamma'),
     theta: sumGreek('theta'),
