@@ -22,7 +22,7 @@ Add a **Quorum** button to each option / spread row. It calls a new `POST /api/q
 
 | Principle | Status | Notes |
 |-----------|--------|-------|
-| I — Privacy-First | ⚠️ → ✅ with amendment v3.3.0 | Sending position details to Vertex AI is a new outbound flow. Amended (D-008) to allow exactly this: user-initiated, de-identified FR-011 fields only, operator's own GCP project, nothing persisted. SC-003 test proves no account hash/token reaches the model. Result is never persisted (FR-015). |
+| I — Privacy-First | ⚠️ BLOCKED — needs user decision | Sending position details to Vertex AI is a new outbound flow that Principle I (v3.2.0) does not permit. A bounded amendment is proposed in research D-008 but has NOT been approved or applied. Proposal: user-initiated, de-identified FR-011 fields only, operator's own GCP project, nothing persisted. SC-003 test proves no account hash/token reaches the model. Result is never persisted (FR-015). |
 | II — Security-First | ✅ | Bearer required; `account_hash` validated via existing `fetch_positions_and_greeks` before any model call; strict 5/min rate limit; generic errors; no sensitive logging; input bounded by Pydantic; prompt-injection contained (D-006); all rendered text escaped; outbound links `rel="noopener noreferrer"`. New deps pinned. |
 | III — Spec-Before-Code | ✅ | spec/plan/tasks and constitution amendment committed before any `src/`, `frontend/`, `tests/` change. |
 | IV — Test-First | ✅ | Tally, feed parsing, agent orchestration, and route contract tests are written and seen failing before implementation. |
@@ -50,7 +50,6 @@ specs/017-macro-quorum-agents/
 ```text
 requirements.txt                         MODIFY — + google-adk==2.10.0, feedparser==6.0.14
 .env.example                             MODIFY — Vertex AI + QUORUM_MODEL settings
-.specify/memory/constitution.md          MODIFY — v3.3.0 amendment (Principle I, Tech Constraints)
 
 src/data/models.py                       MODIFY — QuorumRequest, PositionLegContext, PositionContext,
                                                   Headline, AnalystBallot, AnalystVote, TallyEntry, QuorumResult

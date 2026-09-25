@@ -1,6 +1,7 @@
 Always read .codesight/KNOWLEDGE.md before starting any task if it exists.
 Run /clear between sessions.
 Model: Sonnet for all tasks unless specified.
+NEVER amend `.specify/memory/constitution.md` without asking the user first and getting explicit approval — this includes version bumps, exceptions, and Sync Impact Report edits. If a feature conflicts with the constitution, stop and ask.
 
 <!-- SPECKIT START -->
 For context on technologies, project structure, and implementation approach,
@@ -11,5 +12,5 @@ read the current plan at `specs/017-macro-quorum-agents/plan.md`. Supporting art
 - `specs/017-macro-quorum-agents/quickstart.md` — GCP setup and browser verification protocol
 - `specs/017-macro-quorum-agents/spec.md` — feature specification (source of truth)
 - `specs/016-t0-payoff-overlay/plan.md` — prior feature (T+0 payoff overlay)
-- `.specify/memory/constitution.md` — project constitution v3.3.0
+- `.specify/memory/constitution.md` — project constitution v3.2.0
 <!-- SPECKIT END -->

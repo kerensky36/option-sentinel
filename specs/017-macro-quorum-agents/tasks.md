@@ -9,7 +9,7 @@
 
 ## Phase 1: Setup
 
-- [ ] T001 Amend `.specify/memory/constitution.md` to v3.3.0 (Principle I + Technology Constraints, research D-008)
+- [ ] T001 BLOCKED — user decision on Principle I conflict (research D-008). Do NOT amend the constitution without explicit user approval.
 - [ ] T002 [P] Add `google-adk==2.10.0` and `feedparser==6.0.14` to `requirements.txt`
 - [ ] T003 [P] Document `GOOGLE_GENAI_USE_VERTEXAI`, `GOOGLE_CLOUD_PROJECT`, `GOOGLE_CLOUD_LOCATION`, `QUORUM_MODEL` in `.env.example`
 

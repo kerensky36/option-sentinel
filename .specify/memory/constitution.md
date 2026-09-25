@@ -1,40 +1,6 @@
 <!--
 SYNC IMPACT REPORT
 ==================
-Version change: 3.2.0 → 3.3.0
-Bump type: MINOR — Principle I (Privacy-First) materially expanded with one
-  bounded exception permitting user-initiated AI analysis via the operator's
-  own Vertex AI project. Technology Constraints gains an "AI analysis" bullet.
-
-Modified sections:
-  I. Privacy-First Data Handling
-    Rationale: specs/017-macro-quorum-agents sends de-identified,
-    contract-level position data to Gemini on Vertex AI so a quorum of
-    analyst agents can vote CLOSE / HOLD / ROLL. The exception is limited to
-    explicit user action, excludes all account identifiers and tokens, and
-    forbids persistence of prompts or results.
-
-  Technology Constraints → AI analysis (new bullet)
-
-Added sections:
-  None
-
-Removed sections:
-  None
-
-Templates reviewed:
-  ✅ .specify/templates/plan-template.md — no changes needed
-  ✅ .specify/templates/spec-template.md — no changes needed
-  ✅ .specify/templates/tasks-template.md — no changes needed
-
-Follow-up TODOs:
-  - Confirm Vertex AI request/response logging is disabled in the operator's
-    GCP project (Cloud Logging data-access logs for aiplatform.googleapis.com).
-  - Carried forward from 3.2.0: pip-audit in CI; CORS verification per deploy.
--->
-
-<!--
-PREVIOUS SYNC IMPACT REPORT (3.1.0 → 3.2.0)
 Version change: 3.1.0 → 3.2.0
 Bump type: MINOR — Principle I (Privacy-First) and Technology Constraints
   (Storage) expanded to explicitly cover all client-side trader data, not
@@ -108,18 +74,6 @@ lifetime enforcement is. Compliance is verifiable by confirming no persistent
 storage layer exists on the server, that no trader data is written to IndexedDB
 or localStorage, and that token values never appear in server logs or error
 responses.
-
-**Bounded exception — AI analysis (v3.3.0)**: When, and only when, a user
-explicitly requests an AI analysis of one of their positions, the server MAY
-send that position's contract-level market fields (underlying symbol, option
-type, strike, expiry, days to expiry, signed quantity, cost, mark, unrealised
-P&L, Greeks, implied volatility, underlying price) together with public news
-headlines to a Gemini model on Vertex AI in the operator's own Google Cloud
-project. Account numbers, account hashes, tokens, and any other account data
-MUST NOT be sent. Neither the prompt nor the result may be persisted on the
-server or in the browser, and no provider-side logging of prompts may be
-enabled by the operator. Compliance is verifiable by an automated test that
-inspects every outbound model request for account identifiers and tokens.
 
 ### II. Security-First
 
@@ -272,10 +226,6 @@ is sufficient.
   sensitive output in logs are non-negotiable deployment requirements.
 - **Frontend**: Cloud-hosted web dashboard. No multi-tenant data storage. No native
   mobile app. Responsive layout required for mobile viewports.
-- **AI analysis**: Google ADK agents on Vertex AI (Gemini), authenticated by
-  the Cloud Run service account via Application Default Credentials. No model
-  API keys are stored. Advisory output only — no trade execution. Scope bounded
-  by the Principle I exception.
 - **Dependencies**: All declared in `requirements.txt`; exact versions pinned;
   audited via pip-audit on every release.
 
@@ -303,4 +253,4 @@ documented in plan.md's Complexity Tracking table before implementation proceeds
 Security control gaps identified during review MUST be logged as follow-up TODOs
 in the Sync Impact Report of the relevant amendment.
 
-**Version**: 3.3.0 | **Ratified**: 2026-04-28 | **Last Amended**: 2026-09-25
+**Version**: 3.2.0 | **Ratified**: 2026-04-28 | **Last Amended**: 2026-05-15
