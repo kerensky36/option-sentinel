@@ -31,4 +31,4 @@
 
 ## Notes
 
-- Constitution Principle I requires amendment (v3.3.0) to permit the de-identified Vertex AI flow — handled in plan.md / research D-008.
+- Constitution Principle I (v3.2.0) conflicts with sending position data to Vertex AI. An amendment is proposed in research D-008 and awaits user approval; not applied.

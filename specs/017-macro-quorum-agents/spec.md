@@ -119,7 +119,7 @@ A visitor using demo mode (specs/014) clicks Quorum on a demo position and sees 
 
 ## Assumptions
 
-- Vertex AI in the operator's own GCP project (the one that already hosts Cloud Run) is the model provider; data sent there is governed by the operator's GCP terms and is not used for model training. The constitution is amended (v3.3.0) to explicitly allow this single, user-initiated, de-identified outbound flow.
+- Vertex AI in the operator's own GCP project (the one that already hosts Cloud Run) is the model provider; data sent there is governed by the operator's GCP terms and is not used for model training. This conflicts with Constitution Principle I (v3.2.0); proceeding requires the user to approve an amendment (see research D-008) — not yet approved.
 - Public RSS feeds from CNBC, Yahoo Finance, and Bloomberg are used as "news sources"; paywalled article bodies are not fetched — only headline, summary, and link.
 - The default model is a fast Gemini model configurable by environment variable, so the operator can move to newer models without a code change.
 - "Roll" suggestions are directional only (out / up-and-out / down-and-out); choosing concrete strikes and expiries remains the trader's job.
