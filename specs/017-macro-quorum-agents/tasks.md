@@ -9,7 +9,7 @@
 
 ## Phase 1: Setup
 
-- [ ] T001 BLOCKED — user decision on Principle I conflict (research D-008). Do NOT amend the constitution without explicit user approval.
+- [x] T001 Constitution v3.3.0 — approved and applied by project owner request (research D-008)
 - [ ] T002 [P] Add `google-adk==2.10.0` and `feedparser==6.0.14` to `requirements.txt`
 - [ ] T003 [P] Document `GOOGLE_GENAI_USE_VERTEXAI`, `GOOGLE_CLOUD_PROJECT`, `GOOGLE_CLOUD_LOCATION`, `QUORUM_MODEL` in `.env.example`
 
@@ -39,6 +39,12 @@
 ## Phase 4: User Story 2 — See Why Each Analyst Voted (P2)
 
 - [ ] T016 [US2] `quorum_ui.js` — analyst cards (lens, vote, confidence, rationale, roll direction, abstained), macro brief, headline list with publisher + safe links, disclaimer (FR-016, FR-017)
+
+## Phase 4b: User Story 4 — Data Use Disclosure (P2)
+
+- [ ] T021 [US4] `tests/contract/test_data_use_page.py` — GET /data-use 200 without auth, lists every data use incl. Vertex AI row and "no user-identifiable or pedigree data"; login page and dashboard link to it (write first, confirm failing)
+- [ ] T022 [US4] `frontend/templates/data_use.html` + route in `src/api/routes/dashboard.py`; links in `login.html` and `base.html`
+- [ ] T023 [US4] Quorum panel notice + link (FR-020) in `quorum_ui.js`
 
 ## Phase 5: User Story 3 — Demo Mode (P3)
 

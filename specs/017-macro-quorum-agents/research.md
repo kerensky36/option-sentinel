@@ -45,8 +45,7 @@
 **Decision**: `POST /api/quorum/vote {symbols, account_hash}`. The route calls the existing `fetch_positions_and_greeks()` with the caller's token, which already validates `account_hash` against the token (IDOR guard), then selects the requested legs.
 **Rationale**: Prevents clients from feeding fabricated positions/prompts to the model on the operator's bill; reuses existing validated code path (FR-002, FR-003).
 
-## D-008 — Constitution conflict (PROPOSED amendment — not approved)
+## D-008 — Constitution v3.3.0 (approved by project owner 2026-09-25)
 
-**Status**: Awaiting user approval. The constitution remains v3.2.0.
-**Proposal**: MINOR amendment to Principle I permitting one outbound flow: on explicit user action, de-identified contract-level position data (FR-011 fields) may be sent to the operator's own Vertex AI project for advisory analysis; never account identifiers or tokens; nothing persisted. Technology Constraints gain an "AI analysis" bullet.
-**Rationale**: Principle I forbids external services beyond Schwab for user data; the feature cannot exist without sending position details to a model. The amendment bounds the exception tightly and makes it testable (SC-003).
+**Decision**: Principle I now allows position and market data to be sent to Vertex AI and forbids user-identifiable or pedigree data. It also requires an in-app Data Use Disclosure listing every use of user data.
+**Implementation consequences**: (a) `PositionLegContext` is an allow-list of fields — nothing else can reach the prompt. (b) A test captures every fake-model request and asserts the account hash, token, and OCC symbol-to-account linkage never appear. (c) New `/data-use` page, linked from login and nav (FR-019), and a one-line notice + link in the quorum panel (FR-020).

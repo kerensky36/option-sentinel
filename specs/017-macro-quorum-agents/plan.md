@@ -22,7 +22,7 @@ Add a **Quorum** button to each option / spread row. It calls a new `POST /api/q
 
 | Principle | Status | Notes |
 |-----------|--------|-------|
-| I — Privacy-First | ⚠️ BLOCKED — needs user decision | Sending position details to Vertex AI is a new outbound flow that Principle I (v3.2.0) does not permit. A bounded amendment is proposed in research D-008 but has NOT been approved or applied. Proposal: user-initiated, de-identified FR-011 fields only, operator's own GCP project, nothing persisted. SC-003 test proves no account hash/token reaches the model. Result is never persisted (FR-015). |
+| I — Privacy-First | ✅ (v3.3.0) | Only allow-listed position and market fields (FR-011) reach Vertex AI; no user-identifiable or pedigree data — proven by SC-003 test. Result never persisted (FR-015). Data Use Disclosure page added (FR-019/020). |
 | II — Security-First | ✅ | Bearer required; `account_hash` validated via existing `fetch_positions_and_greeks` before any model call; strict 5/min rate limit; generic errors; no sensitive logging; input bounded by Pydantic; prompt-injection contained (D-006); all rendered text escaped; outbound links `rel="noopener noreferrer"`. New deps pinned. |
 | III — Spec-Before-Code | ✅ | spec/plan/tasks and constitution amendment committed before any `src/`, `frontend/`, `tests/` change. |
 | IV — Test-First | ✅ | Tally, feed parsing, agent orchestration, and route contract tests are written and seen failing before implementation. |
@@ -64,11 +64,16 @@ frontend/static/js/quorum_ui.js          NEW — button wiring, panel rendering 
 frontend/static/js/positions_ui.js       MODIFY — Quorum column + initQuorum()
 frontend/static/js/payoff_graph.js       MODIFY — ignore clicks on [data-quorum-btn]; colspan 14→15
 frontend/static/js/demo_data.js          MODIFY — canned /api/quorum/vote result
+frontend/templates/data_use.html         NEW — "How we use your data" disclosure (FR-019)
+frontend/templates/login.html            MODIFY — link to /data-use
+frontend/templates/base.html             MODIFY — nav link to /data-use
+src/api/routes/dashboard.py              MODIFY — GET /data-use (no auth)
 
 tests/unit/test_quorum_tally.py          NEW
 tests/unit/test_news_feeds.py            NEW
 tests/unit/test_quorum_agents.py         NEW
 tests/contract/test_quorum_api.py        NEW
+tests/contract/test_data_use_page.py     NEW
 ```
 
 ## Agent Topology

@@ -12,5 +12,5 @@ read the current plan at `specs/017-macro-quorum-agents/plan.md`. Supporting art
 - `specs/017-macro-quorum-agents/quickstart.md` — GCP setup and browser verification protocol
 - `specs/017-macro-quorum-agents/spec.md` — feature specification (source of truth)
 - `specs/016-t0-payoff-overlay/plan.md` — prior feature (T+0 payoff overlay)
-- `.specify/memory/constitution.md` — project constitution v3.2.0
+- `.specify/memory/constitution.md` — project constitution v3.3.0
 <!-- SPECKIT END -->

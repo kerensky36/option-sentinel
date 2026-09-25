@@ -12,6 +12,7 @@
 - Q: For an existing options position, what does the "buy" vote mean? → A: Buy (or sell) to close. The three possible votes are **CLOSE**, **HOLD**, **ROLL**.
 - Q: How do the agents reach the language model? → A: Google Vertex AI (Gemini) in the operator's own GCP project, authenticated by the Cloud Run service account — no API key stored anywhere.
 - Q: Where does the macro data come from? → A: Financial news sources — CNBC, Yahoo Finance, Bloomberg — rather than a statistics API.
+- Q: What user data may reach Vertex AI? → A: No user-identifiable or pedigree data. Position and market data is allowed. Stipulated in Constitution v3.3.0, which also requires the app to explicitly list how it uses data.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -64,6 +65,22 @@ A visitor using demo mode (specs/014) clicks Quorum on a demo position and sees 
 
 ---
 
+### User Story 4 - See Exactly How the App Uses My Data (Priority: P2)
+
+Before or after logging in, a trader opens a **How we use your data** page from the login screen or the top navigation. It lists every use of their data in a table: what data, where it goes, why, and how long it is kept — including the new quorum flow to Vertex AI and the explicit statement that no identifying or pedigree data is ever sent there.
+
+**Why this priority**: Required by Constitution v3.3.0 (Data Use Disclosure); the quorum feature is not complete without it.
+
+**Independent Test**: From the login page and from the dashboard, follow the link; verify the page lists every data use, including the Vertex AI row.
+
+**Acceptance Scenarios**:
+
+1. **Given** the login page, **When** the visitor clicks "How we use your data", **Then** the disclosure page opens without requiring login.
+2. **Given** any logged-in page, **When** the trader clicks the nav link, **Then** the same page opens.
+3. **Given** the page, **When** read, **Then** it lists at least: Schwab login (OAuth), Schwab token, position data, screener data, account selection, server processing, security logs, Quorum → Vertex AI (with the exact fields sent and the statement that no user-identifiable or pedigree data is sent), and Quorum → news feeds (only the underlying ticker symbol is sent to Yahoo Finance's feed).
+
+---
+
 ### Edge Cases
 
 - The quorum is not configured on the server (no GCP project set): the endpoint answers "service unavailable" with a plain message; the panel shows "Quorum is not configured on this server" and nothing else breaks.
@@ -91,13 +108,15 @@ A visitor using demo mode (specs/014) clicks Quorum on a demo position and sees 
 - **FR-008**: The result MUST include, per action, the vote count and the mean confidence of the analysts who chose it.
 - **FR-009**: Macro news MUST be gathered at request time from CNBC, Yahoo Finance, and Bloomberg public news feeds, plus the Yahoo Finance headline feed for the position's underlying symbol; at most 30 headlines, de-duplicated by title, newest first, are passed to the analysts and returned in the result.
 - **FR-010**: A news-research agent MUST additionally summarise current macro conditions for the analysts using Google Search grounding focused on the same three publishers; its summary is shared read-only with all five analysts. If research fails, analysts proceed with headlines only.
-- **FR-011**: The data sent to the model MUST be limited to public-market and contract-level fields: underlying symbol, option type, strike, expiry, days to expiry, signed quantity, cost basis per contract, current mark, unrealised P&L, Greeks, implied volatility, underlying price, and the gathered headlines. Account identifiers, tokens, and any other account data MUST NOT be sent.
+- **FR-011**: The data sent to Vertex AI MUST be limited to position and market fields: underlying symbol, option type, strike, expiry, days to expiry, signed quantity, cost basis per contract, current mark, unrealised P&L, Greeks, implied volatility, underlying price, and the gathered headlines. User-identifiable or pedigree data (Constitution v3.3.0, Principle I) MUST NOT be sent — including names, emails, addresses, phone numbers, dates of birth, government/tax IDs, account numbers, account hashes, tokens, and IP addresses.
 - **FR-012**: The whole quorum (news + research + votes) MUST complete or fail within 60 seconds; individual feed fetches MUST time out after 5 seconds.
 - **FR-013**: The quorum endpoint MUST be rate-limited more strictly than other endpoints (5 requests per minute per client).
 - **FR-014**: If the server is not configured for the quorum, the endpoint MUST answer "service unavailable" without attempting any model call.
 - **FR-015**: The quorum result MUST NOT be persisted anywhere — not on the server, and not in browser storage; closing the panel discards it.
 - **FR-016**: The result panel MUST show the verdict, tally, per-analyst cards (FR-005 fields, abstentions marked), and the headline list with publisher and link; all text MUST be escaped; links MUST open in a new tab with no opener/referrer.
 - **FR-017**: The result MUST display a fixed notice that it is informational only and not financial advice; no trade is ever placed by this feature.
+- **FR-019**: The app MUST provide a "How we use your data" page, reachable without login from the login screen and from the navigation on every app page, listing each data use with: data, destination, purpose, retention (Constitution v3.3.0, Data Use Disclosure).
+- **FR-020**: The quorum panel MUST link to that page and state in one line that position and market data (no identifying information) is sent to Google Vertex AI.
 - **FR-018**: In demo mode, the Quorum button MUST return a canned result client-side without contacting the server.
 
 ### Key Entities
@@ -113,13 +132,14 @@ A visitor using demo mode (specs/014) clicks Quorum on a demo position and sees 
 
 - **SC-001**: A trader gets a verdict for any open position with one click and without leaving the dashboard, in under 60 seconds.
 - **SC-002**: For any combination of five votes, the displayed verdict matches the FR-007 rule in 100% of cases (verified by exhaustive automated test over all 4⁵ vote/abstain combinations).
-- **SC-003**: No account identifier or token value ever appears in any text sent to the model (verified by automated test of the prompt payload).
+- **SC-003**: No user-identifiable or pedigree data (account number, account hash, token, IP address, or any other identifier) ever appears in any request sent to the model (verified by automated test of every model request).
+- **SC-006**: Every data use in the app is listed on the disclosure page, reachable in one click from the login screen and from every app page.
 - **SC-004**: Every analyst's reasoning and every headline behind a verdict is visible to the trader from the same panel.
 - **SC-005**: The feature degrades without breaking the dashboard in every edge case listed above.
 
 ## Assumptions
 
-- Vertex AI in the operator's own GCP project (the one that already hosts Cloud Run) is the model provider; data sent there is governed by the operator's GCP terms and is not used for model training. This conflicts with Constitution Principle I (v3.2.0); proceeding requires the user to approve an amendment (see research D-008) — not yet approved.
+- Vertex AI in the operator's own GCP project (the one that already hosts Cloud Run) is the model provider. Constitution v3.3.0 permits position and market data there and forbids user-identifiable or pedigree data.
 - Public RSS feeds from CNBC, Yahoo Finance, and Bloomberg are used as "news sources"; paywalled article bodies are not fetched — only headline, summary, and link.
 - The default model is a fast Gemini model configurable by environment variable, so the operator can move to newer models without a code change.
 - "Roll" suggestions are directional only (out / up-and-out / down-and-out); choosing concrete strikes and expiries remains the trader's job.

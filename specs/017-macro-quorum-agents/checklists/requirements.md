@@ -31,4 +31,4 @@
 
 ## Notes
 
-- Constitution Principle I (v3.2.0) conflicts with sending position data to Vertex AI. An amendment is proposed in research D-008 and awaits user approval; not applied.
+- Constitution v3.3.0 (approved 2026-09-25): position and market data allowed in Vertex AI; no user-identifiable or pedigree data; in-app Data Use Disclosure required (US4, FR-019/020).
