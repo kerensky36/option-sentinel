@@ -26,6 +26,16 @@ async def dashboard(request: Request):
     )
 
 
+@router.get("/data-use", response_class=HTMLResponse)
+async def data_use(request: Request):
+    """Data Use Disclosure — every use of user data (Constitution v3.3.0). No auth required."""
+    return templates.TemplateResponse(
+        request,
+        "data_use.html",
+        {"csp_nonce": getattr(request.state, "csp_nonce", "")},
+    )
+
+
 @router.get("/health")
 async def health():
     """Health check — no DB check, no auth required."""

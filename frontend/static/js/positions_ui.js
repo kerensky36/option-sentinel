@@ -10,6 +10,7 @@ import { fetchWithAuth, isAuthenticated } from './auth.js';
 import { withAccountHash, getSelectedAccountHash } from './account_picker.js';
 import { savePositions, loadPositions } from './position_cache.js';
 import { initPayoffGraphToggle, closeOpenGraph } from './payoff_graph.js';
+import { initQuorum, quorumButtonCell } from './quorum_ui.js';
 
 const TABLE_ID = 'positions-table';
 const TIMESTAMP_ID = 'positions-timestamp';
@@ -173,6 +174,7 @@ export function renderPositions(positions, timestamp) {
       <td class="px-2 py-1 text-right text-gray-200">${fmt(p.theta, 4)}${sourceBadge(p.theta_source)}</td>
       <td class="px-2 py-1 text-right text-gray-200">${fmt(p.vega, 4)}${sourceBadge(p.vega_source)}</td>
       <td class="px-2 py-1 text-right text-gray-200">${p.implied_volatility !== null && p.implied_volatility !== undefined ? (Number(p.implied_volatility) * 100).toFixed(1) + '%' : '—'}${sourceBadge(p.iv_source)}</td>
+      ${quorumButtonCell(p.symbol)}
     </tr>`;
   };
 
@@ -198,6 +200,7 @@ export function renderPositions(positions, timestamp) {
       <td class="px-2 py-1 text-right text-gray-200">${agg.theta !== null ? fmt(agg.theta, 4) + sourceBadge(agg.hasBsGreek.theta ? 'calculated' : null) : '—'}</td>
       <td class="px-2 py-1 text-right text-gray-200">${agg.vega !== null ? fmt(agg.vega, 4) + sourceBadge(agg.hasBsGreek.vega ? 'calculated' : null) : '—'}</td>
       <td class="px-2 py-1 text-right text-gray-500">—</td>
+      ${quorumButtonCell(group.groupId)}
     </tr>`;
 
     const legRows = group.legs.map((p) => {
@@ -218,6 +221,7 @@ export function renderPositions(positions, timestamp) {
       <td class="px-2 py-1 text-right text-gray-200">${fmt(p.theta, 4)}${sourceBadge(p.theta_source)}</td>
       <td class="px-2 py-1 text-right text-gray-200">${fmt(p.vega, 4)}${sourceBadge(p.vega_source)}</td>
       <td class="px-2 py-1 text-right text-gray-200">${p.implied_volatility !== null && p.implied_volatility !== undefined ? (Number(p.implied_volatility) * 100).toFixed(1) + '%' : '—'}${sourceBadge(p.iv_source)}</td>
+      <td></td>
     </tr>`;
     }).join('');
 
@@ -246,6 +250,7 @@ export function renderPositions(positions, timestamp) {
             <th class="px-2 py-1 text-right">Theta</th>
             <th class="px-2 py-1 text-right">Vega</th>
             <th class="px-2 py-1 text-right">IV</th>
+            <th class="px-2 py-1 text-right">Quorum</th>
           </tr>
         </thead>
         <tbody>${spreadRows}${standaloneRows}</tbody>
@@ -267,6 +272,9 @@ export function renderPositions(positions, timestamp) {
 
   // Payoff graph toggle: wires spread group rows + standalone option rows
   initPayoffGraphToggle(container, { groups, standalone });
+
+  // Macro news voting quorum buttons (specs/017)
+  initQuorum(container, { groups, standalone });
 
   // Update timestamp badge
   const tsEl = document.getElementById(TIMESTAMP_ID);

@@ -1,15 +1,16 @@
 Always read .codesight/KNOWLEDGE.md before starting any task if it exists.
 Run /clear between sessions.
 Model: Sonnet for all tasks unless specified.
+NEVER amend `.specify/memory/constitution.md` without asking the user first and getting explicit approval — this includes version bumps, exceptions, and Sync Impact Report edits. If a feature conflicts with the constitution, stop and ask.
 
 <!-- SPECKIT START -->
 For context on technologies, project structure, and implementation approach,
-read the current plan at `specs/016-t0-payoff-overlay/plan.md`. Supporting artifacts:
-- `specs/016-t0-payoff-overlay/research.md` — decisions D-001–D-008 (underlying_price sourcing, BS pricing in JS, checkpoint model)
-- `specs/016-t0-payoff-overlay/data-model.md` — extended PayoffLeg, Checkpoint, OverlayAnalysis shapes
-- `specs/016-t0-payoff-overlay/contracts/payoff-theoretical-contract.md` — new JS module API and numeric invariants
-- `specs/016-t0-payoff-overlay/quickstart.md` — 10-scenario browser verification protocol
-- `specs/016-t0-payoff-overlay/spec.md` — feature specification (source of truth)
-- `specs/015-payoff-graphs/plan.md` — prior feature (expiration-only payoff graphs; this feature extends it)
-- `.specify/memory/constitution.md` — project constitution v3.2.0
+read the current plan at `specs/017-macro-quorum-agents/plan.md`. Supporting artifacts:
+- `specs/017-macro-quorum-agents/research.md` — decisions D-001–D-008 (ADK per-seat runners, Vertex AI, RSS + search grounding, deterministic tally)
+- `specs/017-macro-quorum-agents/data-model.md` — PositionContext, Headline, AnalystBallot/Vote, QuorumResult shapes
+- `specs/017-macro-quorum-agents/contracts/quorum-api-contract.md` — POST /api/quorum/vote contract and service APIs
+- `specs/017-macro-quorum-agents/quickstart.md` — GCP setup and browser verification protocol
+- `specs/017-macro-quorum-agents/spec.md` — feature specification (source of truth)
+- `specs/016-t0-payoff-overlay/plan.md` — prior feature (T+0 payoff overlay)
+- `.specify/memory/constitution.md` — project constitution v3.3.0
 <!-- SPECKIT END -->

@@ -294,6 +294,49 @@ export const DEMO_SCREENER_RESULTS = [
   },
 ];
 
+/**
+ * Canned quorum result for demo mode (specs/017 FR-018) — no server call.
+ * @param {string} underlying
+ */
+function _demoQuorum(underlying) {
+  const vote = (seat, lens, action, confidence, rationale, roll_direction = null) => ({
+    seat, lens, action, confidence, rationale, roll_direction, abstained: false,
+  });
+  return {
+    verdict: 'ROLL',
+    quorum_met: true,
+    seats: 5,
+    valid_votes: 5,
+    tally: [
+      { action: 'CLOSE', votes: 1, mean_confidence: 0.55 },
+      { action: 'HOLD', votes: 1, mean_confidence: 0.5 },
+      { action: 'ROLL', votes: 3, mean_confidence: 0.68 },
+    ],
+    votes: [
+      vote('rates_fed', 'Rates & Fed', 'ROLL', 0.7,
+        'Fed minutes point to an extended pause; a later expiry buys time for the rate path to clear.', 'out'),
+      vote('volatility', 'Volatility Regime', 'HOLD', 0.5,
+        'VIX is subdued and no major event sits before expiry, so theta keeps working as is.'),
+      vote('growth_inflation', 'Growth & Inflation', 'ROLL', 0.65,
+        'Cooling CPI supports the trend, but the next payrolls print lands inside this expiry.', 'up_and_out'),
+      vote('underlying_news', 'Underlying & Sector News', 'CLOSE', 0.55,
+        `Sector rotation headlines weigh on ${underlying}; locking in the gain avoids the next catalyst.`),
+      vote('position_risk', 'Position Risk', 'ROLL', 0.7,
+        'Most of the premium is captured and gamma rises into expiry; rolling out resets risk.', 'out'),
+    ],
+    macro_brief: 'Demo: the Fed held rates at its last meeting; CPI cooled slightly; VIX sits in the mid-teens; earnings season is underway.',
+    headlines: [
+      { publisher: 'CNBC', title: 'Demo headline: Fed holds rates steady, signals patience', link: 'https://www.cnbc.com/', published: null, summary: '' },
+      { publisher: 'Bloomberg', title: 'Demo headline: Treasury yields drift lower after inflation data', link: 'https://www.bloomberg.com/markets', published: null, summary: '' },
+      { publisher: 'Yahoo Finance', title: `Demo headline: What to watch for ${underlying} this week`, link: 'https://finance.yahoo.com/', published: null, summary: '' },
+    ],
+    underlying_symbol: underlying,
+    model: 'demo (no model call)',
+    generated_at: new Date().toISOString(),
+    disclaimer: 'Informational only — not financial advice. Option Sentinel never places trades.',
+  };
+}
+
 function _makeResponse(data) {
   return new Response(JSON.stringify(data), {
     status: 200,
@@ -306,9 +349,10 @@ function _makeResponse(data) {
  * Called from fetchWithAuth() in auth.js when isDemoMode() is true.
  *
  * @param {string} url - The full URL that would have been fetched
+ * @param {RequestInit} [options] - The fetch options (used for POST bodies)
  * @returns {Response}
  */
-export function demoResponse(url) {
+export function demoResponse(url, options = {}) {
   const u = new URL(url, window.location.origin);
   const hash = u.searchParams.get('account_hash') || '';
 
@@ -324,6 +368,14 @@ export function demoResponse(url) {
     return _makeResponse(
       hash === DEMO_EQUITY_HASH ? DEMO_SCREENER_RESULTS : []
     );
+  }
+  if (u.pathname === '/api/quorum/vote') {
+    let underlying = 'DEMO';
+    try {
+      const sym = JSON.parse(options.body || '{}').symbols?.[0] || '';
+      underlying = sym.trim().split(/\s+/)[0] || underlying;
+    } catch { /* keep default */ }
+    return _makeResponse(_demoQuorum(underlying));
   }
   return _makeResponse({ detail: 'Demo mode: endpoint not available' });
 }

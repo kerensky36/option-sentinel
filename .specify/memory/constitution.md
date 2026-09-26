@@ -1,6 +1,39 @@
 <!--
 SYNC IMPACT REPORT
 ==================
+Version change: 3.2.0 → 3.3.0
+Bump type: MINOR — Principle I (Privacy-First) materially expanded, approved
+  by the project owner on 2026-09-25. No principles removed.
+
+Modified sections:
+  I. Privacy-First Data Handling
+    - Added "AI analysis (Vertex AI)": position and market data may be sent
+      to Gemini on Vertex AI; user-identifiable or pedigree data MUST NOT be.
+    - Added "Data Use Disclosure": the app MUST explicitly list how it uses
+      user data, and the list MUST be kept current with every feature.
+    Rationale: specs/017-macro-quorum-agents (Google ADK voting quorum).
+
+  Technology Constraints
+    - Added "AI analysis" bullet.
+
+Added sections:
+  None
+
+Removed sections:
+  None
+
+Templates reviewed:
+  ✅ .specify/templates/plan-template.md — no changes needed
+  ✅ .specify/templates/spec-template.md — no changes needed
+  ✅ .specify/templates/tasks-template.md — no changes needed
+
+Follow-up TODOs:
+  - Implement the in-app Data Use Disclosure (specs/017).
+-->
+
+<!--
+PREVIOUS SYNC IMPACT REPORT
+===========================
 Version change: 3.1.0 → 3.2.0
 Bump type: MINOR — Principle I (Privacy-First) and Technology Constraints
   (Storage) expanded to explicitly cover all client-side trader data, not
@@ -74,6 +107,21 @@ lifetime enforcement is. Compliance is verifiable by confirming no persistent
 storage layer exists on the server, that no trader data is written to IndexedDB
 or localStorage, and that token values never appear in server logs or error
 responses.
+
+**AI analysis (Vertex AI)**: Position and market data MAY be sent to a Gemini
+model on Google Cloud Vertex AI for analysis features. User-identifiable or
+pedigree data MUST NOT be sent to Vertex AI under any circumstances. This
+includes, but is not limited to: names, email addresses, postal addresses,
+phone numbers, dates of birth, government or tax identifiers, Schwab account
+numbers, account hashes, access or refresh tokens, IP addresses, and any
+other value that identifies the user or their account. Compliance MUST be
+verified by an automated test that inspects every outbound model request.
+
+**Data Use Disclosure**: The app MUST explicitly list, in a page reachable
+from the login screen and from every page of the app, every way it uses user
+data: what data is used, where it is sent, why, and how long it is kept. Any
+feature that adds or changes a use of user data MUST update this list in the
+same change, and the feature is not complete until it does.
 
 ### II. Security-First
 
@@ -226,6 +274,8 @@ is sufficient.
   sensitive output in logs are non-negotiable deployment requirements.
 - **Frontend**: Cloud-hosted web dashboard. No multi-tenant data storage. No native
   mobile app. Responsive layout required for mobile viewports.
+- **AI analysis**: Gemini on Google Cloud Vertex AI via Google ADK. Subject
+  to the Principle I rule that no user-identifiable or pedigree data is sent.
 - **Dependencies**: All declared in `requirements.txt`; exact versions pinned;
   audited via pip-audit on every release.
 
@@ -253,4 +303,4 @@ documented in plan.md's Complexity Tracking table before implementation proceeds
 Security control gaps identified during review MUST be logged as follow-up TODOs
 in the Sync Impact Report of the relevant amendment.
 
-**Version**: 3.2.0 | **Ratified**: 2026-04-28 | **Last Amended**: 2026-05-15
+**Version**: 3.3.0 | **Ratified**: 2026-04-28 | **Last Amended**: 2026-09-25

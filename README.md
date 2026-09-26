@@ -19,6 +19,7 @@ Option Sentinel connects to your Charles Schwab account and gives you a **live, 
 | **Greeks** | Delta, gamma, theta, vega, IV — sourced from Schwab API, Black-Scholes fallback |
 | **Thesis groups** | Group positions by named thesis — stored in your browser only |
 | **Covered call screener** | Ranks long stock positions by covered-call income opportunity |
+| **Macro news quorum** | Five Google ADK analyst agents read CNBC / Yahoo Finance / Bloomberg news and vote CLOSE / HOLD / ROLL on a position (Gemini on Vertex AI — no identifying data sent). Setup: `specs/017-macro-quorum-agents/quickstart.md` |
 | **Mobile-ready** | Visual-first responsive dashboard — readable on your phone mid-session |
 | **Erase All** | One button wipes every piece of your data from the browser instantly |
 
@@ -78,7 +79,10 @@ This section explains exactly where your data lives, how it flows, and how to er
 | Cached positions | Browser `sessionStorage` | Tab/browser closed, or Erase All |
 | Screener cache | Browser `sessionStorage` | Tab/browser closed, or Erase All |
 | Thesis groups & assignments | Browser `localStorage` | Erase All, or manual browser data clear |
+| Quorum results | Page only (never stored) | Panel closed |
 | **Server storage** | **None** | **N/A — nothing is stored server-side** |
+
+The full list of every data use — including exactly what the quorum sends to Google Vertex AI — is in the app at **`/data-use`** (linked from the login page and navigation).
 
 ### What Cloud Run sees
 
