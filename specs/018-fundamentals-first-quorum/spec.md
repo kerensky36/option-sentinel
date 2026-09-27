@@ -111,7 +111,7 @@ A positions refresh asks Schwab only for the option contracts the trader actuall
 
 - Realised volatility cannot be calculated (new listing, price history unavailable or too short): the figure is unavailable; IV-to-realised comparison is unavailable; everything else proceeds.
 - The underlying price is unavailable: moneyness, breakevens relative to price, expected move, and probability of finishing in the money are unavailable; the analysts are told so.
-- Days to expiry is 0 (expiration day): expected move and time-based figures use a minimum time value rather than dividing by zero; figures that are meaningless at expiry are marked unavailable.
+- Days to expiry is 0 (expiration day): every time-based figure (expected move, probability of finishing in the money) uses a minimum of one day to expiry rather than dividing by zero; no figure is dropped because of expiry alone.
 - A spread whose maximum profit or loss is undefined (e.g. a net-long call with unlimited upside): percent of maximum profit captured is unavailable; other figures proceed.
 - The browser's position data is older than 15 minutes: rejected as stale; the panel asks the trader to refresh.
 - The request carries values that are internally inconsistent (e.g. a modified mark): the quorum runs on them as given; the result reflects that input. Only shape and range are validated (tampering is the sender's problem, per clarification).
@@ -140,12 +140,12 @@ A positions refresh asks Schwab only for the option contracts the trader actuall
 
 #### Screener volatility
 
-- **FR-109**: The covered-call screener MUST replace its "IV Rank" figure with implied volatility relative to the underlying's realised volatility (FR-102 method), and its recommendation score's volatility component MUST be derived from that comparison. When realised volatility is unavailable the figure is shown as unavailable and the volatility component contributes nothing.
+- **FR-109**: The covered-call screener MUST replace its "IV Rank" figure with implied volatility relative to the underlying's realised volatility (FR-102 method), and its recommendation score's volatility component MUST be derived from that comparison. When realised volatility is unavailable, or the row has no recommended call to take implied volatility from (suppressed or insufficient-data rows), the figure is shown as unavailable and the volatility component contributes nothing.
 
 #### Quorum request (replaces 017 FR-002, FR-003)
 
 - **FR-110** *(replaces 017 FR-002)*: Requesting a quorum MUST send the position's legs, as held by the browser from the last positions refresh, together with the one fundamental that cannot be derived from the leg fields (the underlying's realised volatility) and that refresh's "as of" time. The server MUST re-derive every other FR-101 leg fundamental from the received leg fields using the same calculation as the refresh, so the analysts see figures consistent with the legs. The server MUST NOT re-fetch the position, option chain, or price history from Schwab for a quorum request. The server MUST confirm the caller's login token is valid with a single lightweight Schwab request before any model call. The account identifier MUST NOT be sent.
-- **FR-111** *(replaces 017 FR-003)*: The server MUST reject as invalid input any quorum request that: has zero or more than four legs; has legs on more than one underlying; contains any field not on the FR-113 list; contains a value outside its permitted type or range (numbers bounded to plausible market ranges, dates bounded, option type and seat-facing enumerations fixed, underlying symbol matching a ticker pattern of at most 10 letters, digits, dots, hyphens, slashes, carets or a leading dollar sign); or whose "as of" time is more than 15 minutes old or in the future beyond a small clock-skew allowance (rejected as stale).
+- **FR-111** *(replaces 017 FR-003)*: The server MUST reject as invalid input any quorum request that: has zero or more than four legs; has legs on more than one underlying; contains any field not on the FR-113 list; contains a value outside its permitted type or range (numbers bounded to plausible market ranges, dates bounded, option type and seat-facing enumerations fixed, underlying symbol matching a ticker pattern of at most 10 uppercase letters, digits, dots, hyphens, slashes, carets or a leading dollar sign); or whose "as of" time is more than 15 minutes old or in the future beyond a small clock-skew allowance (rejected as stale).
 - **FR-112**: The quorum result MUST include the "as of" time of the data it was based on, and the panel MUST show it ("Data as of HH:MM").
 
 #### Data sent to the model (replaces 017 FR-011)
@@ -184,14 +184,14 @@ A positions refresh asks Schwab only for the option contracts the trader actuall
 
 ### Measurable Outcomes
 
-- **SC-101**: In typical conditions a trader gets a verdict at least 5 seconds sooner than under spec 017 for the same position, and never slower than 60 seconds.
+- **SC-101**: For the same position with all news feeds responding, the median time-to-verdict over 5 consecutive runs is at least 5 seconds lower than the spec 017 build's median over 5 runs; no run exceeds 60 seconds.
 - **SC-102**: A quorum request makes no positions, option-chain, or price-history request to Schwab (verified by automated test).
 - **SC-103**: For a representative set of single-leg and spread positions, every calculated fundamental matches an independent reference calculation to within 1% (or is correctly marked unavailable).
 - **SC-104**: 100% of placeholder Greek values (-999, NaN, infinite, out of range) in test fixtures are replaced by calculated values, and 100% of genuine zero values are preserved.
 - **SC-105**: In a review of at least 10 quorum results, every card from seats 1–4 cites a specific position figure, and seat 5 is the only card citing headlines.
 - **SC-106**: 100% of quorum requests carrying an extra field, an out-of-range value, or data older than 15 minutes are rejected before any model call (verified by automated test).
 - **SC-107**: No user-identifiable or pedigree data appears in any model request (017 SC-003, re-verified against the new request shape).
-- **SC-108**: A positions refresh for an account holding one option on a heavily traded underlying downloads substantially less option-chain data than before (at least 80% smaller response) with identical Greeks for the held contract.
+- **SC-108**: A positions refresh requests option-chain data only for the held contracts' expiry range (and single strike when only one strike is held), and returns Greeks identical to a full-chain fetch for every held contract (verified by automated test).
 
 ## Assumptions
 
@@ -204,4 +204,5 @@ A positions refresh asks Schwab only for the option contracts the trader actuall
 - The extra price-history request (one per held underlying per refresh) stays well within Schwab's API rate limits for a personal portfolio, and is offset by the narrower option-chain request.
 - True IV rank/percentile (requiring stored IV history) is out of scope; IV relative to realised volatility is the volatility signal.
 - Displaying the new fundamentals on dashboard rows is out of scope (possible follow-up feature).
+- User Stories 1 and 2 share the quorum code path; Story 2 builds on Story 1's seat changes, and the two ship together as the minimum viable release.
 - The tally rule, abstention handling, ballot shape, rate limit, result panel layout, demo mode, and disclosure page mechanics are unchanged from spec 017.

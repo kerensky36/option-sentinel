@@ -72,6 +72,7 @@
   - `start_datetime` ≈ now−60 days
   - index map: `SPX`/`SPXW`→`$SPX`, `NDX`→`$NDX`, `RUT`→`$RUT`, `VIX`→`$VIX`
   - error or empty candles → `None` for that underlying without raising
+  - a Schwab 4xx/5xx or transport error logs `SECURITY schwab_api_error source=price_history status=<code>` on the `security` logger, and the log line contains no symbol (Constitution II; check with `caplog`)
 - [ ] T007 [P] In `tests/unit/test_schwab_client.py`, test `fetch_positions_and_greeks`:
   - every `PositionView` has the same tz-aware UTC `as_of`
   - every `PositionView` has a populated `fundamentals` object
@@ -97,6 +98,7 @@
   - `gather` the chain and price-history fetches
   - stamp one `as_of = datetime.now(timezone.utc)`
   - attach `fundamentals=leg_fundamentals(view, rv[underlying], r=RISK_FREE_RATE)`
+  - on a price-history 4xx/5xx or transport error, log `SECURITY schwab_api_error source=price_history status=<code>` via `logging.getLogger("security")`, with no symbol or values
 
   Makes T006–T008 pass.
 
@@ -126,6 +128,8 @@
   - with a research agent that sleeps longer than the seats, seats 1–4 complete before research finishes (FR-119)
   - research failure → seat 5 still votes on headlines alone
   - the seat instruction for 1–4 requires citing a figure (FR-115)
+  - both seat instructions say a null figure means unavailable and must never be estimated (US1 scenario 5)
+  - timing (fake agents, scaled delays): headlines take 0.1 s, research 0.2 s, every seat 0.1 s → `run_quorum` completes in < 0.35 s, showing feeds run alongside research rather than before it (017 order would take ≥ 0.4 s) (FR-119, SC-101)
   - the research instruction mentions events before expiry (FR-117)
   - privacy scan still passes over every recorded request (SC-107)
 
@@ -143,8 +147,10 @@
   - `Seat` gains `uses_news: bool`; replace `SEATS` with the FR-114 lenses and focus text
   - split `_SEAT_INSTRUCTION` into a fundamentals template (seats 1–4: "form your vote from the FUNDAMENTALS block; cite at least one specific figure") and an overlay template (seat 5: "judge whether news confirms or overrides the fundamentals; cite a headline or research point, or say news was thin")
   - `_seat_message` builds a fundamentals-only DATA block for seats 1–4 and fundamentals + brief + headlines for seat 5
+  - both seat templates state: "A null figure means it is unavailable; never estimate or assume it"
   - refocus `_RESEARCH_INSTRUCTION` on the underlying and scheduled events before expiry (earnings, ex-dividend, macro releases) plus a short macro note
-- [ ] T018 [US1] In `src/services/quorum_agents.py`, rework `run_quorum(ctx, *, model=None, seat_timeout=40.0, research_timeout=15.0, headline_fetcher=fetch_headlines)`:
+- [ ] T018 [US1] In `src/services/quorum_agents.py`, rework `run_quorum(ctx, *, model=None, seat_timeout=40.0, research_timeout=15.0, headline_fetcher=None)`:
+  - `headline_fetcher=None` resolves to the module-level `fetch_headlines` at call time, so tests can monkeypatch `quorum_agents.fetch_headlines`
   - start seats 1–4, `headline_fetcher(ctx.underlying_symbol)` and `_research` concurrently
   - start seat 5 once headlines and research have both finished
   - gather votes in `SEATS` order
@@ -159,7 +165,7 @@
   - raise `ValueError` for 0 legs or more than one underlying
 
   In `src/api/routes/quorum.py`, pass `realised_vols` from each `PositionView.fundamentals.realised_volatility` and `as_of` from the re-fetched views. Remove the route-level `fetch_headlines` call; `run_quorum` now fetches news. The 017 request path stays for this story.
-- [ ] T020 [US1] In `tests/contract/test_quorum_api.py`, update existing 017 contract tests for the new seat ids, `as_of` and `position_fundamentals` in the 200 body, and patch `run_quorum`'s `headline_fetcher` instead of the route's `fetch_headlines`.
+- [ ] T020 [US1] In `tests/contract/test_quorum_api.py`, update existing 017 contract tests for the new seat ids, `as_of` and `position_fundamentals` in the 200 body, and monkeypatch `src.services.quorum_agents.fetch_headlines` (resolved at call time, T018) instead of the route's `fetch_headlines`.
 - [ ] T021 [US1] In `frontend/static/js/quorum_ui.js`:
   - loading text becomes "five analysts are reviewing the position…"
   - button title becomes "Ask the quorum: close, hold, or roll?"
@@ -192,7 +198,7 @@
     - `as_of` 16 minutes old
     - `as_of` 3 minutes in the future
   - **401**: Schwab `get_account_numbers` returns 401, the `401_invalid_token` security event is logged, and the fake model is never called
-  - **502**: Schwab returns 500 or raises
+  - **502**: Schwab returns 500 or raises; the `schwab_api_error` security event is logged; the fake model is never called
   - **503**: not configured, with no Schwab call
   - **504**: timeout
   - `Cache-Control: no-store` on responses
@@ -233,7 +239,7 @@
   2. `await request.body()`: over 16 KiB → generic 422.
   3. `QuorumRequest.model_validate_json`: on `ValidationError` → 422 `{"detail": "Invalid quorum request", "fields": [".".join(map(str, e["loc"])) ...]}`.
   4. Freshness `now−15min ≤ as_of ≤ now+2min` else 409 `{"detail": "Position data is stale — refresh positions and try again"}`.
-  5. `verify_token`: `TokenRejected` → `log_security_event("401_invalid_token", request)` + 401 `{"detail": "Missing or invalid token"}`; `TokenCheckFailed` → 502 `{"detail": "Could not verify Schwab login"}`.
+  5. `verify_token`: `TokenRejected` → `log_security_event("401_invalid_token", request)` + 401 `{"detail": "Missing or invalid token"}`; `TokenCheckFailed` → `log_security_event("schwab_api_error", request)` + 502 `{"detail": "Could not verify Schwab login"}`.
   6. `build_position_context(body.legs, realised_vols={...from legs}, as_of=body.as_of)`: `ValueError` → generic 422.
   7. `run_quorum` under 60 s else 504.
 
@@ -264,6 +270,7 @@
   - `vol_score` is 0 at ratio ≤ 0.8, 100 at ≥ 1.5, and linear between
   - RV unavailable → `iv_rv_ratio`/`vol_score` are `None` and the composite volatility component is 0
   - IV comes from the recommended call's contract `volatility` (percent → decimal)
+  - suppressed and insufficient-data rows (no recommended call) → `implied_volatility`, `iv_rv_ratio` and `vol_score` are `None`
   - one `get_price_history_every_day` per ticker
 - [ ] T031 [P] [US3] In `tests/contract/test_screener_api.py`, check that response items have `implied_volatility`, `realised_volatility`, `iv_rv_ratio` and `vol_score`, and no `iv_rank`.
 - [ ] T032 [US3] Update `src/data/models.py` and `src/services/covered_call_screener.py`:
@@ -313,7 +320,7 @@
   - `strike=` is set only when exactly one distinct strike is held
   - `contract_type` is CALL or PUT when all held legs share a type, otherwise ALL
   - a held symbol missing from the narrowed response triggers exactly one full-chain retry for that underlying
-  - Greeks are identical to the current full-chain behaviour
+  - Greeks are identical to the current full-chain behaviour for every held contract (SC-108)
 - [ ] T039 [US5] In `src/services/schwab_client.py`, implement the narrowed `_fetch_greeks` with the single full-chain retry (makes T038 pass).
 
 ---
@@ -328,7 +335,7 @@
   - no position values in any log line or 4xx body
   - no module-level mutable state added
   - the CSP is unchanged
-- [ ] T045 Update the PR #6 description with the implemented scope. Leave quickstart.md browser scenarios 1–11 as a manual checklist, since they need a live Schwab + Vertex AI deployment.
+- [ ] T045 Update the PR #6 description with the implemented scope. Add quickstart.md browser scenarios 1–12 as a manual checklist, since they need a live Schwab + Vertex AI deployment, including the SC-101 timing comparison (scenario 8) and the SC-105 10-quorum rationale review (scenario 9).
 
 ---
 

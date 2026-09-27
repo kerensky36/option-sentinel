@@ -25,7 +25,9 @@ of the feature is that LLM arithmetic is unreliable.
 end_datetime=now)` once per distinct underlying per refresh, run concurrently with the
 option-chain fetches. Take the last 31 daily closes → 30 log returns → sample standard
 deviation × √252. Fewer than 20 returns, any non-positive close, or any fetch error →
-`None` (unavailable, FR-105). Index underlyings are looked up with Schwab's `$` prefix
+`None` (unavailable, FR-105). A Schwab 4xx/5xx or transport error on this call is logged to
+the `security` logger as `SECURITY schwab_api_error source=price_history status=<code>`
+(no symbol, no values), per Constitution II security-event logging. Index underlyings are looked up with Schwab's `$` prefix
 (`SPX` → `$SPX`, `SPXW` → `$SPX`, `NDX` → `$NDX`, `RUT` → `$RUT`, `VIX` → `$VIX`); other
 symbols as-is.
 
@@ -116,8 +118,8 @@ other endpoint's error contract; out of scope.
 
 **Decision**: One `client.get_account_numbers()` call before any model or feed work.
 Schwab 401 → `401 {"detail": "Missing or invalid token"}` plus the existing
-`401_invalid_token` security event; any other non-2xx or transport error → `502 {"detail":
-"Could not verify Schwab login"}`. The response body is discarded unread.
+`401_invalid_token` security event; any other non-2xx or transport error → the
+`schwab_api_error` security event plus `502 {"detail": "Could not verify Schwab login"}`. The response body is discarded unread.
 
 **Rationale**: The lightest authenticated Schwab endpoint; without it any non-empty Bearer
 string would reach Vertex AI (cost abuse), since `get_schwab_client` never validates.
@@ -184,7 +186,8 @@ newest first. `FEED_TIMEOUT_SECONDS = 3.0`.
 
 **Decision**: Remove `iv_rank`; add `implied_volatility`, `realised_volatility`,
 `iv_rv_ratio`, and `vol_score` (0–100) to `ScreenerResultView`. IV is the recommended
-call's contract volatility (percent → decimal); realised vol from D-102 (one price-history
+call's contract volatility (percent → decimal), so suppressed and insufficient-data rows
+(no recommended call) have IV/RV unavailable; realised vol from D-102 (one price-history
 call per ticker, concurrent with the chain fetch). `vol_score = clamp((ratio − 0.8) /
 (1.5 − 0.8), 0, 1) × 100` — ratio ≤ 0.8 (IV cheap) scores 0, ≥ 1.5 (IV rich, good for
 selling calls) scores 100. Missing ratio → `vol_score = None`, contributes 0 to the

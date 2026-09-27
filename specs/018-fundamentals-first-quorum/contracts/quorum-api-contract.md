@@ -38,7 +38,8 @@ No `account_hash`, no leg OCC symbol.
 1. `quorum_configured()` else 503.
 2. Read body, size check, `QuorumRequest.model_validate` else 422 (generic, no values echoed).
 3. Freshness (`as_of` within −15 min / +2 min of server time) else 409.
-4. Token check: one `get_account_numbers()` → 401 / 502.
+4. Token check: one `get_account_numbers()` → 401 (security event `401_invalid_token`) /
+   502 (security event `schwab_api_error`).
 5. `build_position_context(legs)` — re-derives leg fundamentals, computes position
    fundamentals.
 6. `run_quorum(ctx)` under a 60 s budget else 504.
@@ -102,5 +103,5 @@ async def fetch_headlines(underlying, *, client=None) -> list[Headline]        #
 SEATS: tuple[Seat, ...]            # FR-114 order; Seat gains `uses_news: bool`
 def build_position_context(legs: list[QuorumLegIn], as_of: datetime) -> PositionContext
 async def run_quorum(ctx, *, model=None, seat_timeout=40.0, research_timeout=15.0,
-                     headline_fetcher=fetch_headlines) -> QuorumResult     # fetches news itself
+                     headline_fetcher=None) -> QuorumResult  # None → module fetch_headlines, looked up at call time
 ```

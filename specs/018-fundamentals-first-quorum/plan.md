@@ -35,7 +35,7 @@ Make the quorum judge an option on its own numbers first, with market news as a 
 
 **Constraints**: Stateless server; no position data in logs or error bodies; privacy allow-list (FR-113); Schwab ~120 req/min.
 
-**Scale/Scope**: 1 new backend module and 1 new test module; edits to 7 backend files, 5 frontend files, 1 template; test updates in 8 files.
+**Scale/Scope**: 1 new backend module and 1 new test module; edits to 8 backend files, 5 frontend files, 1 template; test updates in 8 files.
 
 ## Constitution Check
 

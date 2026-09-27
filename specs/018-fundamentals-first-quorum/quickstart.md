@@ -26,6 +26,8 @@ Expected: all pass. Key assertions per requirement:
 | seat 1–4 prompts contain no headline titles or brief; seat 5 prompt does | FR-114, FR-117, SC-105 |
 | seats 1–4 start before a slow fake research agent finishes | FR-119 |
 | `select_headlines` quota / 48 h / cap cases | FR-116 |
+| timing test: feeds ∥ research, seat 5 after both | FR-119, SC-101 (structure) |
+| `schwab_api_error` logged on token-check 502 and price-history failure | Constitution II |
 | privacy scan of every fake-model request (no account hash, token, IP) | FR-113, SC-107 |
 
 ## Browser verification (live Schwab + Vertex AI)
@@ -43,9 +45,14 @@ Expected: all pass. Key assertions per requirement:
    click Quorum → "Position data is more than 15 minutes old — refresh positions".
 7. **Bad token** — Replace the sessionStorage token with junk, click Quorum → 401 handling
    (redirect to login) and no quorum run.
-8. **Speed** — Compare time-to-verdict with the pre-018 build on the same position: expect
-   several seconds faster (SC-101).
-9. **Screener** — "IV/RV" column shows e.g. `1.42×`; rows sort by the new score.
-10. **Demo mode** — Canned quorum uses the new lenses and shows "Data as of"; no server call.
-11. **Data use page** — Vertex AI row lists the new fundamentals fields; a row covers the
+8. **Speed (SC-101)** — On the same position, time 5 consecutive quorums (click → verdict)
+   on the pre-018 build and 5 on this build, with all feeds responding. The median must be
+   ≥ 5 s lower on this build and no run may exceed 60 s.
+9. **Rationale review (SC-105)** — Run 10 quorums across at least 3 different positions.
+   Every Greeks & Exposure, Volatility & Pricing, Time Decay & P&L and Strike & Assignment
+   card cites a specific figure; only Macro & News Overlay cards cite headlines. Record the
+   tally in the PR.
+10. **Screener** — "IV/RV" column shows e.g. `1.42×`; rows sort by the new score.
+11. **Demo mode** — Canned quorum uses the new lenses and shows "Data as of"; no server call.
+12. **Data use page** — Vertex AI row lists the new fundamentals fields; a row covers the
     price-history fetch for realised volatility (FR-120).
