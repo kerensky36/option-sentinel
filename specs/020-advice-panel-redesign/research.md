@@ -108,5 +108,8 @@ Decisions for spec 020. They continue from 018's D-101–D-114, numbered D-301 o
 
 ## D-312 — Demo mode summary
 
-- **Decision**: `demo_quorum.js` builds a catalog with the same names from the demo figures it already computes, assigns each demo seat's cited names, and composes a summary from templates keyed by verdict (majority / NO_CONSENSUS / NO_QUORUM). The templates use the same placeholders and are filled by a shared `fillPlaceholders()` exported from `quorum_ui.js`, so demo output passes the same digit guard in tests. There is no token and no network request; the summary is labelled "demo".
-- **Rationale**: FR-321, and it keeps demo and live rendering on one code path.
+- **Decision**: Demo mode keeps the live client code path. `demo_data.js` already intercepts `fetch('/api/quorum/vote')`; it now also intercepts `/api/quorum/summary`.
+  - `buildDemoQuorum()` builds a catalog with the same names from the demo figures it already computes and assigns each demo seat's cited names. When the verdict is not NO_QUORUM, it sets `summary_token` to `"demo." + base64url(JSON payload)`. The payload is unsigned; it never leaves the browser.
+  - The summary intercept decodes that payload and calls `buildDemoSummary(payload)`, which composes title, explanation, "why" and dissent from templates keyed by verdict (majority or NO_CONSENSUS) using `{name}` placeholders. The placeholders are filled with the catalog `display` values, and the summary is labelled "demo".
+  - A token without the `demo.` prefix is answered "unavailable".
+- **Rationale**: FR-321. No network request; the pending → ok states behave as in live mode; one rendering path to test.

@@ -12,7 +12,7 @@ Redesign how quorum advice is requested and shown, and add a model-written summa
 - **Panel**: a pure SVG builder draws the radial vote ring (slate HOLD, blue ROLL, hatched orange CLOSE, text on every mark). Beside it sits the summary area; below it, five collapsible analyst rows with cited-figure chips, then a collapsed brief-and-headlines section.
 - **Figure catalog**: at vote time the server turns the position fundamentals into a named list of figures, each with a label and a display value. Seats cite figures by name, and the server supplies the values.
 - **Two-step summary**: `/api/quorum/vote` returns as today, plus cited figures and an opaque, HMAC-signed `summary_token` that carries the summariser's inputs. The panel then posts the token to a new `/api/quorum/summary`. The server verifies the signature and age (15 min), makes one summariser call (10 s budget, 15 s route limit), fills `{placeholders}` from the catalog, checks the title against the verdict, and removes or discards text containing model-typed digits. Nothing is stored.
-- **Demo mode**: `demo_quorum.js` builds the catalog, the cited figures and a template summary in the browser.
+- **Demo mode**: `demo_quorum.js` builds the catalog, the cited figures and a `demo.` token. `demo_data.js` intercepts `/api/quorum/summary` and answers with a template summary, so the client path is identical and nothing leaves the browser (D-312).
 
 ## Technical Context
 
@@ -41,7 +41,7 @@ Redesign how quorum advice is requested and shown, and add a model-written summa
 - New backend modules: `figure_catalog.py`, `quorum_summary.py`.
 - Backend edits: 4 files (models, quorum_agents, quorum route, deploy script).
 - New frontend module: `quorum_ring.js`.
-- Frontend edits: 3 files (quorum_ui.js rewrite, positions_ui.js, demo_quorum.js) and 1 template (`data_use.html`).
+- Frontend edits: 4 files (quorum_ui.js rewrite, positions_ui.js, demo_quorum.js, demo_data.js) and 1 template (`data_use.html`).
 - Tests: 3 new test modules and 4 updated.
 
 ## Constitution Check
@@ -122,7 +122,8 @@ frontend/
 │   ├── quorum_ring.js             # NEW (pure): ringSvg(result) → SVG string; vote palette constants
 │   ├── quorum_ui.js               # rewrite: button HTML, panel layout, rows, expand-all, summary fetch
 │   ├── positions_ui.js            # button in first cell; drop Quorum <th>/<td>; leg rows unchanged
-│   └── demo_quorum.js             # catalog + cited figures + template summary (no network)
+│   ├── demo_quorum.js             # catalog + cited figures + demo token + buildDemoSummary()
+│   └── demo_data.js               # intercept /api/quorum/summary in demo mode
 └── templates/data_use.html        # disclose the summary request (FR-322)
 
 scripts/deploy_backend.sh          # pass QUORUM_SEAL_KEY like LOG_PEPPER
