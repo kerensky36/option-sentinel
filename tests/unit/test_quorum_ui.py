@@ -482,3 +482,110 @@ def test_advice_wording_only_on_the_button():
                 context = s[max(0, m.start() - 20): m.end() + 12]
                 assert ("ADVICE(Agentic)" in s[m.start(): m.start() + 15]
                         or re.search(r"financial advice", context, re.I)), (name, s[:120])
+
+
+# ── Session (b): button matches Erase All Data; results saved for the session ──
+
+ERASE_CLASSES = ["bg-red-900", "hover:bg-red-800", "text-red-300", "uppercase", "tracking-wider", "text-xs"]
+
+
+def test_advice_button_matches_erase_all_data(tmp_path):
+    base = (ROOT / "frontend" / "templates" / "base.html").read_text()
+    erase = re.search(r'id="erase-all-btn"\s+class="([^"]+)"', base).group(1).split()
+    for cls in ERASE_CLASSES:
+        assert cls in erase, cls  # the reference button still uses them
+    html = _call(tmp_path, "quorum_ui", "adviceButton", "SPY-grp")
+    btn_classes = re.search(r'<button[^>]*class="([^"]+)"', html).group(1).split()
+    for cls in ERASE_CLASSES:
+        if cls == "uppercase":
+            assert cls not in btn_classes  # keep "ADVICE(Agentic)" exactly (FR-301)
+        else:
+            assert cls in btn_classes, cls
+    assert 'class="hazard"' in html
+    rule = re.search(r"\.advice-btn \{(.*?)\}", base, re.S).group(1)
+    for prop in ("background", "color:", "font-weight", "letter-spacing"):
+        assert prop not in rule, prop
+    label_rule = re.search(r"\.advice-btn \.advice-label \{(.*?)\}", base, re.S).group(1)
+    assert "font-weight" not in label_rule and "letter-spacing" not in label_rule and "font-size" not in label_rule
+
+
+LEGS = [{"symbol": "SPY 261009P565"}, {"symbol": "SPY 261009P560"}]
+
+
+def test_cache_key_sorts_leg_symbols(tmp_path):
+    key = _call(tmp_path, "quorum_cache", "cacheKey", "grp", LEGS)
+    assert key == "quorum:v1:grp|SPY 261009P560,SPY 261009P565"
+
+
+def test_cache_round_trip_in_session_storage(tmp_path):
+    out = _run_calls([
+        {"module": "quorum_cache", "fn": "save", "args": ["k1", {"x": 1}]},
+        {"module": "quorum_cache", "fn": "load", "args": ["k1"]},
+        {"module": "quorum_cache", "fn": "load", "args": ["nope"]},
+    ], tmp_path)
+    assert out["results"][1] == {"x": 1}
+    assert out["results"][2] is None
+    assert ["sessionStorage", "k1"] in out["storage_writes"]
+    assert not any(w[0] == "localStorage" for w in out["storage_writes"])
+
+
+def test_cache_falls_back_to_memory_when_storage_throws(tmp_path):
+    out = _run_calls([
+        {"module": "harness", "fn": "breakStorage"},
+        {"module": "quorum_cache", "fn": "save", "args": ["k2", {"y": 2}]},
+        {"module": "quorum_cache", "fn": "load", "args": ["k2"]},
+    ], tmp_path)
+    assert out["results"][2] == {"y": 2}
+
+
+VOTE_OK = {"status": 200, "body": RESULT_MAJORITY}
+SUMMARY_OK = {"status": 200, "body": {"status": "ok", "trimmed": False, "summary": SUMMARY}}
+
+
+def _advice(key, responses, current=True):
+    return {"module": "quorum_ui", "fn": "adviceFor", "async": True,
+            "args": [key, [dict(_pos("SPY 261009P565", "565.00", -1), as_of="2099-01-01T00:00:00Z")],
+                     {"__deps__": {"responses": responses, "current": current}}]}
+
+
+def test_second_click_uses_saved_result_without_requests(tmp_path):
+    out = _run_calls([
+        _advice("k", [VOTE_OK, SUMMARY_OK]),
+        _advice("k", []),
+        {"module": "quorum_cache", "fn": "load", "args": ["k"]},
+    ], tmp_path)
+    assert [f["url"] for f in out["fetches"]] == ["/api/quorum/vote", "/api/quorum/summary"]
+    first_log = out["results"][0]["logs"][0]
+    second_log = out["results"][1]["logs"][0]
+    assert first_log[0]["saved"] is False
+    assert second_log == [{"type": "result", "result": dict(RESULT_MAJORITY, summary_token=None),
+                           "summary": {"state": "ok", "summary": SUMMARY}, "saved": True}]
+    saved = out["results"][2]
+    assert saved["summary"] == {"state": "ok", "summary": SUMMARY}
+    assert saved["result"]["summary_token"] is None
+
+
+def test_failed_vote_is_not_saved(tmp_path):
+    out = _run_calls([
+        _advice("f", [{"status": 504, "body": {"detail": "Quorum timed out"}}]),
+        {"module": "quorum_cache", "fn": "load", "args": ["f"]},
+        _advice("f", [VOTE_OK, SUMMARY_OK]),
+    ], tmp_path)
+    assert out["results"][1] is None
+    assert [f["url"] for f in out["fetches"]] == ["/api/quorum/vote", "/api/quorum/vote", "/api/quorum/summary"]
+    assert out["results"][0]["logs"][0][0]["type"] == "error"
+
+
+def test_summary_saved_even_if_panel_closed(tmp_path):
+    out = _run_calls([
+        _advice("c", [VOTE_OK, SUMMARY_OK], current=False),
+        {"module": "quorum_cache", "fn": "load", "args": ["c"]},
+    ], tmp_path)
+    assert out["results"][1]["summary"]["state"] == "ok"
+
+
+def test_saved_badge_only_on_saved_results(tmp_path):
+    saved = _call(tmp_path, "quorum_ui", "renderResult", RESULT_MAJORITY, {"saved": True})
+    assert "Saved for this session" in saved
+    assert saved.index("Data as of") < saved.index("Saved for this session") < saved.index("AI-generated opinion")
+    assert "Saved for this session" not in _panel(tmp_path, RESULT_MAJORITY)

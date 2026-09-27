@@ -26,6 +26,7 @@ const MODULES = {
   positions_rows: '../../frontend/static/js/positions_rows.js',
   demo_quorum: '../../frontend/static/js/demo_quorum.js',
   demo_data: '../../frontend/static/js/demo_data.js',
+  quorum_cache: '../../frontend/static/js/quorum_cache.js',
 };
 
 // Special argument markers let Python describe JS-only values.
@@ -60,6 +61,25 @@ function reviveArg(a) {
       stopPropagation: () => { log.stopped = true; },
     };
   }
+  if (a && typeof a === 'object' && a.__deps__) {
+    // Injected dependencies for quorum_ui.adviceFor: scripted fetch responses,
+    // the real quorum_cache module, and a render log.
+    const spec = a.__deps__;
+    const log = [];
+    const queue = [...(spec.responses || [])];
+    return {
+      __log: log,
+      fetchImpl: async (url, opts) => {
+        fetches.push({ url, body: opts && opts.body ? JSON.parse(opts.body) : null });
+        const r = queue.shift() || { status: 500, body: null };
+        return { ok: r.status >= 200 && r.status < 300, status: r.status, json: async () => r.body };
+      },
+      cache: CACHE,
+      render: (event) => log.push(event),
+      isCurrent: () => spec.current !== false,
+      timeoutMs: 200,
+    };
+  }
   if (a && typeof a === 'object' && a.__fake_root__) {
     const log = [];
     return { __log: log, querySelectorAll: (sel) => { log.push(sel); return []; } };
@@ -67,9 +87,17 @@ function reviveArg(a) {
   return a;
 }
 
+const CACHE = await import(MODULES.quorum_cache).catch(() => null);
+
 const input = JSON.parse(readFileSync(process.argv[2], 'utf8'));
 const results = [];
 for (const call of input.calls || []) {
+  if (call.module === 'harness' && call.fn === 'breakStorage') {
+    globalThis.sessionStorage.setItem = () => { throw new Error('QuotaExceededError'); };
+    globalThis.sessionStorage.getItem = () => { throw new Error('SecurityError'); };
+    results.push(null);
+    continue;
+  }
   const mod = await import(MODULES[call.module]);
   const fn = mod[call.fn];
   if (typeof fn !== 'function') {

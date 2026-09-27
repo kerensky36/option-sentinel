@@ -14,6 +14,7 @@
 
 import { fetchWithAuth } from './auth.js';
 import { VERDICT_BADGE, VOTE_COLORS, esc, ringSvg, verdictLabel } from './quorum_ring.js';
+import * as quorumCache from './quorum_cache.js';
 
 const PANEL_CLASS = 'quorum-panel-row';
 const COLSPAN = 14;
@@ -217,14 +218,14 @@ function _verdictNote(result) {
   return `${winner ? winner.votes : '?'} of ${result.seats} analysts agree.`;
 }
 
-export function renderResult(result) {
+export function renderResult(result, { saved = false } = {}) {
   const badge = VERDICT_BADGE[result.verdict] || VERDICT_BADGE.NO_QUORUM;
   return `
     <div class="quorum-panel">
       <div class="result-head">
         <span class="verdict" style="background:${badge.bg};color:${badge.fg}">${esc(verdictLabel(result))}</span>
         <span class="verdict-note">${esc(result.underlying_symbol)} · ${esc(_verdictNote(result))}</span>
-        ${result.as_of ? `<span class="asof">${esc(_asOfLabel(result.as_of))}</span>` : ''}
+        ${result.as_of ? `<span class="asof">${esc(_asOfLabel(result.as_of))}${saved ? ' · <span class="saved-note">Saved for this session</span>' : ''}</span>` : (saved ? '<span class="asof"><span class="saved-note">Saved for this session</span></span>' : '')}
       </div>
       <div class="warn-strip" role="note"><span aria-hidden="true">⚠</span> ${esc(WARNING_TEXT)}</div>
       <div class="overview">
@@ -350,6 +351,74 @@ export function buildQuorumRequest(legs) {
   };
 }
 
+/**
+ * Get advice for one position: the saved session result when there is one,
+ * otherwise a vote request followed by the summary request (FR-306, FR-324).
+ * Rendering goes through `deps.render`, which receives:
+ *   {type: 'result', result, summary: {state, summary}, saved}
+ *   {type: 'summary', summary: {state, summary}}
+ *   {type: 'error', message}
+ * The summary outcome is saved even when the panel has been closed meanwhile.
+ * @param {string} key - quorum_cache.cacheKey(id, legs)
+ * @param {Array<object>} legs
+ * @param {{fetchImpl: Function, cache: {load: Function, save: Function},
+ *          render: Function, isCurrent: () => boolean, timeoutMs?: number}} deps
+ */
+export async function adviceFor(key, legs, deps) {
+  const { fetchImpl, cache, render, isCurrent } = deps;
+  const saved = cache.load(key);
+  if (saved && saved.result) {
+    render({ type: 'result', result: saved.result, summary: saved.summary, saved: true });
+    if (saved.summary?.state === 'pending' && saved.result.summary_token) {
+      await _settleSummary(key, saved.result, deps);
+    }
+    return saved;
+  }
+
+  const body = buildQuorumRequest(legs);
+  if (!body) {
+    render({ type: 'error', message: STALE_MESSAGE });
+    return null;
+  }
+
+  let result;
+  try {
+    const resp = await fetchImpl('/api/quorum/vote', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!resp) return null; // 401 already handled by fetchWithAuth
+    if (!resp.ok) {
+      render({ type: 'error', message: _errorMessage(resp.status) });
+      return null;
+    }
+    result = await resp.json();
+  } catch (err) {
+    console.error('quorum_ui: request failed', err);
+    render({ type: 'error', message: 'Quorum request failed — check your connection and try again.' });
+    return null;
+  }
+
+  const state = _initialSummaryState(result);
+  const entry = {
+    result: state === 'pending' ? result : { ...result, summary_token: null },
+    summary: { state, summary: null },
+  };
+  cache.save(key, entry);
+  if (isCurrent()) render({ type: 'result', result, summary: entry.summary, saved: false });
+  if (state === 'pending') return _settleSummary(key, result, deps);
+  return entry;
+}
+
+async function _settleSummary(key, result, { fetchImpl, cache, render, isCurrent, timeoutMs }) {
+  const outcome = await requestSummary(result, fetchImpl, () => true, timeoutMs);
+  const entry = { result: { ...result, summary_token: null }, summary: outcome };
+  cache.save(key, entry);
+  if (isCurrent()) render({ type: 'summary', summary: outcome });
+  return entry;
+}
+
 function _clearBusy() {
   if (_openBtn) _openBtn.removeAttribute('aria-busy');
 }
@@ -370,39 +439,34 @@ async function _openPanel(anchorRow, id, legs, btn) {
   _wireResize();
   _fitPanel();
 
-  const body = buildQuorumRequest(legs);
-  if (!body) {
-    _clearBusy(); cell.innerHTML = _renderError(STALE_MESSAGE);
-    return;
-  }
+  let shown = null;
+  const isCurrent = () => _openId === id;
+  await adviceFor(quorumCache.cacheKey(id, legs), legs, {
+    fetchImpl: fetchWithAuth,
+    cache: quorumCache,
+    isCurrent,
+    render: (event) => {
+      if (!isCurrent()) return;
+      _clearBusy();
+      if (event.type === 'error') {
+        cell.innerHTML = _renderError(event.message);
+      } else if (event.type === 'result') {
+        shown = event.result;
+        cell.innerHTML = renderResult(event.result, { saved: event.saved });
+        _wireRing(cell);
+        _updateSummaryArea(cell, event.summary, event.result);
+      } else if (event.type === 'summary' && shown) {
+        _updateSummaryArea(cell, event.summary, shown);
+      }
+    },
+  });
+}
 
-  try {
-    const resp = await fetchWithAuth('/api/quorum/vote', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-    if (!resp) return; // 401 already handled by fetchWithAuth
-    if (_openId !== id) return; // closed or replaced while waiting
-    if (!resp.ok) {
-      _clearBusy(); cell.innerHTML = _renderError(_errorMessage(resp.status));
-      return;
-    }
-    const result = await resp.json();
-    cell.innerHTML = renderResult(result);
-    _wireRing(cell);
-    _clearBusy();
-
-    const update = await requestSummary(result, fetchWithAuth, () => _openId === id);
-    const area = update && cell.querySelector('.summary-area');
-    if (area) {
-      area.dataset.state = update.state;
-      area.innerHTML = renderSummary(update.state, update.summary, result);
-    }
-  } catch (err) {
-    console.error('quorum_ui: request failed', err);
-    if (_openId === id) _clearBusy(); cell.innerHTML = _renderError('Quorum request failed — check your connection and try again.');
-  }
+function _updateSummaryArea(cell, summary, result) {
+  const area = cell.querySelector('.summary-area');
+  if (!area || !summary) return;
+  area.dataset.state = summary.state;
+  area.innerHTML = renderSummary(summary.state, summary.summary, result);
 }
 
 /**
@@ -457,7 +521,7 @@ export function onTableClick(e, open) {
  * @param {string} id - groupId for spreads, symbol for standalone legs
  */
 export function adviceButton(id) {
-  return `<button type="button" class="advice-btn" data-quorum-btn="${esc(id)}" aria-expanded="false"
+  return `<button type="button" class="advice-btn bg-red-900 hover:bg-red-800 text-red-300 tracking-wider text-xs transition-colors" data-quorum-btn="${esc(id)}" aria-expanded="false"
       aria-describedby="${WARNING_NOTE_ID}" title="Five AI analysts vote close, hold or roll. AI opinion, not financial advice."><span class="hazard" aria-hidden="true"></span><span class="advice-label">ADVICE(Agentic)</span></button>`;
 }
 

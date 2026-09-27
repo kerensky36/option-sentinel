@@ -79,7 +79,7 @@ This section explains exactly where your data lives, how it flows, and how to er
 | Cached positions (incl. calculated fundamentals and refresh time) | Browser `sessionStorage` | Tab/browser closed, or Erase All |
 | Screener cache | Browser `sessionStorage` | Tab/browser closed, or Erase All |
 | Thesis groups & assignments | Browser `localStorage` | Erase All, or manual browser data clear |
-| Quorum results | Page only (never stored) | Panel closed |
+| Quorum results | sessionStorage (per position, first result only) | Sign-out, Erase All Data, or tab close |
 | **Server storage** | **None** | **N/A — nothing is stored server-side** |
 
 The full list of every data use — including exactly what the quorum sends to Google Vertex AI — is in the app at **`/data-use`** (linked from the login page and navigation).
@@ -124,7 +124,7 @@ Any option position on the dashboard can be sent to a five-member AI advisory qu
 - a collapsible row for each analyst with its rationale and the figures it cited;
 - the research brief and headlines, in a collapsed section.
 
-Nothing is persisted. The result lives only in the DOM for that page session.
+The first result for each position is saved in the browser's sessionStorage and shown again on later clicks without a new quorum, until you sign out, use Erase All Data or close the tab. A position whose legs change gets a fresh quorum. Nothing is stored on the server.
 
 The summary arrives in a second request after the votes, so it never delays the verdict. The vote response carries an HMAC-signed token (key: `QUORUM_SEAL_KEY`, shared by all instances) that the browser returns unchanged; the server verifies it without storing anything. The summariser never writes numbers. It names figures such as `{captured_pct}`, the server fills in the values, and any text with a number the model typed itself is removed. Design: [`specs/020-advice-panel-redesign/`](specs/020-advice-panel-redesign/).
 
