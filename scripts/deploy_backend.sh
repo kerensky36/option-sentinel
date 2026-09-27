@@ -17,10 +17,13 @@ set -euo pipefail
 #   ALLOWED_ORIGIN      (CORS allowed origin; defaults to Firebase hosting URL)
 #   LOG_PEPPER          (HMAC pepper for IP hashing in audit log)
 #
-# Macro news quorum (specs/017) — passed through only when set; without
-# GOOGLE_GENAI_USE_VERTEXAI + GOOGLE_CLOUD_PROJECT the Quorum button shows
-# "not configured" (unless they were already set on the service):
-#   GOOGLE_GENAI_USE_VERTEXAI, GOOGLE_CLOUD_PROJECT, GOOGLE_CLOUD_LOCATION, QUORUM_MODEL
+# Macro news quorum (specs/017) — Gemini on Vertex AI. Always passed, with defaults:
+#   GOOGLE_GENAI_USE_VERTEXAI=TRUE           (set FALSE to disable the quorum)
+#   GOOGLE_CLOUD_PROJECT=$GCP_PROJECT_ID
+#   GOOGLE_CLOUD_LOCATION=$CLOUD_RUN_REGION
+#   QUORUM_MODEL                             (optional; app default gemini-2.5-flash)
+# The service account also needs roles/aiplatform.user (one-time, see
+# specs/017-macro-quorum-agents/quickstart.md).
 #
 # Env vars are applied with --update-env-vars, so values set on the service
 # outside this script are kept rather than wiped.
@@ -46,13 +49,16 @@ if [[ ${#missing[@]} -gt 0 ]]; then
   exit 1
 fi
 
+VERTEX_ENABLED="${GOOGLE_GENAI_USE_VERTEXAI:-TRUE}"
+VERTEX_PROJECT="${GOOGLE_CLOUD_PROJECT:-${GCP_PROJECT_ID}}"
+VERTEX_LOCATION="${GOOGLE_CLOUD_LOCATION:-${REGION}}"
+
 ENV_VARS="SCHWAB_CLIENT_ID=${SCHWAB_CLIENT_ID},SCHWAB_CLIENT_SECRET=${SCHWAB_CLIENT_SECRET},SCHWAB_REDIRECT_URI=${SCHWAB_REDIRECT_URI},SCHWAB_AUTH_URL=${SCHWAB_AUTH_URL},SCHWAB_TOKEN_URL=${SCHWAB_TOKEN_URL},RISK_FREE_RATE=${RATE},HTTPS_ONLY=${HTTPS_ONLY_VAL},DEBUG=${DEBUG_VAL},ALLOWED_ORIGIN=${ALLOWED_ORIGIN_VAL}"
-for var in LOG_PEPPER GOOGLE_GENAI_USE_VERTEXAI GOOGLE_CLOUD_PROJECT GOOGLE_CLOUD_LOCATION QUORUM_MODEL; do
+ENV_VARS="${ENV_VARS},GOOGLE_GENAI_USE_VERTEXAI=${VERTEX_ENABLED},GOOGLE_CLOUD_PROJECT=${VERTEX_PROJECT},GOOGLE_CLOUD_LOCATION=${VERTEX_LOCATION}"
+for var in LOG_PEPPER QUORUM_MODEL; do
   [[ -n "${!var:-}" ]] && ENV_VARS="${ENV_VARS},${var}=${!var}"
 done
-if [[ -z "${GOOGLE_CLOUD_PROJECT:-}" ]]; then
-  echo "note: GOOGLE_CLOUD_PROJECT not set in .env — Quorum relies on the value already on the service."
-fi
+echo "→ Quorum: Vertex AI=${VERTEX_ENABLED}, project=${VERTEX_PROJECT}, location=${VERTEX_LOCATION}"
 
 # Record which commit this revision was built from (used by backend_changed.sh).
 # Only uncommitted changes to backend paths mark the build "-dirty".

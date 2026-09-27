@@ -9,9 +9,9 @@ SA=$(gcloud run services describe option-sentinel --region=us-central1 \
       --format='value(spec.template.spec.serviceAccountName)')
 gcloud projects add-iam-policy-binding $PROJECT \
   --member="serviceAccount:${SA}" --role="roles/aiplatform.user"
-gcloud run services update option-sentinel --region=us-central1 \
-  --update-env-vars=GOOGLE_GENAI_USE_VERTEXAI=TRUE,GOOGLE_CLOUD_PROJECT=$PROJECT,GOOGLE_CLOUD_LOCATION=us-central1
 ```
+
+`scripts/deploy.sh` sets `GOOGLE_GENAI_USE_VERTEXAI=TRUE`, `GOOGLE_CLOUD_PROJECT=$GCP_PROJECT_ID` and `GOOGLE_CLOUD_LOCATION=$CLOUD_RUN_REGION` on every backend deploy (override in `.env`; set `GOOGLE_GENAI_USE_VERTEXAI=FALSE` to disable).
 
 Local dev: `gcloud auth application-default login` and set the same three variables in `.env`. Optionally `QUORUM_MODEL=<gemini model id>`.
 
