@@ -16,6 +16,14 @@ set -euo pipefail
 #   DEBUG=false         (suppress stack traces; default false in prod)
 #   ALLOWED_ORIGIN      (CORS allowed origin; defaults to Firebase hosting URL)
 #   LOG_PEPPER          (HMAC pepper for IP hashing in audit log)
+#
+# Macro news quorum (specs/017) — passed through only when set; without
+# GOOGLE_GENAI_USE_VERTEXAI + GOOGLE_CLOUD_PROJECT the Quorum button shows
+# "not configured" (unless they were already set on the service):
+#   GOOGLE_GENAI_USE_VERTEXAI, GOOGLE_CLOUD_PROJECT, GOOGLE_CLOUD_LOCATION, QUORUM_MODEL
+#
+# Env vars are applied with --update-env-vars, so values set on the service
+# outside this script are kept rather than wiped.
 
 SERVICE="${CLOUD_RUN_SERVICE:-option-sentinel}"
 REGION="${CLOUD_RUN_REGION:-us-central1}"
@@ -38,7 +46,24 @@ if [[ ${#missing[@]} -gt 0 ]]; then
   exit 1
 fi
 
-echo "→ Deploying $SERVICE to Cloud Run ($REGION)…"
+ENV_VARS="SCHWAB_CLIENT_ID=${SCHWAB_CLIENT_ID},SCHWAB_CLIENT_SECRET=${SCHWAB_CLIENT_SECRET},SCHWAB_REDIRECT_URI=${SCHWAB_REDIRECT_URI},SCHWAB_AUTH_URL=${SCHWAB_AUTH_URL},SCHWAB_TOKEN_URL=${SCHWAB_TOKEN_URL},RISK_FREE_RATE=${RATE},HTTPS_ONLY=${HTTPS_ONLY_VAL},DEBUG=${DEBUG_VAL},ALLOWED_ORIGIN=${ALLOWED_ORIGIN_VAL}"
+for var in LOG_PEPPER GOOGLE_GENAI_USE_VERTEXAI GOOGLE_CLOUD_PROJECT GOOGLE_CLOUD_LOCATION QUORUM_MODEL; do
+  [[ -n "${!var:-}" ]] && ENV_VARS="${ENV_VARS},${var}=${!var}"
+done
+if [[ -z "${GOOGLE_CLOUD_PROJECT:-}" ]]; then
+  echo "note: GOOGLE_CLOUD_PROJECT not set in .env — Quorum relies on the value already on the service."
+fi
+
+# Record which commit this revision was built from (used by backend_changed.sh).
+# Only uncommitted changes to backend paths mark the build "-dirty".
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+mapfile -t BACKEND_PATHS < <(bash "$SCRIPT_DIR/backend_changed.sh" --paths)
+COMMIT_SHA="$(git rev-parse --short=12 HEAD 2>/dev/null || echo unknown)"
+if [[ -n "$(git status --porcelain -- "${BACKEND_PATHS[@]}" 2>/dev/null)" ]]; then
+  COMMIT_SHA="${COMMIT_SHA}-dirty"
+fi
+
+echo "→ Deploying $SERVICE to Cloud Run ($REGION) from ${COMMIT_SHA}…"
 
 gcloud run deploy "$SERVICE" \
   --source . \
@@ -48,7 +73,8 @@ gcloud run deploy "$SERVICE" \
   --max-instances 1 \
   --allow-unauthenticated \
   --project "$GCP_PROJECT_ID" \
-  --set-env-vars "SCHWAB_CLIENT_ID=${SCHWAB_CLIENT_ID},SCHWAB_CLIENT_SECRET=${SCHWAB_CLIENT_SECRET},SCHWAB_REDIRECT_URI=${SCHWAB_REDIRECT_URI},SCHWAB_AUTH_URL=${SCHWAB_AUTH_URL},SCHWAB_TOKEN_URL=${SCHWAB_TOKEN_URL},RISK_FREE_RATE=${RATE},HTTPS_ONLY=${HTTPS_ONLY_VAL},DEBUG=${DEBUG_VAL},ALLOWED_ORIGIN=${ALLOWED_ORIGIN_VAL}"
+  --update-labels "commit-sha=${COMMIT_SHA}" \
+  --update-env-vars "${ENV_VARS}"
 
 SERVICE_URL=$(gcloud run services describe "$SERVICE" \
   --region "$REGION" \

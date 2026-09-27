@@ -58,10 +58,10 @@
 
 ## Phase 7: Deployment
 
-- [ ] T024 `tests/unit/test_build_frontend.py` + `scripts/build_frontend.py` — pre-render `/data-use` to `dist/data-use/index.html`. Firebase Hosting rewrites every non-`/api`/`/auth` path to `index.html`, so without this FR-019's page is unreachable in production (write test first, confirm failing)
-- [ ] T025 `tests/unit/test_backend_changed.py` + `scripts/backend_changed.sh` — decide whether the backend needs redeploying by diffing the deployed commit (Cloud Run service label `commit-sha`) against the working tree for backend paths (write test first, confirm failing)
-- [ ] T026 `scripts/deploy.sh` — single entry point: deploy backend only when T025 says it changed (`--force-backend` / `--skip-backend` overrides), always deploy frontend
-- [ ] T027 `scripts/deploy_backend.sh` — use `--update-env-vars` (stop wiping vars set outside the script), pass optional `GOOGLE_GENAI_USE_VERTEXAI`, `GOOGLE_CLOUD_PROJECT`, `GOOGLE_CLOUD_LOCATION`, `QUORUM_MODEL`, `LOG_PEPPER` when set, label the service with `commit-sha`
+- [x] T024 `tests/unit/test_build_frontend.py` + `scripts/build_frontend.py` — pre-render `/data-use` to `dist/data-use/index.html`. Firebase Hosting rewrites every non-`/api`/`/auth` path to `index.html`, so without this FR-019's page is unreachable in production (write test first, confirm failing)
+- [x] T025 `tests/unit/test_backend_changed.py` + `scripts/backend_changed.sh` — decide whether the backend needs redeploying by diffing the deployed commit (Cloud Run service label `commit-sha`) against the working tree for backend paths (write test first, confirm failing)
+- [x] T026 `scripts/deploy.sh` — single entry point: deploy backend only when T025 says it changed (`--force-backend` / `--skip-backend` overrides), always deploy frontend
+- [x] T027 `scripts/deploy_backend.sh` — use `--update-env-vars` (stop wiping vars set outside the script), pass optional `GOOGLE_GENAI_USE_VERTEXAI`, `GOOGLE_CLOUD_PROJECT`, `GOOGLE_CLOUD_LOCATION`, `QUORUM_MODEL`, `LOG_PEPPER` when set, label the service with `commit-sha`
 
 ## Dependencies
 

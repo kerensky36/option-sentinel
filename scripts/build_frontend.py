@@ -1,16 +1,18 @@
 #!/usr/bin/env python3
 """Pre-render Jinja2 templates to static HTML and copy static assets to dist/."""
+from __future__ import annotations
+
 import shutil
 from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader
 
 
-def build() -> None:
+def build(out_dir: Path | None = None) -> None:
     root = Path(__file__).parent.parent
     templates_dir = root / "frontend" / "templates"
     static_src = root / "frontend" / "static"
-    dist = root / "dist"
+    dist = out_dir or root / "dist"
 
     # Clean and recreate dist/
     shutil.rmtree(dist, ignore_errors=True)
@@ -43,6 +45,14 @@ def build() -> None:
     )
     (dist / "screener" / "index.html").write_text(html, encoding="utf-8")
     print("✓ dist/screener/index.html")
+
+    # data_use.html → dist/data-use/index.html  (clean URL: /data-use)
+    # Firebase rewrites unknown paths to index.html, so the Data Use
+    # Disclosure page (Constitution v3.3.0) must be pre-rendered here.
+    (dist / "data-use").mkdir()
+    html = env.get_template("data_use.html").render(csp_nonce="")
+    (dist / "data-use" / "index.html").write_text(html, encoding="utf-8")
+    print("✓ dist/data-use/index.html")
 
 
 if __name__ == "__main__":
