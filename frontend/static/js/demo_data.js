@@ -346,6 +346,29 @@ function _demoQuorum(underlying, asOf = null) {
   };
 }
 
+// Demo realised volatility per underlying (specs/018 FR-101); other figures stay null.
+const DEMO_REALISED_VOL = { AAPL: 0.24, SPY: 0.15, TSLA: 0.52, QQQ: 0.19, MSFT: 0.21 };
+
+/** Stamp demo positions like a live refresh: one "as of" time plus fundamentals. */
+function _withAsOf(positions) {
+  const asOf = new Date().toISOString();
+  return positions.map((p) => {
+    const rv = DEMO_REALISED_VOL[p.underlying_symbol] ?? null;
+    const iv = p.implied_volatility ?? null;
+    return {
+      ...p,
+      as_of: asOf,
+      fundamentals: {
+        realised_volatility: rv,
+        iv_rv_ratio: rv && iv ? iv / rv : null,
+        moneyness_pct: null, expected_move: null, prob_itm: null,
+        position_delta: null, dollar_delta: null, position_gamma: null,
+        dollar_theta: null, dollar_vega: null,
+      },
+    };
+  });
+}
+
 function _makeResponse(data) {
   return new Response(JSON.stringify(data), {
     status: 200,
@@ -370,7 +393,7 @@ export function demoResponse(url, options = {}) {
   }
   if (u.pathname === '/api/positions/refresh') {
     return _makeResponse(
-      hash === DEMO_EQUITY_HASH ? DEMO_POSITIONS_EQUITY : DEMO_POSITIONS_SPREADS
+      _withAsOf(hash === DEMO_EQUITY_HASH ? DEMO_POSITIONS_EQUITY : DEMO_POSITIONS_SPREADS)
     );
   }
   if (u.pathname === '/api/screener/refresh') {

@@ -2,15 +2,16 @@
  * quorum_ui.js — Fundamentals-first voting quorum panel (specs/017, specs/018).
  *
  * Each option row / spread summary row carries a [data-quorum-btn] button.
- * Clicking it POSTs the row's leg symbols to /api/quorum/vote and renders the
- * verdict, tally, analyst cards, and headlines in a panel row beneath it.
+ * Clicking it POSTs the row's legs — as held from the last positions refresh,
+ * with their realised volatility and "as of" time — to /api/quorum/vote
+ * (specs/018 FR-110) and renders the verdict, tally, analyst cards, and
+ * headlines in a panel row beneath it. No account identifier is sent.
  *
  * The result is held only in the DOM — never written to sessionStorage or any
  * other store (FR-015). Every string is escaped before rendering (FR-016).
  */
 
 import { fetchWithAuth } from './auth.js';
-import { getSelectedAccountHash } from './account_picker.js';
 
 const PANEL_CLASS = 'quorum-panel-row';
 const COLSPAN = 15;
@@ -26,6 +27,15 @@ const VERDICT_STYLE = {
 const ACTION_BAR = { CLOSE: '#b33', HOLD: '#778', ROLL: '#56c' };
 
 const ROLL_LABEL = { out: 'roll out', up_and_out: 'roll up & out', down_and_out: 'roll down & out' };
+
+const STALE_MESSAGE = 'Position data is more than 15 minutes old — refresh positions and try again.';
+
+// Leg fields the quorum endpoint accepts (QuorumLegIn); anything else is rejected.
+const LEG_FIELDS = [
+  'underlying_symbol', 'option_type', 'strike', 'expiry_date', 'days_to_expiry',
+  'quantity', 'cost', 'current_mark', 'unrealised_pnl', 'delta', 'gamma', 'theta',
+  'vega', 'implied_volatility', 'underlying_price',
+];
 
 let _openId = null;
 
@@ -133,6 +143,12 @@ function _renderHeadlines(headlines) {
     .join('')}</ul>`;
 }
 
+function _asOfLabel(asOf) {
+  const d = new Date(asOf);
+  if (Number.isNaN(d.getTime())) return '';
+  return `Data as of ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+}
+
 function _verdictNote(result) {
   if (result.verdict === 'NO_CONSENSUS') return 'No action reached a 3-of-5 majority — status quo is to hold.';
   if (result.verdict === 'NO_QUORUM') return `Only ${result.valid_votes} of ${result.seats} analysts voted — no recommendation.`;
@@ -147,6 +163,7 @@ export function renderResult(result) {
       <div class="flex flex-wrap items-center gap-3">
         <span class="px-2 py-1 text-sm font-semibold tracking-widest ${style.cls}" style="border-radius:1px">${esc(style.label)}</span>
         <span class="text-gray-300 text-sm">${esc(result.underlying_symbol)} · ${esc(_verdictNote(result))}</span>
+        ${result.as_of ? `<span class="text-gray-500 text-xs">${esc(_asOfLabel(result.as_of))}</span>` : ''}
       </div>
       <div class="flex flex-col gap-1" style="max-width:420px">${_renderTally(result)}</div>
       <div class="grid grid-cols-1 md:grid-cols-5 gap-2">${_renderVotes(result.votes)}</div>
@@ -165,7 +182,9 @@ export function renderResult(result) {
 
 function _errorMessage(status) {
   switch (status) {
-    case 404: return 'This position is no longer in the account — refresh positions and try again.';
+    case 409: return STALE_MESSAGE;
+    case 422: return 'Quorum request was rejected — refresh positions and try again.';
+    case 502: return 'Could not verify your Schwab login — try again.';
     case 429: return 'Too many quorum requests — try again in a minute.';
     case 503: return 'Quorum is not configured on this server.';
     case 504: return 'The quorum timed out — try again.';
@@ -173,7 +192,26 @@ function _errorMessage(status) {
   }
 }
 
-async function _openPanel(anchorRow, id, symbols) {
+/**
+ * Build the v2 request body from full position objects, or null if any leg
+ * has no "as of" time (cached before this feature — treat as stale).
+ * @param {Array<object>} legs
+ */
+export function buildQuorumRequest(legs) {
+  if (!legs.length || legs.some((l) => !l.as_of)) return null;
+  const asOf = legs.map((l) => l.as_of).sort((a, b) => new Date(a) - new Date(b))[0];
+  return {
+    as_of: asOf,
+    legs: legs.map((l) => {
+      const out = {};
+      for (const key of LEG_FIELDS) out[key] = l[key] ?? null;
+      out.realised_volatility = l.fundamentals?.realised_volatility ?? null;
+      return out;
+    }),
+  };
+}
+
+async function _openPanel(anchorRow, id, legs) {
   if (_openId === id) { closeQuorumPanel(); return; }
   closeQuorumPanel();
 
@@ -182,11 +220,17 @@ async function _openPanel(anchorRow, id, symbols) {
   _openId = id;
   const cell = panel.firstElementChild;
 
+  const body = buildQuorumRequest(legs);
+  if (!body) {
+    cell.innerHTML = _renderError(STALE_MESSAGE);
+    return;
+  }
+
   try {
     const resp = await fetchWithAuth('/api/quorum/vote', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ symbols, account_hash: getSelectedAccountHash() || null }),
+      body: JSON.stringify(body),
     });
     if (!resp) return; // 401 already handled by fetchWithAuth
     if (_openId !== id) return; // closed or replaced while waiting
@@ -210,9 +254,9 @@ export function initQuorum(container, positionData) {
   const { groups = [], standalone = [] } = positionData || {};
   closeQuorumPanel();
 
-  const symbolsById = new Map();
-  for (const g of groups) symbolsById.set(g.groupId, g.legs.map((l) => l.symbol));
-  for (const p of standalone) symbolsById.set(p.symbol, [p.symbol]);
+  const legsById = new Map();
+  for (const g of groups) legsById.set(g.groupId, g.legs);
+  for (const p of standalone) legsById.set(p.symbol, [p]);
 
   const tbody = container.querySelector('tbody');
   if (!tbody) return;
@@ -222,10 +266,10 @@ export function initQuorum(container, positionData) {
     if (!btn) return;
     e.stopPropagation();
     const id = btn.getAttribute('data-quorum-btn');
-    const symbols = symbolsById.get(id);
+    const legs = legsById.get(id);
     const anchorRow = btn.closest('tr');
-    if (!symbols || !anchorRow) return;
-    _openPanel(anchorRow, id, symbols);
+    if (!legs || !anchorRow) return;
+    _openPanel(anchorRow, id, legs);
   });
 }
 

@@ -1,11 +1,18 @@
 """In-memory Pydantic models — no database, no ORM."""
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from decimal import Decimal
-from typing import Annotated, Literal
+from typing import Literal
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import (
+    AwareDatetime,
+    BaseModel,
+    ConfigDict,
+    Field,
+    field_validator,
+    model_validator,
+)
 
 
 class LegFundamentals(BaseModel):
@@ -112,20 +119,67 @@ QUORUM_DISCLAIMER = (
 )
 
 
-class QuorumRequest(BaseModel):
-    """Request body for POST /api/quorum/vote — leg symbols only (FR-002)."""
+_TICKER_PATTERN = r"^\$?[A-Z0-9./^-]{1,10}$"
 
-    symbols: list[Annotated[str, Field(min_length=1, max_length=64)]] = Field(
-        min_length=1, max_length=4
-    )
-    account_hash: str | None = Field(default=None, max_length=256)
 
-    @field_validator("symbols")
+class QuorumLegIn(BaseModel):
+    """One leg of a quorum request, as held by the browser (specs/018 FR-110, FR-111).
+
+    Strict: unknown fields, non-finite numbers and out-of-range values are rejected.
+    No free-text fields — the only string is a ticker-shaped symbol.
+    """
+
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
+
+    underlying_symbol: str = Field(pattern=_TICKER_PATTERN)
+    option_type: Literal["call", "put"]
+    strike: Decimal = Field(gt=0, le=1_000_000)
+    expiry_date: date
+    days_to_expiry: int = Field(ge=0, le=1500)
+    quantity: int = Field(ge=-100_000, le=100_000)
+    cost: Decimal = Field(ge=0, le=1_000_000)
+    current_mark: Decimal = Field(ge=0, le=1_000_000)
+    unrealised_pnl: Decimal = Field(ge=-1_000_000_000, le=1_000_000_000)
+    delta: float | None = Field(default=None, ge=-1, le=1)
+    gamma: float | None = Field(default=None, ge=0, le=10)
+    theta: float | None = Field(default=None, ge=-10_000, le=10_000)
+    vega: float | None = Field(default=None, ge=0, le=10_000)
+    implied_volatility: float | None = Field(default=None, gt=0, le=10)
+    underlying_price: Decimal | None = Field(default=None, gt=0, le=1_000_000)
+    realised_volatility: float | None = Field(default=None, ge=0, le=10)
+
+    @field_validator("quantity")
     @classmethod
-    def _unique(cls, v: list[str]) -> list[str]:
-        if len(set(v)) != len(v):
-            raise ValueError("symbols must be unique")
+    def _non_zero(cls, v: int) -> int:
+        if v == 0:
+            raise ValueError("quantity must be non-zero")
         return v
+
+    @field_validator("expiry_date")
+    @classmethod
+    def _plausible_expiry(cls, v: date) -> date:
+        today = date.today()
+        if not today - timedelta(days=1) <= v <= today + timedelta(days=4 * 365):
+            raise ValueError("expiry_date out of range")
+        return v
+
+
+class QuorumRequest(BaseModel):
+    """Request body for POST /api/quorum/vote v2 (specs/018 FR-110, FR-111).
+
+    No account identifier and no leg symbol are accepted.
+    """
+
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
+
+    as_of: AwareDatetime
+    legs: list[QuorumLegIn] = Field(min_length=1, max_length=4)
+
+    @model_validator(mode="after")
+    def _one_underlying(self) -> "QuorumRequest":
+        if len({leg.underlying_symbol for leg in self.legs}) != 1:
+            raise ValueError("all legs must share one underlying")
+        return self
 
 
 class PositionLegContext(BaseModel):

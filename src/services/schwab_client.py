@@ -167,6 +167,30 @@ async def fetch_realised_vols(client, underlyings: set[str]) -> dict[str, float 
     return dict(zip(ordered, vols))
 
 
+class TokenRejected(Exception):
+    """Schwab answered 401 to the token check."""
+
+
+class TokenCheckFailed(Exception):
+    """The token check failed for any reason other than a 401."""
+
+
+async def verify_token(client) -> None:
+    """Confirm the caller's token with Schwab's lightest authenticated call (D-107).
+
+    The response body is never read or logged.
+    """
+    try:
+        resp = await client.get_account_numbers()
+    except Exception as exc:
+        raise TokenCheckFailed(type(exc).__name__) from None
+    status = getattr(resp, "status_code", None)
+    if status == 401:
+        raise TokenRejected()
+    if not isinstance(status, int) or status >= 400:
+        raise TokenCheckFailed(str(status))
+
+
 async def fetch_positions_and_greeks(
     schwab_client,
     account_hash: str | None = None,

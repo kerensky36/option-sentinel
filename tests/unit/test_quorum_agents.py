@@ -303,16 +303,16 @@ class TestRunQuorum:
         assert fake.finished[_OVERLAY_ID] > research_done
 
     async def test_news_fetch_runs_alongside_research(self):
-        """FR-119 / SC-101 structure: feeds 0.1 s ∥ research 0.2 s, then seat 5 0.1 s ≈ 0.3 s.
-        The 017 ordering (feeds → research → seats) would take ≥ 0.4 s."""
-        replies = {"macro_researcher": (0.2, "brief")}
-        replies.update({sid: (0.1, _ballot("HOLD")) for sid in _SEAT_IDS})
+        """FR-119 / SC-101 structure: feeds 0.3 s ∥ research 0.6 s, then seat 5 0.3 s ≈ 0.9 s.
+        The 017 ordering (feeds → research → seats) would take ≥ 1.2 s."""
+        replies = {"macro_researcher": (0.6, "brief")}
+        replies.update({sid: (0.3, _ballot("HOLD")) for sid in _SEAT_IDS})
         start = time.monotonic()
         await run_quorum(
             build_position_context([_leg()]), model=_fake(replies),
-            headline_fetcher=_fetcher(_HEADLINES, delay=0.1),
+            headline_fetcher=_fetcher(_HEADLINES, delay=0.3),
         )
-        assert time.monotonic() - start < 0.35
+        assert time.monotonic() - start < 1.15
 
     async def test_research_failure_overlay_still_votes_on_headlines(self):
         replies = {sid: _ballot("CLOSE") for sid in _SEAT_IDS}
@@ -377,3 +377,41 @@ class TestConfigured:
         assert quorum_agents.default_model() == "gemini-2.5-flash"
         monkeypatch.setenv("QUORUM_MODEL", "gemini-x")
         assert quorum_agents.default_model() == "gemini-x"
+
+
+class TestQuorumLegInContext:
+    """specs/018 T024 — context from the v2 browser request (FR-110, D-105)."""
+
+    def _leg_in(self, **kw):
+        from src.data.models import QuorumLegIn
+
+        base = dict(
+            underlying_symbol="SPY", option_type="call", strike="560",
+            expiry_date=date.today(), days_to_expiry=22, quantity=-1,
+            cost="4.20", current_mark="3.10", unrealised_pnl="110",
+            delta=-0.35, gamma=0.01, theta=-0.05, vega=0.3,
+            implied_volatility=0.18, underlying_price="552.10", realised_volatility=0.12,
+        )
+        base.update(kw)
+        return QuorumLegIn(**base)
+
+    def test_fundamentals_re_derived_from_leg_fields_only(self):
+        from src.services.fundamentals import leg_fundamentals
+
+        leg = self._leg_in()
+        as_of = datetime(2026, 9, 27, 14, 0, tzinfo=timezone.utc)
+        ctx = build_position_context([leg], as_of=as_of)
+        assert ctx.as_of == as_of
+        expected = leg_fundamentals(ctx.legs[0], 0.12, r=quorum_agents.RISK_FREE_RATE)
+        assert ctx.legs[0].fundamentals == expected
+        assert "realised_volatility" not in PositionView.model_fields  # carried via fundamentals only
+
+    async def test_privacy_scan_with_v2_request(self):
+        replies = {sid: _ballot("HOLD") for sid in _SEAT_IDS}
+        fake = _fake(replies)
+        ctx = build_position_context([self._leg_in()], as_of=datetime.now(timezone.utc))
+        await run_quorum(ctx, model=fake, headline_fetcher=_fetcher(_HEADLINES))
+        for r in fake.requests:
+            text = _request_text(r) + str(r.config.system_instruction)
+            assert "account_hash" not in text
+            assert "_source" not in text

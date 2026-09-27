@@ -129,7 +129,7 @@
   - research failure → seat 5 still votes on headlines alone
   - the seat instruction for 1–4 requires citing a figure (FR-115)
   - both seat instructions say a null figure means unavailable and must never be estimated (US1 scenario 5)
-  - timing (fake agents, scaled delays): headlines take 0.1 s, research 0.2 s, every seat 0.1 s → `run_quorum` completes in < 0.35 s, showing feeds run alongside research rather than before it (017 order would take ≥ 0.4 s) (FR-119, SC-101)
+  - timing (fake agents, scaled delays): headlines take 0.3 s, research 0.6 s, every seat 0.3 s → `run_quorum` completes in < 1.15 s, showing feeds run alongside research rather than before it (017 order would take ≥ 1.2 s) (FR-119, SC-101). Delays were scaled up from 0.1/0.2 s during implementation because ADK per-agent overhead made the smaller margin flaky.
   - the research instruction mentions events before expiry (FR-117)
   - privacy scan still passes over every recorded request (SC-107)
 
@@ -184,7 +184,7 @@
 
 ### Tests (write first, confirm failing)
 
-- [ ] T023 [P] [US2] Rewrite the request-side cases in `tests/contract/test_quorum_api.py` for the v2 contract (contracts/quorum-api-contract.md), with a fake schwab client that records calls:
+- [X] T023 [P] [US2] Rewrite the request-side cases in `tests/contract/test_quorum_api.py` for the v2 contract (contracts/quorum-api-contract.md), with a fake schwab client that records calls:
   - **200 path**:
     - exactly one `get_account_numbers` call
     - no `get_account`, `get_option_chain` or `get_price_history*` calls (SC-102)
@@ -203,11 +203,11 @@
   - **504**: timeout
   - `Cache-Control: no-store` on responses
   - the 404 case is removed
-- [ ] T024 [P] [US2] In `tests/unit/test_quorum_agents.py`, check that `build_position_context` from `QuorumLegIn` re-derives fundamentals from only the leg fields and `realised_volatility`, and matches `leg_fundamentals` output exactly. The privacy scan uses the v2 request (no account hash anywhere).
+- [X] T024 [P] [US2] In `tests/unit/test_quorum_agents.py`, check that `build_position_context` from `QuorumLegIn` re-derives fundamentals from only the leg fields and `realised_volatility`, and matches `leg_fundamentals` output exactly. The privacy scan uses the v2 request (no account hash anywhere).
 
 ### Implementation
 
-- [ ] T025 [US2] In `src/data/models.py`, add `QuorumLegIn` with `model_config = ConfigDict(extra="forbid")`. All floats must be finite. Quote the data-model.md bounds verbatim:
+- [X] T025 [US2] In `src/data/models.py`, add `QuorumLegIn` with `model_config = ConfigDict(extra="forbid")`. All floats must be finite. Quote the data-model.md bounds verbatim:
 
   | Field | Bound |
   |---|---|
@@ -229,12 +229,12 @@
   | `realised_volatility` | 0 ≤ x ≤ 10 or null |
 
   Replace `QuorumRequest` with `extra="forbid"`, `as_of: AwareDatetime`, and `legs: list[QuorumLegIn]` (1–4 items); remove `symbols` and `account_hash`.
-- [ ] T026 [US2] In `src/services/schwab_client.py`, add `verify_token(client)`:
+- [X] T026 [US2] In `src/services/schwab_client.py`, add `verify_token(client)`:
   - call `get_account_numbers()`
   - 401 → raise `TokenRejected`
   - any other non-2xx or exception → raise `TokenCheckFailed`
   - never read or log the body (D-107)
-- [ ] T027 [US2] Rewrite `src/api/routes/quorum.py` in this order:
+- [X] T027 [US2] Rewrite `src/api/routes/quorum.py` in this order:
   1. `quorum_configured()` else 503.
   2. `await request.body()`: over 16 KiB → generic 422.
   3. `QuorumRequest.model_validate_json`: on `ValidationError` → 422 `{"detail": "Invalid quorum request", "fields": [".".join(map(str, e["loc"])) ...]}`.
@@ -244,7 +244,7 @@
   7. `run_quorum` under 60 s else 504.
 
   Remove the `fetch_positions_and_greeks` import. Makes T023–T024 pass.
-- [ ] T028 [US2] In `frontend/static/js/quorum_ui.js`:
+- [X] T028 [US2] In `frontend/static/js/quorum_ui.js`:
   - `initQuorum` keeps full leg objects per id (not just symbols)
   - `_openPanel` posts `{as_of, legs}`: `as_of` is the oldest leg `as_of`; each leg is mapped to the QuorumLegIn keys only, with `realised_volatility` from `leg.fundamentals?.realised_volatility ?? null`; no `account_hash` and no `symbol`
   - a missing `as_of` on any leg shows the stale message without calling the server
@@ -254,7 +254,7 @@
     - 502 → "Could not verify your Schwab login — try again."
     - drop the 404 case
   - `renderResult` shows "Data as of HH:MM" (local time from `result.as_of`) next to the verdict
-- [ ] T029 [P] [US2] In `frontend/static/js/demo_data.js`, give demo positions `as_of` (now) and `fundamentals`, so the demo request path builds the same payload shape.
+- [X] T029 [P] [US2] In `frontend/static/js/demo_data.js`, give demo positions `as_of` (now) and `fundamentals`, so the demo request path builds the same payload shape.
 
 **Checkpoint**: both P1 stories are done. This is the MVP.
 
