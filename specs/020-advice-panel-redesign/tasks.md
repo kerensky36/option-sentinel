@@ -385,33 +385,33 @@ Commit after each task or logical group; spec and plan commits already precede a
 
 ### Tests (write first, confirm failing)
 
-- [ ] T045 [P] In `tests/unit/test_quorum_ui.py`, test that the `adviceButton` HTML carries every Tailwind class of the Erase All Data button, read from `frontend/templates/base.html` (`bg-red-900`, `hover:bg-red-800`, `text-red-300`, `uppercase`, `tracking-wider`, `text-xs`), still has the hazard stripe, and that `.advice-btn` CSS in base.html sets no `background`, `color`, `font-weight` or `letter-spacing` of its own (FR-323).
-- [ ] T046 [P] In `tests/unit/test_quorum_ui.py`, test `frontend/static/js/quorum_cache.js`:
+- [X] T045 [P] In `tests/unit/test_quorum_ui.py`, test that the `adviceButton` HTML carries every Tailwind class of the Erase All Data button, read from `frontend/templates/base.html` (`bg-red-900`, `hover:bg-red-800`, `text-red-300`, `tracking-wider`, `text-xs`) except `uppercase` (so the label stays "ADVICE(Agentic)"), still has the hazard stripe, and that `.advice-btn` CSS in base.html sets no `background`, `color`, `font-weight` or `letter-spacing` of its own (FR-323).
+- [X] T046 [P] In `tests/unit/test_quorum_ui.py`, test `frontend/static/js/quorum_cache.js`:
   - `cacheKey("grp", legs)` is `quorum:v1:grp|A,B` for legs with symbols B and A (sorted)
   - `save` then `load` round-trips through the sessionStorage spy
   - `load` of an unknown key → `null`
   - when `sessionStorage.setItem` throws, `save`/`load` still round-trip via the in-memory fallback
   - `localStorage` is never written
-- [ ] T047 [P] In `tests/unit/test_quorum_ui.py`, test the pure flow helper `adviceFor(key, legs, deps)` exported from `quorum_ui.js`, with injected `fetchImpl`, cache and `render` callbacks:
+- [X] T047 [P] In `tests/unit/test_quorum_ui.py`, test the pure flow helper `adviceFor(key, legs, deps)` exported from `quorum_ui.js`, with injected `fetchImpl`, cache and `render` callbacks:
   - first call → one vote POST and one summary POST; the cache ends with the result (`summary_token: null`) and `summary.state: "ok"`
   - second call with the same key → zero fetches; `render` receives the saved result and summary with `saved: true`
   - a failed vote (`status: 504`) → nothing saved; the next call fetches again
   - a closed panel (`isCurrent` false) while the summary is pending → the summary outcome is still saved
-- [ ] T048 [P] In `tests/unit/test_quorum_ui.py`, test that `renderResult(result, {saved: true})` shows "Saved for this session" next to "Data as of", and that a fresh result does not (FR-325).
-- [ ] T049 [P] In `tests/contract/test_data_use_page.py`, test that the data-use page states quorum results are saved in the browser's sessionStorage for the session and cleared on sign-out, Erase All Data or tab close (FR-322).
+- [X] T048 [P] In `tests/unit/test_quorum_ui.py`, test that `renderResult(result, {saved: true})` shows "Saved for this session" next to "Data as of", and that a fresh result does not (FR-325).
+- [X] T049 [P] In `tests/contract/test_data_use_page.py`, test that the data-use page states quorum results are saved in the browser's sessionStorage for the session and cleared on sign-out, Erase All Data or tab close (FR-322).
 
 ### Implementation
 
-- [ ] T050 Create `frontend/static/js/quorum_cache.js` per D-314. Makes T046 pass.
-- [ ] T051 In `frontend/static/js/quorum_ui.js`:
+- [X] T050 Create `frontend/static/js/quorum_cache.js` per D-314. Makes T046 pass.
+- [X] T051 In `frontend/static/js/quorum_ui.js`:
   - add the Erase All Data classes to `adviceButton`
   - add `adviceFor(key, legs, deps)` and route `_openPanel` through it
   - `renderResult(result, {saved})`
   - the summary outcome is saved regardless of whether the panel is still open
 
   In `frontend/templates/base.html`, strip the `.advice-btn` colour and font rules, keeping layout and the hazard stripe. Makes T045, T047 and T048 pass.
-- [ ] T052 Update `frontend/templates/data_use.html`, the README storage table and the README quorum section for the session cache. Makes T049 pass.
-- [ ] T053 Run the full suite and the demo-mode browser check:
+- [X] T052 Update `frontend/templates/data_use.html`, the README storage table and the README quorum section for the session cache. Makes T049 pass.
+- [X] T053 Run the full suite and the demo-mode browser check:
   - button colours match Erase All Data
   - a second click on the same row issues no `/api/quorum/*` request and shows "Saved for this session"
   - after Disconnect the saved result is gone

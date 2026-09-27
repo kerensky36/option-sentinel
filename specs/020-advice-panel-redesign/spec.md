@@ -27,7 +27,7 @@
 
 ### Session 2026-09-27 (b) — post-review enhancements
 
-- Q: How should the ADVICE(Agentic) button look? → A: Same font and colours as the red "Erase All Data" button in the top bar (dark red background, light red text, same size, letter-spacing and uppercase). The hazard stripe stays as its warning label.
+- Q: How should the ADVICE(Agentic) button look? → A: Same font and colours as the red "Erase All Data" button in the top bar (dark red background, light red text, same size and letter-spacing). The hazard stripe stays as its warning label. The uppercase transform is left off so the label still reads exactly "ADVICE(Agentic)".
 - Q: Should clicking the button again re-run the quorum? → A: No. The first successful result for a position is kept for the rest of the browser session and shown again on every later click, with no new request, until the user signs out (or uses Erase All Data, or closes the tab). This replaces 017 FR-015's "closing the panel discards it" for successful results.
 - Q: What counts as "the same position"? → A: The same row (spread or single option) with the same set of legs. If the legs change (a leg is closed or rolled), the next click runs a fresh quorum. Price or Greek changes alone do not.
 
@@ -48,7 +48,7 @@ A trader looking at the positions dashboard sees an "ADVICE(Agentic)" button, ma
 3. **Given** an open result panel, **When** the trader clicks the same button again, **Then** the panel closes; **When** they click another row's button, **Then** the first panel closes and a new one opens under the other row.
 4. **Given** leg rows inside an expanded spread, **When** they render, **Then** they carry no advice button (advice is per position, not per leg).
 5. **Given** a phone-width screen (360 px), **When** the dashboard renders, **Then** the button is visible without horizontal scrolling.
-6. **Given** the top bar's "Erase All Data" button, **When** the dashboard renders, **Then** every ADVICE(Agentic) button uses the same background, text colour, hover colour, font size, letter-spacing and uppercase styling, plus its hazard stripe.
+6. **Given** the top bar's "Erase All Data" button, **When** the dashboard renders, **Then** every ADVICE(Agentic) button uses the same background, text colour, hover colour, font size and letter-spacing, plus its hazard stripe; its label is not uppercased, so it reads "ADVICE(Agentic)".
 7. **Given** a position whose quorum already returned a result in this session, **When** the trader clicks its button again (after closing the panel, reloading the page, visiting the screener, or refreshing positions without changing that position's legs), **Then** the saved result, including its summary, is shown at once and no vote or summary request is sent.
 8. **Given** a saved result, **When** the trader signs out, uses Erase All Data, or closes the tab, **Then** the saved result is gone and the next click runs a fresh quorum.
 
@@ -163,7 +163,7 @@ Below the ring and summary, each analyst has one collapsed row showing their len
 - **FR-316** *(replaces 017 FR-016's layout)*: The panel MUST show, in order: verdict badge with the position and "N of 5" note and "Data as of" time; the warning banner (FR-317); the ring and tally beside the summary area, which reads "Writing summary…" while the summary request is pending (stacked on narrow screens); the five collapsible analyst rows with an Expand all / Collapse all control; a collapsed "Research brief & headlines (N)" section; the disclaimer and data-use notice (017 FR-017, FR-020).
 - **FR-317**: The warning banner MUST read "AI-generated opinion. Not financial advice. Option Sentinel never places trades." and MUST be visible without expanding anything.
 - **FR-318**: Row expansion state MUST NOT be persisted; closing the panel discards it.
-- **FR-323**: The ADVICE(Agentic) button MUST use the same background, hover background, text colour, font size, letter-spacing and uppercase styling as the "Erase All Data" button, and keep its hazard-stripe warning label (FR-302).
+- **FR-323**: The ADVICE(Agentic) button MUST use the same background, hover background, text colour, font size and letter-spacing as the "Erase All Data" button, and keep its hazard-stripe warning label (FR-302). It MUST NOT apply the uppercase transform, so the label reads exactly "ADVICE(Agentic)" (FR-301).
 - **FR-324** *(replaces 017 FR-015 for successful results)*: The first successful quorum result for a position MUST be saved in the browser's sessionStorage, keyed by the position's row id and its sorted leg symbols, together with its summary outcome once known. Later clicks for the same key MUST show the saved result and MUST NOT send a vote or summary request. Failed requests MUST NOT be saved. Saved results MUST be cleared by sign-out, Erase All Data and tab close (all of which already clear sessionStorage), and MUST NOT be sent to the server or to any other destination. If sessionStorage is unavailable, results MUST be kept in memory for the page's lifetime.
 - **FR-325**: A panel showing a saved result MUST say so next to the "Data as of" time ("Saved for this session").
 - **FR-319**: The panel MUST be usable at 360 px width without horizontal page scrolling: the panel stays within the visible width even when the table scrolls sideways; ring labels, row fields and the summary remain legible.

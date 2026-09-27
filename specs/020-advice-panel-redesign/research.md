@@ -116,7 +116,7 @@ Decisions for spec 020. They continue from 018's D-101–D-114, numbered D-301 o
 
 ## D-313 — ADVICE(Agentic) button styling (FR-323)
 
-- **Decision**: Put the same Tailwind classes the "Erase All Data" button uses (`bg-red-900 hover:bg-red-800 text-red-300 uppercase tracking-wider text-xs transition-colors`) on the advice button. Its own CSS keeps only layout: inline-flex, the hazard stripe and compact padding. The bold weight and custom letter-spacing are dropped so the font matches.
+- **Decision**: Put the same Tailwind classes the "Erase All Data" button uses (`bg-red-900 hover:bg-red-800 text-red-300 tracking-wider text-xs transition-colors`), minus `uppercase`, which would turn the label into "ADVICE(AGENTIC)" and break FR-301 on the advice button. Its own CSS keeps only layout: inline-flex, the hazard stripe and compact padding. The bold weight and custom letter-spacing are dropped so the font matches.
 - **Rationale**: One source of truth for the red "danger" style; if the top-bar button is restyled, the advice button follows.
 
 ## D-314 — Session cache of quorum results (FR-324, FR-325)
