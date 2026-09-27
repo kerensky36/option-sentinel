@@ -5,12 +5,13 @@ NEVER amend `.specify/memory/constitution.md` without asking the user first and 
 
 <!-- SPECKIT START -->
 For context on technologies, project structure, and implementation approach,
-read the current plan at `specs/018-fundamentals-first-quorum/plan.md`. Supporting artifacts:
-- `specs/018-fundamentals-first-quorum/research.md` — decisions D-101–D-114 (fundamentals module, realised vol, strict quorum request, seat recast, headline selection, screener IV/RV)
-- `specs/018-fundamentals-first-quorum/data-model.md` — LegFundamentals, PositionFundamentals, QuorumLegIn/QuorumRequest v2
-- `specs/018-fundamentals-first-quorum/contracts/quorum-api-contract.md` — POST /api/quorum/vote v2 contract and service APIs
-- `specs/018-fundamentals-first-quorum/quickstart.md` — test commands and browser verification
-- `specs/018-fundamentals-first-quorum/spec.md` — feature specification (source of truth; amends spec 017)
-- `specs/017-macro-quorum-agents/plan.md` — prior feature (macro news voting quorum)
+read the current plan at `specs/020-advice-panel-redesign/plan.md`. Supporting artifacts:
+- `specs/020-advice-panel-redesign/research.md` — decisions D-301–D-312 (two-step summary, signed summary token, figure catalog, summariser guard, vote ring, button placement)
+- `specs/020-advice-panel-redesign/data-model.md` — FigureCatalog, CitedFigure, SummaryToken, SummaryDraft, QuorumSummary
+- `specs/020-advice-panel-redesign/contracts/quorum-api-contract.md` — POST /api/quorum/vote v3 additions and POST /api/quorum/summary
+- `specs/020-advice-panel-redesign/quickstart.md` — test commands and browser verification
+- `specs/020-advice-panel-redesign/spec.md` — feature specification (source of truth; amends specs 017–019)
+- `specs/020-advice-panel-redesign/mock/advice-panel-mock.html` — UI reference mock
+- `specs/018-fundamentals-first-quorum/plan.md` — prior quorum feature (fundamentals-first seats)
 - `.specify/memory/constitution.md` — project constitution v3.3.0
 <!-- SPECKIT END -->
