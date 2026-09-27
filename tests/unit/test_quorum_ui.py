@@ -322,3 +322,88 @@ def test_panel_escapes_model_and_feed_text(tmp_path):
     assert "<b>bold</b>" not in html and "&lt;b&gt;bold&lt;/b&gt;" in html
     assert "Fed <holds>" not in html and "Fed &lt;holds&gt;" in html
     assert "javascript:" not in html
+
+
+# ── US3: summary area and the second request (FR-306, FR-309, FR-312, FR-313) ──
+
+SUMMARY = {
+    "title": "Roll the spread out <now>.",
+    "explanation": "It banked 38% of $86.",
+    "why": ["Time decay: 38% captured.", "Strike: close to spot."],
+    "dissent": "Greeks and Volatility would hold.",
+}
+
+
+def test_summary_area_states(tmp_path):
+    pending = _call(tmp_path, "quorum_ui", "renderSummary", "pending", None, RESULT_MAJORITY)
+    assert "Writing summary…" in pending
+    unavailable = _call(tmp_path, "quorum_ui", "renderSummary", "unavailable", None, RESULT_MAJORITY)
+    assert "Summary unavailable" in unavailable
+    fixed = _call(tmp_path, "quorum_ui", "renderSummary", "fixed", None, RESULT_NO_QUORUM)
+    assert "Only 2 of 5 analysts voted — no recommendation." in fixed
+
+
+def test_summary_ok_layout_and_escaping(tmp_path):
+    html = _call(tmp_path, "quorum_ui", "renderSummary", "ok", SUMMARY, RESULT_MAJORITY)
+    assert re.search(r"<h2[^>]*>Roll the spread out &lt;now&gt;\.</h2>", html)
+    assert "<now>" not in html
+    assert "Why the majority" in html and "Where the votes fell" not in html
+    assert html.count("<li>") == 2
+    assert "Dissent" in html and "Greeks and Volatility would hold." in html
+    assert "LLM-written" in html
+    assert "What would change" not in html and "what would change" not in html
+    split = _call(tmp_path, "quorum_ui", "renderSummary", "ok", SUMMARY, RESULT_SPLIT)
+    assert "Where the votes fell" in split and "Why the majority" not in split
+
+
+def test_panel_starts_with_summary_area_state(tmp_path):
+    assert 'data-state="pending"' in _call(tmp_path, "quorum_ui", "renderResult", RESULT_MAJORITY)
+    assert 'data-state="fixed"' in _call(tmp_path, "quorum_ui", "renderResult", RESULT_NO_QUORUM)
+    no_token = dict(RESULT_MAJORITY, summary_token=None)
+    assert 'data-state="unavailable"' in _call(tmp_path, "quorum_ui", "renderResult", no_token)
+
+
+def _request_summary(tmp_path, result, fetch_spec, current=True, timeout_ms=20000):
+    out = _run_calls([{
+        "module": "quorum_ui", "fn": "requestSummary", "async": True,
+        "args": [result, {"__fake_fetch__": fetch_spec}, {"__const__": current}, timeout_ms],
+    }], tmp_path)
+    return out["results"][0], out["fetches"], out["storage_writes"]
+
+
+def test_no_quorum_sends_no_request(tmp_path):
+    value, fetches, _ = _request_summary(tmp_path, RESULT_NO_QUORUM, {"status": 200, "body": {}})
+    assert value == {"state": "fixed", "summary": None}
+    assert fetches == []
+
+
+def test_missing_token_sends_no_request(tmp_path):
+    value, fetches, _ = _request_summary(tmp_path, dict(RESULT_MAJORITY, summary_token=None), {"status": 200, "body": {}})
+    assert value == {"state": "unavailable", "summary": None}
+    assert fetches == []
+
+
+def test_token_is_posted_once_and_ok_rendered(tmp_path):
+    body = {"status": "ok", "trimmed": False, "summary": SUMMARY}
+    value, fetches, writes = _request_summary(tmp_path, RESULT_MAJORITY, {"status": 200, "body": body})
+    assert value == {"state": "ok", "summary": SUMMARY}
+    assert fetches == [{"url": "/api/quorum/summary", "body": {"summary_token": "tok.en"}}]
+    assert writes == []  # FR-318: nothing stored
+
+
+@pytest.mark.parametrize("spec", [
+    {"status": 403, "body": {"detail": "Summary request rejected"}},
+    {"status": 200, "body": {"status": "unavailable", "trimmed": False, "summary": None}},
+    {"throw": True, "status": 0, "body": None},
+    {"hang": True, "status": 0, "body": None},
+])
+def test_failures_become_unavailable(tmp_path, spec):
+    value, fetches, _ = _request_summary(tmp_path, RESULT_MAJORITY, spec, timeout_ms=50)
+    assert value == {"state": "unavailable", "summary": None}
+    assert len(fetches) == 1
+
+
+def test_stale_panel_is_not_updated(tmp_path):
+    body = {"status": "ok", "trimmed": False, "summary": SUMMARY}
+    value, _, _ = _request_summary(tmp_path, RESULT_MAJORITY, {"status": 200, "body": body}, current=False)
+    assert value is None

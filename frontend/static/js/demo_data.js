@@ -10,7 +10,7 @@
  *   DEMO_EQUITY_HASH  — covered calls + screener candidates (equities & ETFs)
  */
 
-import { buildDemoQuorum } from './demo_quorum.js';
+import { buildDemoQuorum, buildDemoSummary, decodeDemoToken } from './demo_quorum.js';
 
 export const DEMO_SPREADS_HASH = 'demo-spreads-0001';
 export const DEMO_EQUITY_HASH  = 'demo-equity-0002';
@@ -368,6 +368,15 @@ export function demoResponse(url, options = {}) {
       request = JSON.parse(options.body || '{}');
     } catch { /* empty request → NO_QUORUM result */ }
     return _makeResponse(buildDemoQuorum(request));
+  }
+  if (u.pathname === '/api/quorum/summary') {
+    // specs/020 D-312: template summary from the demo token; nothing leaves the browser.
+    let token = null;
+    try {
+      token = JSON.parse(options.body || '{}').summary_token;
+    } catch { /* malformed body → unavailable */ }
+    const payload = decodeDemoToken(token);
+    return _makeResponse(payload ? buildDemoSummary(payload) : { status: 'unavailable', trimmed: false, summary: null });
   }
   return _makeResponse({ detail: 'Demo mode: endpoint not available' });
 }

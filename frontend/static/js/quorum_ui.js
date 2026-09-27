@@ -51,7 +51,10 @@ function pct(x) {
 /** Remove any open quorum panel. Only quorum panel rows are touched — never the payoff graph. */
 export function closeQuorumPanel(root = globalThis.document) {
   if (root) root.querySelectorAll(`.${PANEL_CLASS}`).forEach((row) => row.remove());
-  if (_openBtn) _openBtn.setAttribute('aria-expanded', 'false');
+  if (_openBtn) {
+    _openBtn.setAttribute('aria-expanded', 'false');
+    _openBtn.removeAttribute('aria-busy');
+  }
   _openBtn = null;
   _openId = null;
 }
@@ -203,7 +206,7 @@ export function renderResult(result) {
           <div class="tally">${_renderTally(result)}</div>
           <div class="radial-note">Wedge length = the analyst's confidence. Outer band = their vote. Three matching votes make a majority.</div>
         </div>
-        <div class="summary-area" data-state="none"></div>
+        <div class="summary-area" data-state="${_initialSummaryState(result)}">${renderSummary(_initialSummaryState(result), null, result)}</div>
       </div>
       <div class="members grid grid-cols-1 md:grid-cols-5 gap-2">${_renderVotes(result.votes)}</div>
       ${result.macro_brief ? `
@@ -217,6 +220,77 @@ export function renderResult(result) {
       </div>
       <div class="foot">${esc(result.disclaimer)} · ${esc(result.model)}</div>
     </div>${_notice()}`;
+}
+
+const SUMMARY_TIMEOUT_MS = 20000;
+
+function _initialSummaryState(result) {
+  if (result.verdict === 'NO_QUORUM') return 'fixed';
+  return result.summary_token ? 'pending' : 'unavailable';
+}
+
+/**
+ * Summary area HTML for one state (specs/020 FR-309, FR-312, FR-313).
+ * @param {'pending'|'ok'|'unavailable'|'fixed'} state
+ * @param {{title, explanation, why, dissent}|null} summary
+ * @param {object} result - the vote result (verdict, votes)
+ */
+export function renderSummary(state, summary, result) {
+  const head = '<div class="eyebrow">Quorum summary <span class="tag-new">LLM-written</span></div>';
+  if (state === 'pending') {
+    return `${head}<p class="summary-status"><span class="dot" aria-hidden="true">●</span> Writing summary…</p>`;
+  }
+  if (state === 'fixed') {
+    const valid = result.votes.filter((v) => !v.abstained && v.action).length;
+    const seats = result.seats || result.votes.length;
+    return `<div class="eyebrow">Quorum summary</div><p class="summary-status">Only ${valid} of ${seats} analysts voted — no recommendation.</p>`;
+  }
+  if (state !== 'ok' || !summary) {
+    return `${head}<p class="summary-status">Summary unavailable</p>`;
+  }
+  const whyHeading = result.verdict === 'NO_CONSENSUS' ? 'Where the votes fell' : 'Why the majority';
+  return `${head}
+    <h2 class="summary-title">${esc(summary.title)}</h2>
+    <p class="summary-text">${esc(summary.explanation)}</p>
+    <div class="reason-grid">
+      <div class="reason"><h3>${whyHeading}</h3><ul>${(summary.why || []).map((w) => `<li>${esc(w)}</li>`).join('')}</ul></div>
+      <div class="reason"><h3>Dissent</h3><p>${esc(summary.dissent)}</p></div>
+    </div>`;
+}
+
+/**
+ * Second request of the two-step flow (D-311). Resolves to {state, summary}, or
+ * null when the panel was closed or replaced meanwhile. The token lives only in
+ * this call — never in the DOM or browser storage (FR-318).
+ * @param {object} result
+ * @param {Function} fetchImpl - fetchWithAuth in the app
+ * @param {() => boolean} isCurrent
+ * @param {number} [timeoutMs]
+ */
+export async function requestSummary(result, fetchImpl, isCurrent, timeoutMs = SUMMARY_TIMEOUT_MS) {
+  const state = _initialSummaryState(result);
+  if (state !== 'pending') return { state, summary: null };
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  let outcome = { state: 'unavailable', summary: null };
+  try {
+    const resp = await fetchImpl('/api/quorum/summary', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ summary_token: result.summary_token }),
+      signal: controller.signal,
+    });
+    if (resp && resp.ok) {
+      const body = await resp.json();
+      if (body && body.status === 'ok' && body.summary) outcome = { state: 'ok', summary: body.summary };
+    }
+  } catch {
+    // network error or timeout → unavailable
+  } finally {
+    clearTimeout(timer);
+  }
+  return isCurrent() ? outcome : null;
 }
 
 function _errorMessage(status) {
@@ -250,11 +324,18 @@ export function buildQuorumRequest(legs) {
   };
 }
 
+function _clearBusy() {
+  if (_openBtn) _openBtn.removeAttribute('aria-busy');
+}
+
 async function _openPanel(anchorRow, id, legs, btn) {
   if (_openId === id) { closeQuorumPanel(); return; }
   closeQuorumPanel();
   _openBtn = btn || null;
-  if (_openBtn) _openBtn.setAttribute('aria-expanded', 'true');
+  if (_openBtn) {
+    _openBtn.setAttribute('aria-expanded', 'true');
+    _openBtn.setAttribute('aria-busy', 'true');
+  }
 
   const panel = _panelShell(_renderLoading());
   anchorRow.insertAdjacentElement('afterend', panel);
@@ -265,7 +346,7 @@ async function _openPanel(anchorRow, id, legs, btn) {
 
   const body = buildQuorumRequest(legs);
   if (!body) {
-    cell.innerHTML = _renderError(STALE_MESSAGE);
+    _clearBusy(); cell.innerHTML = _renderError(STALE_MESSAGE);
     return;
   }
 
@@ -278,15 +359,23 @@ async function _openPanel(anchorRow, id, legs, btn) {
     if (!resp) return; // 401 already handled by fetchWithAuth
     if (_openId !== id) return; // closed or replaced while waiting
     if (!resp.ok) {
-      cell.innerHTML = _renderError(_errorMessage(resp.status));
+      _clearBusy(); cell.innerHTML = _renderError(_errorMessage(resp.status));
       return;
     }
     const result = await resp.json();
     cell.innerHTML = renderResult(result);
     _wireRing(cell);
+    _clearBusy();
+
+    const update = await requestSummary(result, fetchWithAuth, () => _openId === id);
+    const area = update && cell.querySelector('.summary-area');
+    if (area) {
+      area.dataset.state = update.state;
+      area.innerHTML = renderSummary(update.state, update.summary, result);
+    }
   } catch (err) {
     console.error('quorum_ui: request failed', err);
-    if (_openId === id) cell.innerHTML = _renderError('Quorum request failed — check your connection and try again.');
+    if (_openId === id) _clearBusy(); cell.innerHTML = _renderError('Quorum request failed — check your connection and try again.');
   }
 }
 

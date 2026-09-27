@@ -18,6 +18,7 @@ function storageSpy(name) {
 }
 globalThis.sessionStorage = storageSpy('sessionStorage');
 globalThis.localStorage = storageSpy('localStorage');
+globalThis.window ??= { location: { origin: 'http://localhost' } };
 
 const MODULES = {
   quorum_ring: '../../frontend/static/js/quorum_ring.js',
@@ -78,6 +79,9 @@ for (const call of input.calls || []) {
   const args = (call.args || []).map(reviveArg);
   let value = fn(...args);
   if (call.async || value instanceof Promise) value = await value;
+  if (typeof Response !== 'undefined' && value instanceof Response) {
+    value = { status: value.status, json: await value.json() };
+  }
   const logs = args.filter((x) => x && x.__log).map((x) => x.__log);
   results.push(logs.length ? { value, logs } : value);
 }

@@ -184,7 +184,7 @@
 
 ### Tests (write first, confirm failing)
 
-- [ ] T020 [P] [US3] Create `tests/unit/test_quorum_summary.py`, seal/unseal section (D-302, D-303, FR-306a):
+- [X] T020 [P] [US3] Create `tests/unit/test_quorum_summary.py`, seal/unseal section (D-302, D-303, FR-306a):
   - `seal_key()` returns `None` when `QUORUM_SEAL_KEY` is unset or shorter than 32 bytes
   - `seal(result, catalog, key=K, now=T)` returns `None` for NO_QUORUM, otherwise a string ≤ 20,000 chars of the form `<b64url>.<b64url>`
   - the payload decodes to canonical JSON with keys `v`, `issued_at`, `underlying_symbol`, `verdict`, `roll_direction`, `tally`, `votes`, `figures`, and contains no `model`, `headlines`, `macro_brief`, token or account field
@@ -192,7 +192,7 @@
   - `unseal(token, key=K, now=T+14min)` round-trips
   - `unseal` raises `TokenRejected` for: one flipped character in the payload; one in the MAC; a different key; `now=T+16min`; `issued_at` 3 min in the future; a payload re-encoded with a different verdict and re-used MAC; `v=2`; an extra key in the payload; a forged NO_QUORUM payload with a valid MAC; non-base64 input
   - the MAC comparison uses `hmac.compare_digest` (patch it and assert it was called)
-- [ ] T021 [P] [US3] In `tests/unit/test_quorum_summary.py`, guard section (D-307, FR-310, FR-311). Build a payload for each verdict and call `guard(SummaryDraft(...), payload)`:
+- [X] T021 [P] [US3] In `tests/unit/test_quorum_summary.py`, guard section (D-307, FR-310, FR-311). Build a payload for each verdict and call `guard(SummaryDraft(...), payload)`:
   - `{captured_pct}` and `{max_profit}` are replaced by their `display` values
   - a "why" bullet containing `90` is removed, `trimmed=True`, and status stays `ok`
   - a digit in the title → `unavailable`; a digit in the explanation → `unavailable`
@@ -206,7 +206,7 @@
   - NO_CONSENSUS with title naming "close" or "roll" → `unavailable`, while "hold" is allowed
   - title > 120 chars truncated; `why` > 4 items truncated to 4; an explanation of 5 sentences keeps the first 3
   - `guard` returns a `reason` code for every non-ok or trimmed outcome
-- [ ] T022 [P] [US3] In `tests/unit/test_quorum_summary.py`, summariser section, using `FakeLlm` from `tests/unit/test_quorum_agents.py` (import it or move it to `tests/conftest.py` if needed):
+- [X] T022 [P] [US3] In `tests/unit/test_quorum_summary.py`, summariser section, using `FakeLlm` from `tests/unit/test_quorum_agents.py` (import it or move it to `tests/conftest.py` if needed):
   - the agent name is `quorum_summariser`, `output_schema` is `SummaryDraft`, and there are no tools
   - the instruction contains no `{` or `}` except in the documented placeholder example (ADK templating safety, as in the existing seat-instruction test)
   - the request text wraps the payload in `DATA START`/`DATA END`, labelled untrusted
@@ -215,12 +215,12 @@
   - a fake that sleeps 11 s → `summarise(..., timeout=10)` returns `unavailable` in < 10.5 s
   - malformed JSON → `unavailable`
   - the privacy scan (the same helper as `test_no_identifiers_reach_the_model`) finds no account hash, token, IP or OCC symbol in the summariser request (FR-314, SC-308)
-- [ ] T023 [P] [US3] In `tests/contract/test_quorum_api.py`, vote route additions:
+- [X] T023 [P] [US3] In `tests/contract/test_quorum_api.py`, vote route additions:
   - with `QUORUM_SEAL_KEY` set, a ROLL result has a non-null `summary_token` that `unseal` accepts
   - NO_QUORUM → `summary_token` null
   - key unset → null
   - the response still passes every existing 018 assertion
-- [ ] T024 [P] [US3] In `tests/contract/test_quorum_api.py`, a new `TestQuorumSummary` class for `POST /api/quorum/summary`, with the fake summariser recording calls:
+- [X] T024 [P] [US3] In `tests/contract/test_quorum_api.py`, a new `TestQuorumSummary` class for `POST /api/quorum/summary`, with the fake summariser recording calls:
   - 200 `{status:"ok", trimmed:false, summary:{title, explanation, why, dissent}}` for a valid token
   - 200 `{status:"unavailable", summary:null}` when the fake fails
   - 503 when quorum is unconfigured or the key is unset
@@ -230,41 +230,41 @@
   - in every non-200 case, the fake summariser is never called
   - 429 on the 6th request within a minute
   - `Cache-Control: no-store` present
-- [ ] T025 [P] [US3] In `tests/unit/test_quorum_ui.py`, test `renderSummary(state, summary)`:
+- [X] T025 [P] [US3] In `tests/unit/test_quorum_ui.py`, test `renderSummary(state, summary)`:
   - `pending` → "Writing summary…"
   - `unavailable` → "Summary unavailable"
   - `fixed` (from a NO_QUORUM result) → "Only 2 of 5 analysts voted — no recommendation."
   - `ok` → title `<h2>`, explanation `<p>`, the heading "Why the majority" (or "Where the votes fell" for NO_CONSENSUS), `<li>` per bullet, "Dissent" paragraph, and the tag "LLM-written"
   - all text is escaped
   - there is no "What would change" heading
-- [ ] T026 [P] [US3] In `tests/unit/test_quorum_ui.py`, test the client flow `requestSummary(result, fetchImpl, isCurrent)` (a pure async function exported from `quorum_ui.js`):
+- [X] T026 [P] [US3] In `tests/unit/test_quorum_ui.py`, test the client flow `requestSummary(result, fetchImpl, isCurrent)` (a pure async function exported from `quorum_ui.js`):
   - NO_QUORUM → no fetch call, state `fixed`
   - null token → no fetch, `unavailable`
   - token present → exactly one POST to `/api/quorum/summary` with body `{"summary_token": token}`, then `ok`
   - non-200, `status:"unavailable"`, a thrown error, or an abort after 20 s (fake timer) → `unavailable`
   - `isCurrent()` false when the response arrives → no state update
   - no `sessionStorage`/`localStorage` writes (harness spies, FR-318)
-- [ ] T027 [P] [US3] In `tests/unit/test_demo_quorum.py`:
+- [X] T027 [P] [US3] In `tests/unit/test_demo_quorum.py`:
   - `buildDemoQuorum` on a demo spread returns `summary_token` starting with `demo.`, and on an empty request (NO_QUORUM) returns `null`
   - `buildDemoSummary(decodedPayload)` returns `{status:"ok", summary}` whose text contains no digit outside the filled catalog values (compare against the catalog `display` strings), names the verdict in the title, and uses "Where the votes fell" wording for NO_CONSENSUS
   - the harness shows `demo_data.js` answering `/api/quorum/summary` without any real `fetch` (FR-321)
 
 ### Implementation
 
-- [ ] T028 [US3] In `src/data/models.py`, add:
+- [X] T028 [US3] In `src/data/models.py`, add:
   - `SummaryDraft` with `title` stripped ≤ 120 chars, `explanation` ≤ 600, `why: list[str]` 1–4 items each ≤ 200, `dissent` ≤ 400; validators truncate rather than reject over-long text, while an empty `why` fails validation
   - `QuorumSummary(status: Literal["ok","unavailable"], trimmed: bool = False, summary: SummaryBody | None)`
   - `SummaryRequest(summary_token: str)` with `extra="forbid"` and max length 20,000
   - the internal `SummaryPayload` pydantic model per data-model.md with `extra="forbid"`
-- [ ] T029 [US3] Create `src/services/quorum_summary.py`:
+- [X] T029 [US3] Create `src/services/quorum_summary.py`:
   - `seal_key()`, `seal()`, `unseal()` (raises `TokenRejected`), `MAX_TOKEN_AGE = timedelta(minutes=15)`, `MAX_SKEW = timedelta(minutes=2)` (D-302, D-303)
   - `build_summariser_agent(model)`: `LlmAgent`, temperature 0.2 (D-306), with the instruction text from D-306
   - `summarise(payload, *, model, timeout=10.0)`, which uses `_run_agent` from `quorum_agents.py`
   - `guard(draft, payload)` per D-307, logging `quorum summary guard outcome=… reason=…` at INFO with no text
 
   Makes T020–T022 pass.
-- [ ] T030 [US3] In `src/services/quorum_agents.py`, `run_quorum` builds `catalog = figure_catalog.build(ctx)` and, after `tally_votes`, `add_tally(...)`. It sets `summary_token = quorum_summary.seal(result, catalog, key=seal_key(), now=now)` (`None` when the key is missing). Makes T023 pass.
-- [ ] T031 [US3] In `src/api/routes/quorum.py`, add `POST /api/quorum/summary` with `@limiter.limit("5/minute")` and `SUMMARY_TIMEOUT_SECONDS = 15.0`, doing in order:
+- [X] T030 [US3] In `src/services/quorum_agents.py`, `run_quorum` builds `catalog = figure_catalog.build(ctx)` and, after `tally_votes`, `add_tally(...)`. It sets `summary_token = quorum_summary.seal(result, catalog, key=seal_key(), now=now)` (`None` when the key is missing). Makes T023 pass.
+- [X] T031 [US3] In `src/api/routes/quorum.py`, add `POST /api/quorum/summary` with `@limiter.limit("5/minute")` and `SUMMARY_TIMEOUT_SECONDS = 15.0`, doing in order:
   1. 503 if not configured or no key
   2. 24 KiB body cap
   3. `SummaryRequest` validation (422 with locations only)
@@ -274,14 +274,14 @@
   7. return JSON with `Cache-Control: no-store`
 
   Makes T024 pass.
-- [ ] T032 [US3] In `frontend/static/js/quorum_ui.js`:
+- [X] T032 [US3] In `frontend/static/js/quorum_ui.js`:
   - add `renderSummary(state, summary)` and `requestSummary(result, fetchImpl, isCurrent)` (D-311, with a 20 s `AbortController`)
   - in `_openPanel`, after rendering the result, set the summary area to `fixed`, `unavailable` or `pending`, then await `requestSummary(result, fetchWithAuth, () => _openId === id)` and update the summary area
   - keep the token only in the closure, never in the DOM
   - add summary CSS (`.summary`, `.reason-grid`, `.tag-new`) to `frontend/templates/base.html`
 
   Makes T025 and T026 pass.
-- [ ] T033 [US3] In `frontend/static/js/demo_quorum.js`, add:
+- [X] T033 [US3] In `frontend/static/js/demo_quorum.js`, add:
   - `demoCatalog(figures, votes, tally)`, reusing the names from data-model.md
   - `summary_token = 'demo.' + base64url(JSON payload)` for non-NO_QUORUM results
   - an exported `buildDemoSummary(payload)` using the verdict templates with `{name}` placeholders, filled from the catalog

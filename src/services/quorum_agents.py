@@ -40,6 +40,7 @@ from src.data.models import (
     PositionLegContext,
     QuorumResult,
 )
+from src.services import figure_catalog, quorum_summary
 from src.services.fundamentals import leg_fundamentals, position_fundamentals
 from src.services.greeks_service import RISK_FREE_RATE
 from src.services.news_feeds import fetch_headlines
@@ -330,6 +331,7 @@ async def run_quorum(
     """
     model = model if model is not None else default_model()
     fetcher = headline_fetcher or fetch_headlines  # resolved at call time (testable)
+    catalog = figure_catalog.build(ctx)  # specs/020 D-304
 
     fundamentals_message = _seat_message(ctx)
     early = {
@@ -351,7 +353,7 @@ async def run_quorum(
     votes = [await tasks[seat.id] for seat in SEATS]
 
     verdict, quorum_met, valid, tally = tally_votes(votes)
-    return QuorumResult(
+    result = QuorumResult(
         verdict=verdict,
         quorum_met=quorum_met,
         seats=len(SEATS),
@@ -366,3 +368,11 @@ async def run_quorum(
         as_of=ctx.as_of,
         position_fundamentals=ctx.position_fundamentals,
     )
+    # Signed summariser input for the follow-up summary request (specs/020 D-302).
+    result.summary_token = quorum_summary.seal(
+        result,
+        figure_catalog.add_tally(catalog, tally, votes),
+        key=quorum_summary.seal_key(),
+        now=datetime.now(timezone.utc),
+    )
+    return result

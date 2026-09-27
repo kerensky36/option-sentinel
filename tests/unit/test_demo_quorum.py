@@ -5,6 +5,7 @@ frontend/static/js/demo_quorum.js is pure; the harness imports it and prints JSO
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import subprocess
 from collections import Counter
@@ -167,3 +168,63 @@ def test_prob_itm_is_consistent_with_moneyness(tmp_path):
     v = _vote(_one(_req(leg), tmp_path), "strike_assignment")
     pct = int(re.search(r"≈(\d+)% chance", v["rationale"]).group(1))
     assert pct > 50
+
+
+# ── specs/020: demo summary via the intercepted summary request (T027) ─────────
+
+UI_HARNESS = Path(__file__).with_name("quorum_ui_harness.mjs")
+
+
+def _ui(calls, tmp_path):
+    path = tmp_path / "ui_calls.json"
+    path.write_text(json.dumps({"calls": calls}))
+    proc = subprocess.run([NODE, str(UI_HARNESS), str(path)], capture_output=True, text=True, timeout=30)
+    assert proc.returncode == 0, proc.stderr
+    return json.loads(proc.stdout)
+
+
+def _decode_demo(token):
+    import base64
+    body = token.split(".", 1)[1]
+    return json.loads(base64.urlsafe_b64decode(body + "=" * (-len(body) % 4)))
+
+
+def test_demo_result_carries_demo_token_and_cited_figures(tmp_path):
+    r = _one(_req(), tmp_path)
+    assert r["summary_token"].startswith("demo.")
+    payload = _decode_demo(r["summary_token"])
+    assert payload["verdict"] == r["verdict"]
+    assert payload["figures"]
+    cited = [c for v in r["votes"] for c in v["cited_figures"]]
+    assert cited, "demo seats should cite figures"
+    for c in cited:
+        assert payload["figures"][c["name"]]["display"] == c["display"]
+    assert _one({"as_of": AS_OF, "legs": []}, tmp_path)["summary_token"] is None
+
+
+def test_demo_summary_uses_only_catalog_numbers(tmp_path):
+    for req in (_req(), _req(_leg(days_to_expiry=5)), _req(_leg(unrealised_pnl="250.00"))):
+        r = _one(req, tmp_path)
+        payload = _decode_demo(r["summary_token"])
+        out = _ui([{"module": "demo_quorum", "fn": "buildDemoSummary", "args": [payload]}], tmp_path)["results"][0]
+        assert out["status"] == "ok"
+        s = out["summary"]
+        text = " ".join([s["title"], s["explanation"], *s["why"], s["dissent"]])
+        for display in sorted((f["display"] for f in payload["figures"].values()), key=len, reverse=True):
+            text = text.replace(display, "")
+        assert not re.search(r"\d", text), text
+        if r["verdict"] in ("CLOSE", "HOLD", "ROLL"):
+            assert r["verdict"].lower() in s["title"].lower()
+        assert "demo" in s["title"].lower() or "demo" in s["explanation"].lower()
+
+
+def test_demo_data_answers_summary_without_network(tmp_path):
+    r = _one(_req(), tmp_path)
+    opts = {"method": "POST", "body": json.dumps({"summary_token": r["summary_token"]})}
+    out = _ui([{"module": "demo_data", "fn": "demoResponse", "args": ["/api/quorum/summary", opts]}], tmp_path)
+    resp = out["results"][0]
+    assert resp["status"] == 200 and resp["json"]["status"] == "ok"
+    assert out["fetches"] == []
+    bad = _ui([{"module": "demo_data", "fn": "demoResponse",
+                "args": ["/api/quorum/summary", {"method": "POST", "body": json.dumps({"summary_token": "x.y"})}]}], tmp_path)
+    assert bad["results"][0]["json"]["status"] == "unavailable"

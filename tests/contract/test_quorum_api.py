@@ -338,3 +338,173 @@ class TestPrivacyEndToEnd:
             assert _TOKEN not in text
             assert "account_hash" not in text
             assert "testclient" not in text  # client host/IP never forwarded
+
+
+# ── specs/020: summary token on the vote result (T023) ─────────────────────────
+
+_SEAL_KEY = "s" * 40
+
+
+def _real_quorum(client, action, monkeypatch, key=_SEAL_KEY):
+    from tests.unit.test_quorum_agents import _SEAT_IDS, _ballot, _fake
+
+    if key is None:
+        monkeypatch.delenv("QUORUM_SEAL_KEY", raising=False)
+    else:
+        monkeypatch.setenv("QUORUM_SEAL_KEY", key)
+    replies = {sid: (_ballot(action) if action else RuntimeError("down")) for sid in _SEAT_IDS}
+    fake = _fake(replies)
+    with (
+        patch("src.services.quorum_agents.fetch_headlines", new_callable=AsyncMock) as news,
+        patch("src.services.quorum_agents.default_model", return_value=fake),
+    ):
+        news.return_value = _HEADLINES
+        return _post(client, _body())
+
+
+class TestVoteSummaryToken:
+    def test_roll_result_carries_a_verifiable_token(self, client, schwab, monkeypatch):
+        from src.services.quorum_summary import unseal
+
+        resp = _real_quorum(client, "ROLL", monkeypatch)
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["verdict"] == "ROLL"
+        payload = unseal(data["summary_token"], key=_SEAL_KEY.encode(), now=datetime.now(timezone.utc))
+        assert payload.verdict == "ROLL"
+        for key in ("tally", "votes", "headlines", "as_of", "position_fundamentals", "disclaimer"):
+            assert key in data  # 018 shape unchanged
+
+    def test_no_quorum_has_no_token(self, client, schwab, monkeypatch):
+        data = _real_quorum(client, None, monkeypatch).json()
+        assert data["verdict"] == "NO_QUORUM"
+        assert data["summary_token"] is None
+
+    def test_no_seal_key_means_no_token(self, client, schwab, monkeypatch):
+        data = _real_quorum(client, "HOLD", monkeypatch, key=None).json()
+        assert data["verdict"] == "HOLD"
+        assert data["summary_token"] is None
+
+
+# ── specs/020: POST /api/quorum/summary (T024) ────────────────────────────────
+
+def _token(verdict="ROLL", issued=None, key=_SEAL_KEY):
+    from src.services import figure_catalog
+    from src.services.quorum_summary import seal
+    from tests.unit.test_quorum_summary import MAJORITY, NO_QUORUM, _ctx, _tally, _votes
+
+    now = issued or datetime.now(timezone.utc)
+    votes = _votes(NO_QUORUM if verdict == "NO_QUORUM" else MAJORITY)
+    tally = _tally(votes)
+    result = _result(verdict=verdict, votes=votes, tally=tally, generated_at=now, as_of=now)
+    catalog = figure_catalog.add_tally(figure_catalog.build(_ctx()), tally, votes)
+    if verdict == "NO_QUORUM":  # seal() refuses; forge a validly signed one
+        import base64, hashlib, hmac
+        from src.services.quorum_summary import _payload_for
+        body = base64.urlsafe_b64encode(
+            json.dumps(_payload_for(result, catalog, now).model_dump(mode="json"), sort_keys=True, separators=(",", ":")).encode()
+        ).rstrip(b"=").decode()
+        mac = base64.urlsafe_b64encode(hmac.new(key.encode(), body.encode(), hashlib.sha256).digest()).rstrip(b"=").decode()
+        return body + "." + mac
+    return seal(result, catalog, key=key.encode(), now=now)
+
+
+_OK_SUMMARY = {
+    "status": "ok",
+    "trimmed": False,
+    "summary": {"title": "Roll the spread out.", "explanation": "x.", "why": ["y."], "dissent": "z."},
+}
+
+
+@pytest.fixture
+def summariser(schwab, monkeypatch):
+    from src.data.models import QuorumSummary
+
+    monkeypatch.setenv("QUORUM_SEAL_KEY", _SEAL_KEY)
+    with patch("src.api.routes.quorum.summarise", new_callable=AsyncMock) as fake:
+        fake.return_value = QuorumSummary.model_validate(_OK_SUMMARY)
+        yield fake
+
+
+def _post_summary(client, body, headers=_AUTH):
+    return client.post("/api/quorum/summary", json=body, headers=headers)
+
+
+class TestQuorumSummary:
+    def test_200_ok_summary(self, client, summariser):
+        resp = _post_summary(client, {"summary_token": _token()})
+        assert resp.status_code == 200
+        assert resp.json() == _OK_SUMMARY
+        assert resp.headers["cache-control"] == "no-store"
+        assert summariser.await_count == 1
+
+    def test_200_unavailable_when_summariser_fails(self, client, summariser):
+        from src.data.models import QuorumSummary
+
+        summariser.return_value = QuorumSummary(status="unavailable")
+        resp = _post_summary(client, {"summary_token": _token()})
+        assert resp.status_code == 200
+        assert resp.json() == {"status": "unavailable", "trimmed": False, "summary": None}
+
+    def test_503_without_seal_key(self, client, summariser, monkeypatch):
+        monkeypatch.delenv("QUORUM_SEAL_KEY")
+        assert _post_summary(client, {"summary_token": _token()}).status_code == 503
+        summariser.assert_not_awaited()
+
+    def test_503_when_quorum_not_configured(self, client, summariser, monkeypatch):
+        monkeypatch.delenv("GOOGLE_CLOUD_PROJECT")
+        assert _post_summary(client, {"summary_token": _token()}).status_code == 503
+        summariser.assert_not_awaited()
+
+    @pytest.mark.parametrize("body", [{"summary_token": "a.b", "extra": 1}, {}, {"summary_token": 5}])
+    def test_422_bad_body_never_echoes_input(self, client, summariser, body):
+        resp = _post_summary(client, body)
+        assert resp.status_code == 422
+        assert "a.b" not in resp.text
+        summariser.assert_not_awaited()
+
+    def test_422_non_json_and_oversize(self, client, summariser):
+        resp = client.post("/api/quorum/summary", content=b"not json", headers={**_AUTH, "Content-Type": "application/json"})
+        assert resp.status_code == 422
+        big = "A" * (25 * 1024)
+        resp = _post_summary(client, {"summary_token": big})
+        assert resp.status_code == 422
+        assert big[:100] not in resp.text
+        summariser.assert_not_awaited()
+
+    def test_401_without_auth(self, client, summariser):
+        assert _post_summary(client, {"summary_token": _token()}, headers={}).status_code == 401
+        summariser.assert_not_awaited()
+
+    def test_401_when_schwab_rejects(self, client, summariser, schwab, caplog):
+        schwab.status = 401
+        with caplog.at_level(logging.WARNING, logger="security"):
+            assert _post_summary(client, {"summary_token": _token()}).status_code == 401
+        assert "401_invalid_token" in caplog.text
+        summariser.assert_not_awaited()
+
+    def test_502_when_token_check_fails(self, client, summariser, schwab):
+        schwab.status = 500
+        assert _post_summary(client, {"summary_token": _token()}).status_code == 502
+        summariser.assert_not_awaited()
+
+    @pytest.mark.parametrize("case", ["tampered", "expired", "no_quorum", "wrong_key"])
+    def test_403_identical_body_and_no_model_call(self, client, summariser, case):
+        if case == "tampered":
+            t = _token()
+            token = t[:10] + ("A" if t[10] != "A" else "B") + t[11:]
+        elif case == "expired":
+            token = _token(issued=datetime.now(timezone.utc) - timedelta(minutes=16))
+        elif case == "no_quorum":
+            token = _token("NO_QUORUM")
+        else:
+            token = _token(key="w" * 40)
+        resp = _post_summary(client, {"summary_token": token})
+        assert resp.status_code == 403
+        assert resp.json() == {"detail": "Summary request rejected"}
+        summariser.assert_not_awaited()
+
+    def test_429_after_five(self, client, summariser):
+        token = _token()
+        codes = [_post_summary(client, {"summary_token": token}).status_code for _ in range(6)]
+        assert codes[:5] == [200] * 5 and codes[5] == 429

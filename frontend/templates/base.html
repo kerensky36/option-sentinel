@@ -253,6 +253,22 @@
     @keyframes wedge-grow { from { transform: scale(0.2); opacity: 0; } to { transform: scale(1); opacity: 1; } }
     .quorum-panel .wedge-fill.anim { transform-box: view-box; transform-origin: 140px 140px; animation: wedge-grow 0.45s cubic-bezier(.2,.8,.3,1) both; }
     @media (prefers-reduced-motion: reduce) { .quorum-panel .wedge-fill.anim { animation: none; } }
+
+    /* ── Quorum summary area (specs/020 US3) ── */
+    .quorum-panel .summary-area { display: grid; gap: 10px; min-width: 0; }
+    .quorum-panel .eyebrow { color: #626270; font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase; display: flex; gap: 8px; align-items: center; }
+    .quorum-panel .tag-new { color: #aeaeb8; border: 1px solid #2c2c3a; padding: 0 5px; font-size: 8px; letter-spacing: 0.12em; }
+    .quorum-panel .summary-title { margin: 0; font-size: 14px; font-weight: 600; color: #d2d2d8; text-wrap: balance; }
+    .quorum-panel .summary-text { margin: 0; color: #aeaeb8; line-height: 1.65; max-width: 72ch; }
+    .quorum-panel .summary-status { margin: 0; color: #90909c; }
+    .quorum-panel .summary-status .dot { color: #c8a820; animation: quorum-pulse 1s infinite; }
+    @keyframes quorum-pulse { 50% { opacity: 0.2; } }
+    @media (prefers-reduced-motion: reduce) { .quorum-panel .summary-status .dot { animation: none; } }
+    .quorum-panel .reason-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }
+    .quorum-panel .reason { border-top: 1px solid #2c2c3a; padding-top: 6px; display: grid; gap: 4px; align-content: start; }
+    .quorum-panel .reason h3 { margin: 0; font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase; color: #626270; font-weight: 600; }
+    .quorum-panel .reason ul { margin: 0; padding-left: 14px; color: #90909c; display: grid; gap: 3px; line-height: 1.55; list-style: disc; }
+    .quorum-panel .reason p { margin: 0; color: #90909c; line-height: 1.55; }
   </style>
 </head>
 <body class="bg-gray-950 text-gray-100 min-h-screen flex flex-col">
