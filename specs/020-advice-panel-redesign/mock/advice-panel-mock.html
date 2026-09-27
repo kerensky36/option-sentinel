@@ -1,0 +1,621 @@
+<title>Sentinel Advice Panel</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  /* Single dark look, matching Option Sentinel's ThinkorSwim-style theme (base.html). */
+  :root {
+    color-scheme: dark;
+    --bg-950: #0c0c10;
+    --bg-900: #14141a;
+    --bg-800: #1c1c24;
+    --bg-700: #252532;
+    --line: #22222e;
+    --line-2: #2c2c3a;
+    --tx-1: #d2d2d8;
+    --tx-2: #aeaeb8;
+    --tx-3: #90909c;
+    --tx-4: #626270;
+    --tx-5: #484856;
+    --green: #2ec82e;
+    --red: #d43c3c;
+    --amber: #c8a820;
+    --amber-dim: #1e1a08;
+    --blue: #60a5fa;
+    --yellow: #facc15;
+    --v-close: #e8703a;
+    --v-hold: #8c93a8;
+    --v-roll: #3aa8e0;
+    --v-none: #3a3a4a;
+    --pin: #d2d2d8;
+    --mono: "JetBrains Mono", Consolas, ui-monospace, monospace;
+  }
+  *, *::before, *::after { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg-950);
+    color: var(--tx-1);
+    font-family: var(--mono);
+    font-size: 11px;
+    line-height: 1.5;
+    letter-spacing: 0.01em;
+    -webkit-font-smoothing: antialiased;
+  }
+  button { font-family: inherit; }
+  :focus-visible { outline: 1px solid var(--blue); outline-offset: 2px; }
+  .up { text-transform: uppercase; letter-spacing: 0.12em; }
+  .num { font-variant-numeric: tabular-nums; }
+
+  /* ── Review strip (mock-only, outside the app frame) ── */
+  .review {
+    padding: 14px 16px;
+    border-bottom: 1px dashed var(--line-2);
+    background: repeating-linear-gradient(135deg, #111117 0 12px, #13131a 12px 24px);
+    display: grid;
+    gap: 10px;
+  }
+  .review h1 { margin: 0; font-size: 13px; font-weight: 600; letter-spacing: 0.1em; color: var(--tx-1); text-wrap: balance; }
+  .review p { margin: 0; color: var(--tx-3); max-width: 80ch; }
+  .changes { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 8px; }
+  .change { display: flex; gap: 8px; align-items: flex-start; color: var(--tx-2); }
+  .pin {
+    flex: none; width: 16px; height: 16px; border-radius: 50%;
+    background: var(--pin); color: #111; font-weight: 700; font-size: 9px;
+    display: inline-flex; align-items: center; justify-content: center;
+    box-shadow: 0 0 0 2px rgba(224,185,58,0.18);
+  }
+  .scenario { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; color: var(--tx-4); }
+  .scenario button {
+    background: var(--bg-800); color: var(--tx-3); border: 1px solid var(--line-2);
+    padding: 3px 8px; font-size: 10px; cursor: pointer; border-radius: 1px;
+  }
+  .scenario button[aria-pressed="true"] { color: var(--tx-1); border-color: var(--pin); }
+
+  /* ── App chrome ── */
+  .nav {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    background: var(--bg-900); border-bottom: 1px solid var(--line); padding: 6px 16px;
+  }
+  .brand { display: flex; align-items: center; gap: 8px; color: var(--tx-2); font-weight: 600; font-size: 11px; }
+  .brand-mark { width: 18px; height: 18px; border-radius: 50%; background: radial-gradient(circle at 50% 45%, #ff4a2a 0 28%, #3a0d08 30% 60%, #1a0604 62%); box-shadow: 0 0 6px rgba(255,34,0,0.5); }
+  .nav-right { display: flex; gap: 8px; align-items: center; color: var(--tx-4); font-size: 9px; }
+  .chip-btn { background: var(--bg-800); color: var(--tx-3); border: 0; padding: 3px 8px; font-size: 9px; }
+  .chip-btn.red { background: #3a1010; color: #e05050; }
+  .shell { display: flex; min-height: 0; }
+  .side {
+    width: 200px; flex: none; background: var(--bg-900); border-right: 1px solid var(--line);
+    padding-block: 8px; display: flex; flex-direction: column; gap: 4px;
+  }
+  .side-label { padding: 6px 12px; font-size: 9px; letter-spacing: 0.14em; color: #3a3a52; }
+  .side-item {
+    margin: 0 8px; padding: 8px 10px; font-size: 11px; color: #9090b8; display: flex; gap: 8px; align-items: center;
+    background: linear-gradient(180deg, #20202e, #161622); border: 1px solid #2c2c42; border-radius: 2px;
+  }
+  .side-item.active { background: linear-gradient(180deg, #0c0c1c, #12122a); color: #d0d0f0; border-color: #3e3e62; box-shadow: inset 0 3px 7px rgba(0,0,0,0.65); }
+  .pill { width: 20px; height: 10px; border-radius: 10px; flex: none; }
+  .pill.r { background: linear-gradient(145deg, #c42828, #7a1010); }
+  .pill.b { background: linear-gradient(145deg, #2255cc, #0e2d7a); opacity: 0.65; }
+  main { flex: 1; min-width: 0; padding: 16px; }
+  .toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; gap: 8px; }
+  .toolbar .title { color: var(--tx-4); font-size: 9px; letter-spacing: 0.16em; }
+
+  /* ── Positions table ── */
+  .table-wrap { border: 1px solid var(--line); background: var(--bg-900); overflow-x: auto; border-radius: 2px; }
+  table { border-collapse: collapse; width: 100%; font-size: 11px; }
+  th { font-size: 9px; letter-spacing: 0.12em; font-weight: 600; color: var(--tx-4); text-align: left; padding: 5px 8px; text-transform: uppercase; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  td { padding: 4px 8px; white-space: nowrap; border-bottom: 1px solid var(--line); color: var(--tx-2); }
+  .r { text-align: right; }
+  tr.spread td { background: rgba(28,28,36,0.6); font-weight: 500; }
+  tr.leg td:first-child { padding-left: 22px; color: var(--tx-4); font-size: 10px; }
+  .pos { color: var(--green); } .neg { color: var(--red); } .dim { color: var(--tx-5); }
+  .call { color: var(--green); font-size: 9px; } .put { color: var(--red); font-size: 9px; }
+  .chev { color: var(--tx-3); margin-right: 4px; font-size: 9px; }
+  tr.drawer > td { padding: 0; background: rgba(20,20,26,0.6); white-space: normal; }
+  .drawer-inner { position: sticky; left: 0; padding: 12px 16px 16px; display: grid; gap: 14px; }
+
+  /* ── Payoff graph (as today) ── */
+  .checkpoints { display: flex; gap: 4px; }
+  .checkpoints button { background: none; border: 0; color: var(--tx-5); font-size: 9px; padding: 2px 6px; cursor: pointer; }
+  .checkpoints button.on { color: var(--blue); border-bottom: 1px solid var(--blue); }
+  .payoff svg { width: 100%; display: block; }
+
+  /* ── Advice button (in the row) ── */
+  .advice-btn {
+    display: inline-flex; align-items: stretch; border: 1px solid #5a4a12; cursor: pointer; padding: 0;
+    background: var(--bg-800); color: var(--tx-1); border-radius: 2px; margin-left: 10px; vertical-align: middle;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 1px 3px rgba(0,0,0,0.5);
+  }
+  .advice-btn:hover { background: var(--bg-700); border-color: var(--amber); }
+  .advice-btn[aria-expanded="true"] { background: #231f0a; border-color: var(--amber); }
+  .advice-btn .hazard { width: 8px; flex: none; background: repeating-linear-gradient(135deg, var(--amber) 0 3px, #16140a 3px 6px); }
+  .advice-btn .label { padding: 2px 8px 2px 6px; font-size: 10px; font-weight: 700; letter-spacing: 0.14em; white-space: nowrap; }
+  .advice-btn .label em { font-style: normal; font-weight: 500; letter-spacing: 0.04em; color: var(--amber); }
+  .advice-btn[aria-busy="true"] .label::after { content: " …"; }
+  tr.advice-row > td { padding: 0; background: rgba(20,20,26,0.6); white-space: normal; }
+
+  /* ── Result panel ── */
+  .result { display: grid; gap: 14px; border: 1px solid var(--line-2); background: var(--bg-900); padding: 14px; position: relative; }
+  .result-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+  .verdict {
+    padding: 3px 10px; font-weight: 700; letter-spacing: 0.2em; font-size: 12px; border-radius: 1px;
+    background: var(--vc-bg, var(--bg-700)); color: var(--vc-fg, var(--tx-1));
+  }
+  .result-head .meta { color: var(--tx-3); }
+  .result-head .asof { color: var(--tx-5); font-size: 9px; margin-left: auto; }
+  .warn-strip {
+    display: flex; gap: 8px; align-items: center; color: var(--amber); background: var(--amber-dim);
+    border: 1px solid #3a3210; padding: 5px 10px; font-size: 10px;
+  }
+  .overview { display: grid; grid-template-columns: minmax(240px, 340px) 1fr; gap: 18px; align-items: start; }
+  @media (max-width: 760px) { .overview { grid-template-columns: 1fr; } }
+
+  .radial-card { display: grid; gap: 8px; justify-items: center; }
+  .radial-card svg { width: 100%; max-width: 340px; height: auto; display: block; overflow: visible; }
+  .wedge { cursor: pointer; transition: opacity 0.15s; }
+  .radial-card svg:hover .wedge { opacity: 0.45; }
+  .radial-card svg .wedge:hover, .radial-card svg .wedge.hl { opacity: 1; }
+  .tally { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; color: var(--tx-3); font-size: 10px; }
+  .tally span { display: inline-flex; align-items: center; gap: 5px; }
+  .sw { width: 9px; height: 9px; display: inline-block; border-radius: 1px; }
+  .tally .win { color: var(--tx-1); font-weight: 600; }
+  .radial-note { color: var(--tx-4); font-size: 9px; text-align: center; max-width: 34ch; }
+
+  .summary { display: grid; gap: 10px; min-width: 0; }
+  .eyebrow { color: var(--tx-4); font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase; display: flex; gap: 8px; align-items: center; }
+  .tag-new { color: var(--tx-2); border: 1px solid var(--line-2); padding: 0 5px; font-size: 8px; letter-spacing: 0.12em; }
+  .summary h2 { margin: 0; font-size: 14px; font-weight: 600; color: var(--tx-1); text-wrap: balance; }
+  .summary p { margin: 0; color: var(--tx-2); line-height: 1.65; max-width: 72ch; }
+  .reason-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; }
+  .reason { border-top: 1px solid var(--line-2); padding-top: 6px; display: grid; gap: 4px; align-content: start; }
+  .reason h3 { margin: 0; font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--tx-4); font-weight: 600; }
+  .reason ul { margin: 0; padding-left: 14px; color: var(--tx-3); display: grid; gap: 3px; line-height: 1.55; }
+  .reason p { color: var(--tx-3); line-height: 1.55; }
+
+  /* ── Member rows ── */
+  .members { display: grid; gap: 0; border: 1px solid var(--line); }
+  .members-head { display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; border-bottom: 1px solid var(--line); background: var(--bg-800); }
+  .members-head button { background: none; border: 0; color: var(--tx-4); font-size: 9px; cursor: pointer; letter-spacing: 0.1em; }
+  .members-head button:hover { color: var(--tx-2); }
+  details.member { border-bottom: 1px solid var(--line); }
+  details.member:last-child { border-bottom: 0; }
+  details.member > summary {
+    list-style: none; cursor: pointer; display: grid; align-items: center; gap: 10px;
+    grid-template-columns: 4px minmax(150px, 1.4fr) 140px minmax(90px, 1fr) 14px;
+    padding: 7px 10px 7px 0;
+  }
+  details.member > summary::-webkit-details-marker { display: none; }
+  details.member > summary:hover, details.member.hl > summary { background: rgba(34,34,50,0.55); }
+  .stripe { align-self: stretch; background: var(--c); }
+  .lens { color: var(--tx-1); display: flex; gap: 8px; align-items: baseline; min-width: 0; }
+  .lens small { color: var(--tx-5); font-size: 9px; }
+  .vote-chip { display: inline-flex; gap: 6px; align-items: baseline; }
+  .vote-chip b { color: var(--c); letter-spacing: 0.14em; font-weight: 700; }
+  .vote-chip span { color: var(--tx-4); font-size: 9px; }
+  .conf { display: flex; align-items: center; gap: 8px; }
+  .conf-track { flex: 1; height: 5px; background: var(--bg-700); position: relative; }
+  .conf-fill { position: absolute; inset: 0 auto 0 0; background: var(--c); }
+  .conf-num { color: var(--tx-3); width: 3ch; text-align: right; }
+  .caret { color: var(--tx-4); transition: transform 0.15s; font-size: 9px; }
+  details[open] .caret { transform: rotate(90deg); }
+  .member-body { padding: 4px 14px 12px 14px; display: grid; gap: 8px; border-top: 1px dashed var(--line); background: rgba(12,12,16,0.35); }
+  .member-body p { margin: 0; color: var(--tx-2); line-height: 1.65; max-width: 80ch; padding-top: 6px; }
+  .figs { display: flex; flex-wrap: wrap; gap: 6px; }
+  .fig { border: 1px solid var(--line-2); padding: 2px 6px; color: var(--tx-3); font-size: 10px; }
+  .fig b { color: var(--tx-1); font-weight: 500; }
+  .abstain b { color: var(--tx-4) !important; }
+  @media (max-width: 560px) {
+    details.member > summary { grid-template-columns: 4px 1fr 14px; row-gap: 4px; }
+    details.member > summary .vote-chip, details.member > summary .conf { grid-column: 2; }
+  }
+
+  details.extra { border: 1px solid var(--line); }
+  details.extra > summary { list-style: none; cursor: pointer; padding: 6px 10px; color: var(--tx-4); font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase; display: flex; gap: 8px; }
+  details.extra > summary::-webkit-details-marker { display: none; }
+  details.extra .body { padding: 0 10px 10px; display: grid; gap: 8px; color: var(--tx-3); }
+  details.extra ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 3px; }
+  details.extra a { color: var(--tx-2); }
+  .foot { color: var(--tx-5); font-size: 9px; display: grid; gap: 3px; }
+  .foot a { color: var(--tx-3); }
+
+  /* callout pins placed on the app */
+  .callout { position: absolute; z-index: 2; }
+  .callout.a { top: -8px; left: -8px; }
+  .callout.b { top: -8px; left: -8px; }
+
+  /* loading */
+  .loading-veil { position: absolute; inset: 0; background: rgba(12,12,16,0.72); display: flex; align-items: center; justify-content: center; gap: 8px; color: var(--tx-2); }
+  .dot { animation: pulse 1s infinite; color: var(--amber); }
+  @keyframes pulse { 50% { opacity: 0.2; } }
+  @keyframes grow { from { transform: scale(0.2); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+  .wedge-fill.anim { transform-box: view-box; transform-origin: 140px 140px; animation: grow 0.45s cubic-bezier(.2,.8,.3,1) both; }
+  @media (prefers-reduced-motion: reduce) { .wedge-fill.anim, .dot { animation: none; } }
+
+  @media (max-width: 760px) { .side { display: none; } .nav-right .chip-btn:not(.red) { display: none; } }
+</style>
+
+<section class="review" aria-label="Mock notes">
+  <h1 class="up">Mock · Advice panel (quorum v3) · revision 3</h1>
+  <p>Built on the current Positions dashboard. Pins mark what changes. Sample SPY put credit spread, sample votes; nothing here is live.</p>
+  <div class="changes">
+    <div class="change"><span class="pin">A</span><span>"Quorum" column is removed. Clicking a row still opens the payoff graph and expands the spread, as today.</span></div>
+    <div class="change"><span class="pin">B</span><span>ADVICE(Agentic) button sits on every spread and single-option row, next to the name, so you don't need to expand the spread or open the graph. The hazard stripe is its warning label. Results open right under that row.</span></div>
+    <div class="change"><span class="pin">C</span><span>Radial vote ring. Vote colours stay clear of the app's P&amp;L red/green and warning yellow: slate hold, blue roll, hatched orange close. Wedge length is that analyst's confidence.</span></div>
+    <div class="change"><span class="pin">D</span><span>Master summary written by an LLM from the five votes: the call, why, and the dissent. It explains the counted verdict and never sets it.</span></div>
+    <div class="change"><span class="pin">E</span><span>Collapsible row per analyst: vote, confidence bar, and full rationale with the figures it used.</span></div>
+  </div>
+  <div class="scenario" role="group" aria-label="Sample outcome">
+    <span class="up" style="font-size:9px">Preview outcome:</span>
+    <button type="button" data-scn="roll" aria-pressed="true">Majority · ROLL</button>
+    <button type="button" data-scn="split" aria-pressed="false">No consensus</button>
+    <button type="button" data-scn="noquorum" aria-pressed="false">No quorum</button>
+  </div>
+</section>
+
+<nav class="nav">
+  <div class="brand"><span class="brand-mark" aria-hidden="true"></span><span class="up">Option Sentinel</span></div>
+  <div class="nav-right">
+    <span class="chip-btn">Individual ···4417</span>
+    <span class="chip-btn red up">Erase all data</span>
+    <span class="chip-btn up">Disconnect</span>
+  </div>
+</nav>
+
+<div class="shell">
+  <aside class="side">
+    <div class="side-label up">Views</div>
+    <div class="side-item active"><span class="pill r"></span>Positions</div>
+    <div class="side-item"><span class="pill b"></span>Covered Call Screener</div>
+  </aside>
+
+  <main>
+    <div class="toolbar">
+      <span class="title up">Positions Dashboard</span>
+      <span class="dim" style="font-size:9px">Updated 10:42 · <span class="chip-btn up">↻ Refresh</span></span>
+    </div>
+
+    <div style="position:relative"><span class="pin" style="position:absolute; right:-6px; top:-8px; z-index:3" title="Quorum column removed">A</span>
+    <div class="table-wrap" id="tableWrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Symbol</th><th>Underlying</th><th>Type</th><th>Strike</th><th>Expiry</th>
+            <th class="r">Qty</th><th class="r">Mark</th><th class="r">P&amp;L</th><th class="r">DTE</th>
+            <th class="r">Delta</th><th class="r">Gamma</th><th class="r">Theta</th><th class="r">Vega</th>
+            <th class="r">IV</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="spread">
+            <td style="position:relative"><span class="chev">▶</span>SPY Put Credit Spread<button type="button" class="advice-btn" data-advice="spy-pcs" aria-expanded="true" title="Five AI analysts vote close, hold or roll on this position. AI opinion, not financial advice."><span class="hazard" aria-hidden="true"></span><span class="label">⚠ ADVICE<em>(Agentic)</em></span></button><span class="pin" style="margin-left:6px; vertical-align:middle">B</span></td><td>SPY</td><td class="dim">—</td><td class="dim">—</td><td>2026-10-09</td>
+            <td class="r dim">—</td><td class="r dim">—</td><td class="r pos num">+$55.00</td><td class="r dim num">12d</td>
+            <td class="r num">0.2210</td><td class="r num">-0.0391</td><td class="r num">0.0842</td><td class="r num">-0.1630</td><td class="r dim">—</td>
+          </tr>
+          <tr class="advice-row">
+            <td colspan="14">
+              <div class="drawer-inner" id="drawer">
+                <div class="result" id="result" aria-live="polite"></div>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td>SPY 261016C590<button type="button" class="advice-btn" data-advice="spy-c590" aria-expanded="false" title="Five AI analysts vote close, hold or roll on this position. AI opinion, not financial advice."><span class="hazard" aria-hidden="true"></span><span class="label">⚠ ADVICE<em>(Agentic)</em></span></button></td><td>SPY</td><td class="call up">call</td><td class="num">590.00</td><td>2026-10-16</td>
+            <td class="r pos">2</td><td class="r num">$3.8800</td><td class="r neg num">-$84.00</td><td class="r dim num">19d</td>
+            <td class="r num">0.2840</td><td class="r num">0.0196</td><td class="r num">-0.1920</td><td class="r num">0.4810</td><td class="r num">14.9%</td>
+          </tr>
+          <tr>
+            <td>NVDA 261120P160<button type="button" class="advice-btn" data-advice="nvda-p160" aria-expanded="false" title="Five AI analysts vote close, hold or roll on this position. AI opinion, not financial advice."><span class="hazard" aria-hidden="true"></span><span class="label">⚠ ADVICE<em>(Agentic)</em></span></button></td><td>NVDA</td><td class="put up">put</td><td class="num">160.00</td><td>2026-11-20</td>
+            <td class="r neg">-1</td><td class="r num">$4.3500</td><td class="r pos num">+$212.00</td><td class="r dim num">54d</td>
+            <td class="r num">0.2370</td><td class="r num">-0.0081</td><td class="r num">0.0960</td><td class="r num">-0.2240</td><td class="r num">41.8%</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    </div>
+  </main>
+</div>
+
+<script>
+(function () {
+  const COLORS = { CLOSE: 'var(--v-close)', HOLD: 'var(--v-hold)', ROLL: 'var(--v-roll)', NONE: 'var(--v-none)' };
+  const HEX = { CLOSE: '#e8703a', HOLD: '#8c93a8', ROLL: '#3aa8e0', NONE: '#3a3a4a' };
+  const VERDICT = {
+    CLOSE: { label: 'CLOSE', bg: '#3a1a0c', fg: '#f59a6a' },
+    HOLD: { label: 'HOLD', bg: '#252836', fg: '#c4cadb' },
+    ROLL: { label: 'ROLL OUT', bg: '#0c2434', fg: '#7cc8f0' },
+    NO_CONSENSUS: { label: 'NO CONSENSUS', bg: '#1c1c24', fg: '#aeaeb8' },
+    NO_QUORUM: { label: 'NO QUORUM', bg: '#1c1c24', fg: '#90909c' },
+  };
+  const SHORT = { greeks: 'GREEKS', vol: 'VOL', theta: 'DECAY', strike: 'STRIKE', macro: 'MACRO' };
+
+  const base = [
+    { id: 'greeks', lens: 'Greeks & Exposure', tag: 'net delta, gamma' },
+    { id: 'vol', lens: 'Volatility & Pricing', tag: 'IV vs realised' },
+    { id: 'theta', lens: 'Time Decay & P&L', tag: 'profit captured' },
+    { id: 'strike', lens: 'Strike & Assignment', tag: 'distance, prob. ITM' },
+    { id: 'macro', lens: 'Macro & News Overlay', tag: 'events, headlines' },
+  ];
+
+  const SCENARIOS = {
+    roll: {
+      verdict: 'ROLL',
+      votes: {
+        greeks: { action: 'HOLD', conf: 0.55, text: 'Net delta is +22 shares with 12 days to expiry. That is a modest directional tilt for a one-lot spread, and gamma on the short 565 put is still manageable, so there is no exposure reason to act yet.', figs: [['Net delta', '+22 sh'], ['Net gamma', '-3.9'], ['DTE', '12']] },
+        vol: { action: 'HOLD', conf: 0.5, text: 'IV/RV is 1.08×. Implied volatility on the short put is roughly fair against the 20-day realised move, so the premium sold is neither rich nor cheap. No volatility reason to change the trade.', figs: [['IV (short leg)', '16.2%'], ['20d realised', '15.0%'], ['IV/RV', '1.08×']] },
+        theta: { action: 'ROLL', dir: 'out', conf: 0.6, text: '38% of max profit ($145) is captured with 12 days left. The last third of the profit arrives with the steepest gamma, so rolling out one cycle collects fresh premium before the final weeks.', figs: [['Credit', '$145'], ['Captured', '38% · $55'], ['Theta/day', '+$8.42']] },
+        strike: { action: 'ROLL', dir: 'out', conf: 0.6, text: 'The short 565 put is 1.3% out of the money (≈31% chance of finishing in the money) with 12 days left. That is thin cushion for the final stretch; rolling out adds time for the position to recover if SPY dips.', figs: [['Spot', '$572.40'], ['Short strike', '565 P'], ['Distance', '1.3% OTM'], ['P(ITM)', '≈31%'], ['Breakeven', '$563.55']] },
+        macro: { action: 'ROLL', dir: 'out', conf: 0.55, text: 'The Oct 2 jobs report lands inside this expiry window and recent headlines lean toward rate-path uncertainty. Nothing in the news argues for staying in the current expiry; moving out spreads the event risk over more time.', figs: [['Scheduled', 'Jobs report · Oct 2'], ['Headlines read', '6']] },
+      },
+      summary: {
+        title: 'Roll the spread out one cycle, keeping the strikes.',
+        body: 'The spread has banked 38% of its $145 max profit with 12 days left, and the short 565 put sits only 1.3% below SPY at $572.40. The remaining $90 of profit comes with rising gamma risk, so three analysts would close the current expiry and re-sell further out in time.',
+        why: ['Time decay: 38% captured inside 21 days. Rolling now collects fresh premium.', 'Strike: ≈31% chance the 565 put finishes in the money.', 'Macro: the Oct 2 jobs report falls inside the window.'],
+        dissent: 'Greeks and Volatility would hold. Net delta is a modest +22 shares and IV/RV of 1.08× says the premium is still fairly priced.',
+      },
+    },
+    split: {
+      verdict: 'NO_CONSENSUS',
+      votes: {
+        greeks: { action: 'HOLD', conf: 0.55, text: 'Net delta is +22 shares with 12 days to expiry. The exposure is modest, so holding is reasonable.', figs: [['Net delta', '+22 sh'], ['DTE', '12']] },
+        vol: { action: 'CLOSE', conf: 0.55, text: 'IV/RV is 0.88×. The premium sold is now cheap relative to how much SPY has actually been moving, so the volatility edge that justified the trade is gone.', figs: [['IV (short leg)', '16.2%'], ['20d realised', '18.4%'], ['IV/RV', '0.88×']] },
+        theta: { action: 'ROLL', dir: 'out', conf: 0.6, text: '38% of max profit is captured with 12 days left; rolling out collects fresh premium before the final weeks.', figs: [['Captured', '38% · $55'], ['DTE', '12']] },
+        strike: { action: 'ROLL', dir: 'out', conf: 0.6, text: 'The short 565 put is 1.3% out of the money (≈31% chance of finishing in the money). Rolling out adds cushion.', figs: [['Distance', '1.3% OTM'], ['P(ITM)', '≈31%']] },
+        macro: { action: 'HOLD', conf: 0.5, text: 'News flow is quiet and no scheduled event dominates before expiry; siding with holding.', figs: [['Headlines read', '4']] },
+      },
+      summary: {
+        title: 'No action reached 3 of 5. The status quo is to hold.',
+        body: 'Two analysts favour rolling out, two favour holding and one would close. The disagreement is about volatility: realised moves have caught up with the premium sold, which weakens the case for staying short, but the strike and time figures alone don\'t force a change.',
+        why: ['Roll (2): 38% captured and a thin 1.3% cushion on the short put.', 'Hold (2): modest delta and a quiet news calendar.', 'Close (1): IV/RV of 0.88× means the premium is now cheap.'],
+        dissent: 'With no majority there is no dissent to report; each side is shown above.',
+      },
+    },
+    noquorum: {
+      verdict: 'NO_QUORUM',
+      votes: {
+        greeks: { action: 'HOLD', conf: 0.55, text: 'Net delta is +22 shares with 12 days to expiry; exposure is modest, so holding is reasonable.', figs: [['Net delta', '+22 sh']] },
+        vol: { abstain: true, text: 'Abstained: realised volatility for SPY could not be computed from the price history returned.' },
+        theta: { action: 'ROLL', dir: 'out', conf: 0.6, text: '38% of max profit is captured with 12 days left; rolling out collects fresh premium.', figs: [['Captured', '38% · $55']] },
+        strike: { abstain: true, text: 'Abstained: the analyst did not answer within the time limit.' },
+        macro: { abstain: true, text: 'Abstained: the news service did not respond, so no headlines were available to judge.' },
+      },
+      summary: {
+        title: 'Only 2 of 5 analysts voted. No recommendation.',
+        body: 'Three analysts could not vote this time, so the result is not a quorum. The two votes that came back are shown for reference but should not be read as advice.',
+        why: ['Greeks voted hold; Time Decay voted roll out.', 'Volatility, Strike and Macro abstained (see their rows).'],
+        dissent: 'Not applicable without a quorum.',
+      },
+    },
+  };
+
+  const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+  /* ── Payoff graph (same look as payoff_graph.js) ── */
+  function normCdf(x) {
+    const t = 1 / (1 + 0.3275911 * Math.abs(x) / Math.SQRT2);
+    const p = t * (0.254829592 + t * (-0.284496736 + t * (1.421413741 + t * (-1.453152027 + t * 1.061405429))));
+    const erf = 1 - p * Math.exp(-(x * x) / 2);
+    return x >= 0 ? (1 + erf) / 2 : (1 - erf) / 2;
+  }
+  function bsPut(S, K, iv, T) {
+    const r = 0.045, d1 = (Math.log(S / K) + (r + iv * iv / 2) * T) / (iv * Math.sqrt(T)), d2 = d1 - iv * Math.sqrt(T);
+    return K * Math.exp(-r * T) * normCdf(-d2) - S * normCdf(-d1);
+  }
+  function drawPayoff() {
+    const W = 800, H = 180, P = { t: 24, r: 20, b: 36, l: 58 };
+    const cw = W - P.l - P.r, ch = H - P.t - P.b;
+    const lo = 548, hi = 588, pMin = -400, pMax = 200, credit = 1.45, spot = 572.4;
+    const x = (s) => P.l + (s - lo) / (hi - lo) * cw;
+    const y = (v) => P.t + ch - (v - pMin) / (pMax - pMin) * ch;
+    const exp = (s) => 100 * (credit - Math.max(565 - s, 0) + Math.max(560 - s, 0));
+    const today = (s) => 100 * (credit - bsPut(s, 565, 0.162, 12 / 365) + bsPut(s, 560, 0.174, 12 / 365));
+    let e = '', t = '';
+    for (let s = lo; s <= hi; s += 0.25) { e += `${x(s).toFixed(1)},${y(exp(s)).toFixed(1)} `; t += `${x(s).toFixed(1)},${y(today(s)).toFixed(1)} `; }
+    const F = 'font-family="JetBrains Mono, monospace" font-size="9"';
+    let g = '';
+    [-400, -200, 0, 200].forEach((v) => { g += `<text x="${P.l - 6}" y="${y(v) + 3}" text-anchor="end" ${F} fill="#9ca3af">${v > 0 ? '+' : ''}${v}.00</text>`; });
+    [550, 560, 570, 580].forEach((s) => { g += `<text x="${x(s)}" y="${H - P.b + 14}" text-anchor="middle" ${F} fill="#9ca3af">$${s}</text>`; });
+    [560, 565].forEach((k) => { g += `<line x1="${x(k)}" y1="${P.t}" x2="${x(k)}" y2="${P.t + ch}" stroke="#6b7280" stroke-dasharray="4,3"/><text x="${x(k) + 3}" y="${P.t + 9}" ${F} fill="#6b7280">$${k}</text>`; });
+    const ty = y(today(spot)), ey = y(exp(spot));
+    document.getElementById('payoff').innerHTML = `
+      <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Payoff chart for the SPY 565/560 put credit spread">
+        <text x="${P.l}" y="${P.t - 8}" font-family="JetBrains Mono, monospace" font-size="10" fill="#9ca3af">SPY Put Credit Spread · 2026-10-09</text>
+        <text x="${W - P.r}" y="${P.t - 8}" text-anchor="end" ${F} fill="#e5e7eb">— Expiration <tspan fill="#60a5fa">— Today</tspan></text>
+        <line x1="${P.l}" y1="${P.t}" x2="${P.l}" y2="${P.t + ch}" stroke="#374151"/>
+        <line x1="${P.l}" y1="${P.t + ch}" x2="${P.l + cw}" y2="${P.t + ch}" stroke="#374151"/>
+        <line x1="${P.l}" y1="${y(0)}" x2="${P.l + cw}" y2="${y(0)}" stroke="#4b5563" stroke-dasharray="6,4"/>
+        ${g}
+        <polyline points="${e}" fill="none" stroke="#e5e7eb" stroke-width="1.5"/>
+        <polyline points="${t}" fill="none" stroke="#60a5fa" stroke-width="1.5"/>
+        <circle cx="${x(584)}" cy="${y(145)}" r="3" fill="#4ade80"/><text x="${x(584)}" y="${y(145) - 6}" text-anchor="middle" ${F} fill="#4ade80">+145.00</text>
+        <circle cx="${x(552)}" cy="${y(-355)}" r="3" fill="#f87171"/><text x="${x(552)}" y="${y(-355) - 6}" text-anchor="middle" ${F} fill="#f87171">-355.00</text>
+        <line x1="${x(spot)}" y1="${P.t}" x2="${x(spot)}" y2="${P.t + ch}" stroke="#facc15" stroke-dasharray="2,3"/>
+        <circle cx="${x(spot)}" cy="${ey}" r="2.5" fill="#e5e7eb"/><circle cx="${x(spot)}" cy="${ty}" r="2.5" fill="#60a5fa"/>
+        <text x="${x(spot) + 5}" y="${ty + 12}" ${F} fill="#60a5fa">Today ${today(spot) >= 0 ? '+' : ''}${today(spot).toFixed(2)}</text>
+      </svg>`;
+  }
+
+  /* ── Radial vote ring ── */
+  function polar(cx, cy, r, deg) { const a = (deg - 90) * Math.PI / 180; return [cx + r * Math.cos(a), cy + r * Math.sin(a)]; }
+  function arcPath(cx, cy, r0, r1, a0, a1) {
+    const [x0, y0] = polar(cx, cy, r1, a0), [x1, y1] = polar(cx, cy, r1, a1);
+    const [x2, y2] = polar(cx, cy, r0, a1), [x3, y3] = polar(cx, cy, r0, a0);
+    const large = a1 - a0 > 180 ? 1 : 0;
+    return `M${x0.toFixed(2)},${y0.toFixed(2)} A${r1},${r1} 0 ${large} 1 ${x1.toFixed(2)},${y1.toFixed(2)} L${x2.toFixed(2)},${y2.toFixed(2)} A${r0},${r0} 0 ${large} 0 ${x3.toFixed(2)},${y3.toFixed(2)}Z`;
+  }
+  function radial(scn, animate) {
+    const cx = 140, cy = 140, r0 = 50, r1 = 104, gap = 3;
+    const seg = 360 / base.length;
+    let out = '';
+    // guide rings at 50% and 100% confidence
+    out += `<circle cx="${cx}" cy="${cy}" r="${r0 + (r1 - r0) * 0.5}" fill="none" stroke="#2c2c3a" stroke-dasharray="2,3"/>`;
+    out += `<circle cx="${cx}" cy="${cy}" r="${r1}" fill="none" stroke="#2c2c3a"/>`;
+    out += `<text x="${cx + 3}" y="${cy - (r0 + (r1 - r0) * 0.5) - 3}" font-size="7" fill="#484856">50%</text>`;
+    out += `<text x="${cx + 3}" y="${cy - r1 - 3}" font-size="7" fill="#484856">100%</text>`;
+    base.forEach((m, i) => {
+      const v = scn.votes[m.id];
+      const a0 = i * seg + gap / 2 - seg / 2, a1 = (i + 1) * seg - gap / 2 - seg / 2;
+      const key = v.abstain ? 'NONE' : v.action;
+      const rr = v.abstain ? r0 + 4 : r0 + (r1 - r0) * v.conf;
+      const mid = (a0 + a1) / 2;
+      const [lx, ly] = polar(cx, cy, r1 + 24, mid);
+      const anchor = Math.abs(lx - cx) < 8 ? 'middle' : lx > cx ? 'start' : 'end';
+      const label = v.abstain ? 'ABSTAIN' : v.action + (v.dir ? ' ↗' : '');
+      out += `<g class="wedge" data-seat="${m.id}" tabindex="0" role="button" aria-label="${esc(m.lens)}: ${esc(label)}${v.abstain ? '' : ', ' + Math.round(v.conf * 100) + '% confidence'}">
+        <path d="${arcPath(cx, cy, r0, r1, a0, a1)}" fill="#1c1c24" stroke="#22222e"/>
+        <path class="wedge-fill${animate ? ' anim' : ''}" style="animation-delay:${animate ? i * 0.22 + 0.1 : 0}s" d="${arcPath(cx, cy, r0, rr, a0, a1)}" fill="${key === 'CLOSE' ? 'url(#hatch)' : HEX[key]}" fill-opacity="${v.abstain ? 0.6 : 0.9}"/>
+        <path d="${arcPath(cx, cy, r1 + 3, r1 + 7, a0, a1)}" fill="${HEX[key]}"/>
+        <text x="${lx.toFixed(1)}" y="${(ly - 4).toFixed(1)}" text-anchor="${anchor}" font-size="11" font-weight="600" letter-spacing="1" fill="#c6c6cc">${SHORT[m.id]}</text>
+        <text x="${lx.toFixed(1)}" y="${(ly + 10).toFixed(1)}" text-anchor="${anchor}" font-size="10" fill="${HEX[key] === HEX.NONE ? '#626270' : HEX[key]}">${esc(label)}${v.abstain ? '' : ' ' + Math.round(v.conf * 100) + '%'}</text>
+      </g>`;
+    });
+    const vd = VERDICT[scn.verdict];
+    const valid = base.filter((m) => !scn.votes[m.id].abstain);
+    const winners = scn.verdict in HEX ? valid.filter((m) => scn.votes[m.id].action === scn.verdict).length : null;
+    const centerTop = scn.verdict === 'ROLL' ? 'ROLL' : scn.verdict === 'NO_CONSENSUS' ? 'NO' : scn.verdict === 'NO_QUORUM' ? 'NO' : vd.label;
+    const centerMid = scn.verdict === 'ROLL' ? 'OUT' : scn.verdict === 'NO_CONSENSUS' ? 'CONSENSUS' : scn.verdict === 'NO_QUORUM' ? 'QUORUM' : '';
+    const sub = winners !== null ? `${winners} of 5` : `${valid.length} of 5 voted`;
+    out += `<circle cx="${cx}" cy="${cy}" r="${r0 - 4}" fill="#14141a" stroke="#2c2c3a"/>
+      <text x="${cx}" y="${cy - 8}" text-anchor="middle" font-size="${centerMid.length > 6 ? 11 : 15}" font-weight="700" letter-spacing="2" fill="${vd.fg}">${centerTop}</text>
+      <text x="${cx}" y="${cy + 5}" text-anchor="middle" font-size="${centerMid.length > 6 ? 9 : 15}" font-weight="700" letter-spacing="${centerMid.length > 6 ? 1 : 2}" fill="${vd.fg}">${centerMid}</text>
+      <text x="${cx}" y="${cy + 22}" text-anchor="middle" font-size="10" fill="#90909c">${sub}</text>`;
+    return `<svg viewBox="-34 0 348 280" font-family="JetBrains Mono, monospace" role="img" aria-label="Vote ring"><defs><pattern id="hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="#e8703a"/><rect width="2" height="6" fill="#14141a" fill-opacity="0.55"/></pattern></defs>${out}</svg>`;
+  }
+
+  function tallyHtml(scn) {
+    const counts = { CLOSE: 0, HOLD: 0, ROLL: 0 };
+    let abst = 0;
+    base.forEach((m) => { const v = scn.votes[m.id]; v.abstain ? abst++ : counts[v.action]++; });
+    const parts = Object.keys(counts).map((k) => `<span class="${scn.verdict === k ? 'win' : ''}"><i class="sw" style="background:${HEX[k]}"></i>${k} ${counts[k]}</span>`);
+    if (abst) parts.push(`<span><i class="sw" style="background:${HEX.NONE}"></i>ABSTAIN ${abst}</span>`);
+    return parts.join('');
+  }
+
+  function memberRow(m, v) {
+    const key = v.abstain ? 'NONE' : v.action;
+    const dir = v.dir ? `<span>roll ${v.dir.replace(/_/g, ' ')}</span>` : '';
+    const conf = v.abstain ? 0 : Math.round(v.conf * 100);
+    const figs = (v.figs || []).map(([k, val]) => `<span class="fig">${esc(k)} <b>${esc(val)}</b></span>`).join('');
+    return `<details class="member" data-seat="${m.id}" style="--c:${HEX[key]}">
+      <summary>
+        <span class="stripe"></span>
+        <span class="lens">${esc(m.lens)} <small>${esc(m.tag)}</small></span>
+        <span class="vote-chip ${v.abstain ? 'abstain' : ''}"><b>${v.abstain ? 'ABSTAINED' : v.action}</b>${dir}</span>
+        <span class="conf" aria-label="Confidence ${conf}%"><span class="conf-track"><span class="conf-fill" style="width:${conf}%"></span></span><span class="conf-num num">${v.abstain ? '—' : conf + '%'}</span></span>
+        <span class="caret">▶</span>
+      </summary>
+      <div class="member-body"><p>${esc(v.text)}</p>${figs ? `<div class="figs">${figs}</div>` : ''}</div>
+    </details>`;
+  }
+
+  function render(key, animate) {
+    const scn = SCENARIOS[key];
+    const vd = VERDICT[scn.verdict];
+    const valid = base.filter((m) => !scn.votes[m.id].abstain).length;
+    const note = scn.verdict === 'NO_CONSENSUS' ? 'No action reached a 3-of-5 majority' : scn.verdict === 'NO_QUORUM' ? `Only ${valid} of 5 analysts voted` : '3 of 5 analysts agree';
+    const s = scn.summary;
+    document.getElementById('result').innerHTML = `
+      <div class="result-head">
+        <span class="verdict" style="--vc-bg:${vd.bg}; --vc-fg:${vd.fg}">${vd.label}</span>
+        <span class="meta">SPY 565/560 put credit spread · ${note}</span>
+        <span class="asof">Data as of 10:42</span>
+      </div>
+      <div class="warn-strip up"><span aria-hidden="true">⚠</span><span>AI-generated opinion. Not financial advice. Option Sentinel never places trades.</span></div>
+      <div class="overview">
+        <div class="radial-card" style="position:relative">
+          <span class="pin" style="position:absolute; top:0; left:0">C</span>
+          ${radial(scn, animate)}
+          <div class="tally num">${tallyHtml(scn)}</div>
+          <div class="radial-note">Wedge length = the analyst's confidence. Outer band = their vote. 3 matching votes make a majority. Tap a wedge to open that analyst.</div>
+        </div>
+        <div class="summary" style="position:relative">
+          <div class="eyebrow"><span class="pin">D</span>Quorum summary <span class="tag-new">NEW · LLM-WRITTEN</span></div>
+          <h2>${esc(s.title)}</h2>
+          <p>${esc(s.body)}</p>
+          <div class="reason-grid">
+            <div class="reason"><h3>${scn.verdict === 'ROLL' ? 'Why the majority' : 'Where the votes fell'}</h3><ul>${s.why.map((w) => `<li>${esc(w)}</li>`).join('')}</ul></div>
+            <div class="reason"><h3>Dissent</h3><p>${esc(s.dissent)}</p></div>
+          </div>
+        </div>
+      </div>
+      <div class="members" style="position:relative">
+        <span class="pin" style="position:absolute; top:-8px; left:-8px">E</span>
+        <div class="members-head"><span class="eyebrow">Quorum members · ${valid} of 5 voted</span><button type="button" id="toggleAll" class="up">Expand all</button></div>
+        ${base.map((m) => memberRow(m, scn.votes[m.id])).join('')}
+      </div>
+      <details class="extra">
+        <summary><span>▶</span>Research brief &amp; headlines given to the Macro analyst (6)</summary>
+        <div class="body">
+          <p style="margin:0">Sample brief: the Oct 2 jobs report and two Fed speakers fall before the Oct 9 expiry. Headlines this week focus on the rate path; no SPY-specific events.</p>
+          <ul>
+            <li><span class="dim">Sample Wire</span> · <a href="#">What to watch for SPY this week</a></li>
+            <li><span class="dim">Sample Wire</span> · <a href="#">Fed officials signal patience ahead of jobs data</a></li>
+            <li><span class="dim">Sample Wire</span> · <a href="#">Treasury yields drift lower after inflation print</a></li>
+          </ul>
+        </div>
+      </details>
+      <div class="foot">
+        <span>Informational only. Not financial advice. Option Sentinel never places trades. · model: sample</span>
+        <span>Position and market data (no identifying information) is sent to Google Vertex AI. <a href="#">How we use your data</a></span>
+      </div>`;
+    wire();
+  }
+
+  function highlight(seat, on) {
+    document.querySelectorAll(`[data-seat="${seat}"]`).forEach((el) => el.classList.toggle('hl', on));
+  }
+  function wire() {
+    const res = document.getElementById('result');
+    res.querySelectorAll('.wedge').forEach((w) => {
+      const seat = w.dataset.seat;
+      const open = () => {
+        const d = res.querySelector(`details.member[data-seat="${seat}"]`);
+        d.open = true;
+        d.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      };
+      w.addEventListener('mouseenter', () => highlight(seat, true));
+      w.addEventListener('mouseleave', () => highlight(seat, false));
+      w.addEventListener('click', open);
+      w.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } });
+    });
+    res.querySelectorAll('details.member').forEach((d) => {
+      d.addEventListener('mouseenter', () => highlight(d.dataset.seat, true));
+      d.addEventListener('mouseleave', () => highlight(d.dataset.seat, false));
+    });
+    const btn = document.getElementById('toggleAll');
+    btn.addEventListener('click', () => {
+      const rows = [...res.querySelectorAll('details.member')];
+      const openAll = rows.some((d) => !d.open);
+      rows.forEach((d) => { d.open = openAll; });
+      btn.textContent = openAll ? 'Collapse all' : 'Expand all';
+    });
+  }
+
+  let current = 'roll';
+  document.querySelectorAll('[data-scn]').forEach((b) => b.addEventListener('click', () => {
+    current = b.dataset.scn;
+    document.querySelectorAll('[data-scn]').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+    render(current, true);
+  }));
+
+  // Only the SPY spread's panel is live in this mock; other rows' buttons just show the pressed state.
+  document.querySelectorAll('[data-advice]').forEach((btn) => btn.addEventListener('click', () => {
+    if (btn.dataset.advice !== 'spy-pcs') return;
+    if (btn.getAttribute('aria-busy') === 'true') return;
+    btn.setAttribute('aria-busy', 'true');
+    const res = document.getElementById('result');
+    const veil = document.createElement('div');
+    veil.className = 'loading-veil';
+    veil.innerHTML = '<span class="dot">●</span> Five analysts are reviewing the position…';
+    res.appendChild(veil);
+    setTimeout(() => { btn.removeAttribute('aria-busy'); render(current, true); }, 1400);
+  }));
+
+  // keep the drawer as wide as the visible table area so it doesn't scroll sideways with the table
+  const wrap = document.getElementById('tableWrap');
+  const drawer = document.getElementById('drawer');
+  const fit = () => { drawer.style.width = wrap.clientWidth + 'px'; };
+  window.addEventListener('resize', fit);
+
+  render('roll', false);
+  fit();
+})();
+</script>
