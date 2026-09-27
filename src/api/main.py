@@ -135,12 +135,13 @@ def create_app() -> FastAPI:
         app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
     from src.auth import router as auth_module
-    from src.api.routes import accounts, dashboard, partials, positions, screener
+    from src.api.routes import accounts, dashboard, partials, positions, quorum, screener
     app.include_router(auth_module.router)
     app.include_router(accounts.router)
     app.include_router(dashboard.router)
     app.include_router(partials.router)
     app.include_router(positions.router)
+    app.include_router(quorum.router)
     app.include_router(screener.router)
 
     if os.getenv("DEBUG", "true").lower() != "true":

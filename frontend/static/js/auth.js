@@ -46,7 +46,7 @@ export function isAuthenticated() {
 export async function fetchWithAuth(url, options = {}) {
   if (isDemoMode()) {
     const { demoResponse } = await import('./demo_data.js');
-    return demoResponse(url);
+    return demoResponse(url, options);
   }
 
   const token = getAccessToken();

@@ -19,6 +19,7 @@ Option Sentinel connects to your Charles Schwab account and gives you a **live, 
 | **Greeks** | Delta, gamma, theta, vega, IV — sourced from Schwab API, Black-Scholes fallback |
 | **Thesis groups** | Group positions by named thesis — stored in your browser only |
 | **Covered call screener** | Ranks long stock positions by covered-call income opportunity |
+| **Macro news quorum** | Five Google ADK analyst agents read CNBC / Yahoo Finance / Bloomberg news and vote CLOSE / HOLD / ROLL on a position (Gemini on Vertex AI — no identifying data sent). Setup: `specs/017-macro-quorum-agents/quickstart.md` |
 | **Mobile-ready** | Visual-first responsive dashboard — readable on your phone mid-session |
 | **Erase All** | One button wipes every piece of your data from the browser instantly |
 
@@ -78,7 +79,10 @@ This section explains exactly where your data lives, how it flows, and how to er
 | Cached positions | Browser `sessionStorage` | Tab/browser closed, or Erase All |
 | Screener cache | Browser `sessionStorage` | Tab/browser closed, or Erase All |
 | Thesis groups & assignments | Browser `localStorage` | Erase All, or manual browser data clear |
+| Quorum results | Page only (never stored) | Panel closed |
 | **Server storage** | **None** | **N/A — nothing is stored server-side** |
+
+The full list of every data use — including exactly what the quorum sends to Google Vertex AI — is in the app at **`/data-use`** (linked from the login page and navigation).
 
 ### What Cloud Run sees
 
@@ -108,6 +112,36 @@ The server receives no request during this operation. After erasing, the app is 
 ### Two-browser / two-device behaviour
 
 Because all data is browser-local, your data on one device is not available on another. If you log in on your phone, your desktop session is unaffected (and vice versa). This is a privacy feature, not a limitation — nothing syncs through any server.
+
+---
+
+## Macro News Quorum
+
+Any option position on the dashboard can be sent to a five-member AI advisory quorum. Click the quorum button on a position row (or a spread's summary row) and a panel expands beneath it with the verdict, tally, each seat's reasoning, and the headlines used. Nothing is persisted — the result lives only in the DOM for that page session (FR-015).
+
+Each seat is an independent agent (Gemini on Vertex AI, via Google ADK) that votes **CLOSE / HOLD / ROLL** without seeing any other seat's vote. A seat that errors or times out (40s) simply abstains rather than blocking the quorum.
+
+| Seat ID | Lens | Focus |
+|---|---|---|
+| `rates_fed` | **Rates & Fed** | Federal Reserve policy, rate expectations, Treasury yields and the yield curve, and how they shift the value and risk of this option position |
+| `volatility` | **Volatility Regime** | VIX level and trend, event risk ahead of expiry, and whether the position's implied volatility is rich or cheap given the news |
+| `growth_inflation` | **Growth & Inflation** | Growth and inflation data (CPI, PCE, jobs, GDP, PMIs), earnings-season tone, and whether the macro backdrop supports the position's directional exposure |
+| `underlying_news` | **Underlying & Sector News** | News specific to the underlying and its sector: company or ETF headlines, catalysts, and sector rotation that could move the underlying before expiry |
+| `position_risk` | **Position Risk** | The position's own risk: Greeks, days to expiry, distance of strikes from the underlying price, profit captured versus remaining, and assignment or gamma risk, weighed against the macro backdrop |
+
+### Where the macro data comes from
+
+Before the 5 seats vote, a separate `macro_researcher` agent writes a shared brief that all seats read:
+
+- **Live web grounding** — the researcher uses Google Search grounding (ADK's `google_search` tool) to pull current market context.
+- **RSS headlines**, fetched fresh at vote time (never cached or stored):
+  - CNBC — Top News, Markets
+  - Yahoo Finance — headline index, plus a ticker-specific feed for the position's underlying
+  - Bloomberg — Markets
+
+Each seat also receives an allow-listed `PositionContext` (Greeks, DTE, strikes, P&L) built from the position's legs — never the account hash or Schwab token (Constitution v3.3.0, Principle I: only public headlines and position fields reach the model).
+
+Full spec and setup (Vertex AI IAM, env vars): [`specs/017-macro-quorum-agents/quickstart.md`](specs/017-macro-quorum-agents/quickstart.md)
 
 ---
 
