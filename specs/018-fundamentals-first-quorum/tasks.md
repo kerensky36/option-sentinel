@@ -265,15 +265,15 @@
 **Goal**: FR-109, D-113. Quorum IV/RV is already delivered by Phase 2 + US1; this phase covers the screener.
 **Independent test**: with IV 30% and RV 20%, the screener shows `1.50×` and `vol_score` is 100·(1.5−0.8)/0.7 = 100.
 
-- [ ] T030 [P] [US3] Update `tests/unit/test_covered_call_screener.py`:
+- [X] T030 [P] [US3] Update `tests/unit/test_covered_call_screener.py`:
   - remove the `_iv_rank_from_chain` tests
   - `vol_score` is 0 at ratio ≤ 0.8, 100 at ≥ 1.5, and linear between
   - RV unavailable → `iv_rv_ratio`/`vol_score` are `None` and the composite volatility component is 0
   - IV comes from the recommended call's contract `volatility` (percent → decimal)
   - suppressed and insufficient-data rows (no recommended call) → `implied_volatility`, `iv_rv_ratio` and `vol_score` are `None`
   - one `get_price_history_every_day` per ticker
-- [ ] T031 [P] [US3] In `tests/contract/test_screener_api.py`, check that response items have `implied_volatility`, `realised_volatility`, `iv_rv_ratio` and `vol_score`, and no `iv_rank`.
-- [ ] T032 [US3] Update `src/data/models.py` and `src/services/covered_call_screener.py`:
+- [X] T031 [P] [US3] In `tests/contract/test_screener_api.py`, check that response items have `implied_volatility`, `realised_volatility`, `iv_rv_ratio` and `vol_score`, and no `iv_rank`.
+- [X] T032 [US3] Update `src/data/models.py` and `src/services/covered_call_screener.py`:
   - `ScreenerResultView` drops `iv_rank` and gains `implied_volatility`, `realised_volatility`, `iv_rv_ratio`, `vol_score` (all `float | None = None`)
   - delete `_iv_rank_from_chain`
   - `_fetch_call_chain` also returns each contract's `volatility`
@@ -281,12 +281,12 @@
   - `_compute_composite_score(vol_score=..., ...)` keeps the 0.50 weight
 
   Makes T030–T031 pass.
-- [ ] T033 [US3] In `frontend/static/js/screener_ui.js`:
+- [X] T033 [US3] In `frontend/static/js/screener_ui.js`:
   - the client re-rank uses `result.vol_score || 0` in place of `iv_rank`
   - the column header becomes "IV/RV"
   - cells show `iv_rv_ratio.toFixed(2) + '×'` or "—"
-- [ ] T034 [P] [US3] In `frontend/templates/partials/screener_table.html`, rename the `iv_rank_cell` macro to `iv_rv_cell(ratio)` (green when ≥ 1.2, "—" when none) and set the header to "IV/RV".
-- [ ] T035 [P] [US3] In `frontend/static/js/demo_data.js`, the demo screener rows use the new fields instead of `iv_rank`.
+- [X] T034 [P] [US3] In `frontend/templates/partials/screener_table.html`, rename the `iv_rank_cell` macro to `iv_rv_cell(ratio)` (green when ≥ 1.2, "—" when none) and set the header to "IV/RV".
+- [X] T035 [P] [US3] In `frontend/static/js/demo_data.js`, the demo screener rows use the new fields instead of `iv_rank`.
 
 ---
 

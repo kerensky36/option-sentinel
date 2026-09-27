@@ -29,7 +29,10 @@ _FIXTURE_RESULTS = [
         ticker="QQQ",
         shares=100,
         stock_price=475.50,
-        iv_rank=65.0,
+        implied_volatility=0.33,
+        realised_volatility=0.22,
+        iv_rv_ratio=1.5,
+        vol_score=100.0,
         recommended_strike=490.0,
         recommended_expiry="2026-06-20",
         bid_premium=3.20,
@@ -44,7 +47,10 @@ _FIXTURE_RESULTS = [
         ticker="AAPL",
         shares=200,
         stock_price=185.00,
-        iv_rank=30.0,
+        implied_volatility=None,
+        realised_volatility=0.18,
+        iv_rv_ratio=None,
+        vol_score=None,
         recommended_strike=None,
         recommended_expiry=None,
         bid_premium=None,
@@ -150,7 +156,8 @@ class TestScreenerRefresh:
         data = resp.json()
         first = data[0]
         required_fields = [
-            "ticker", "shares", "stock_price", "iv_rank",
+            "ticker", "shares", "stock_price",
+            "implied_volatility", "realised_volatility", "iv_rv_ratio", "vol_score",
             "recommended_strike", "recommended_expiry",
             "bid_premium", "annualised_yield", "call_delta",
             "days_to_earnings", "composite_score",
@@ -158,3 +165,4 @@ class TestScreenerRefresh:
         ]
         for field in required_fields:
             assert field in first, f"Missing field: {field}"
+        assert "iv_rank" not in first  # specs/018 FR-109: fake rank removed

@@ -95,7 +95,10 @@ class ScreenerResultView(BaseModel):
     shares: int
     contracts: int = 0
     stock_price: float
-    iv_rank: float | None = None
+    implied_volatility: float | None = None
+    realised_volatility: float | None = None
+    iv_rv_ratio: float | None = None
+    vol_score: float | None = None
     recommended_strike: float | None = None
     recommended_expiry: str | None = None
     bid_premium: float | None = None
