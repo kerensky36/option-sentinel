@@ -79,7 +79,7 @@ The string `base64url(payload) + "." + base64url(HMAC_SHA256(QUORUM_SEAL_KEY, ba
 | Field | Type | Limit |
 |-------|------|-------|
 | `title` | str | stripped, ≤ 120 chars |
-| `explanation` | str | ≤ 600 chars (the prompt asks for ≤ 3 sentences) |
+| `explanation` | str | ≤ 600 chars; the guard keeps the first 3 sentences |
 | `why` | list[str] | 1–4 items, each ≤ 200 chars |
 | `dissent` | str | ≤ 400 chars |
 

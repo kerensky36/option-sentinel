@@ -81,13 +81,16 @@
   - has `data-quorum-btn="SPY-grp"`
   - its `aria-label` or `aria-describedby` text contains "AI opinion" and "not financial advice" (FR-302)
   - the id is HTML-escaped (`<x>` → `&lt;x&gt;`)
-- [ ] T008 [P] [US1] Add `tests/unit/positions_ui_harness.mjs` and a test in `tests/unit/test_quorum_ui.py`. The harness renders `renderPositions()` table HTML from `frontend/static/js/positions_ui.js` into a string, exposing the row-template functions for testing without a DOM. With one spread (two legs) and one standalone option, assert:
+- [ ] T008 [P] [US1] In `tests/unit/test_quorum_ui.py` (via `quorum_ui_harness.mjs`), test the pure row builders in `frontend/static/js/positions_rows.js`: `tableHeader()`, `standaloneRow(p)`, `spreadRows(group, agg)`. The module has no side-effect imports (no `auth.js`, no storage). With one spread (two legs) and one standalone option, assert:
   - no `<th>` has text "Quorum"
   - the header has 14 columns
   - the spread summary row and the standalone row each contain exactly one `ADVICE(Agentic)` button, inside their first `<td>` after the name
   - spread leg rows contain none
   - panel and graph rows use `colspan="14"` (FR-301)
-- [ ] T009 [P] [US1] In `tests/unit/test_quorum_ui.py`, test via the harness's event stub that the quorum click handler calls `stopPropagation()` and does not match `[data-spread-toggle]` or trigger the graph handler (FR-303).
+- [ ] T009 [P] [US1] In `tests/unit/test_quorum_ui.py`, test via the harness's event stub:
+  - the quorum click handler calls `stopPropagation()` and does not match `[data-spread-toggle]` or trigger the graph handler (FR-303)
+  - opening a second row's panel removes the first (US1 scenario 3)
+  - opening a panel does not remove an open `.payoff-graph-row` (spec edge case)
 
 ### Implementation
 
@@ -97,7 +100,7 @@
   - set `COLSPAN = 14`
 
   Makes T007 and T009 pass.
-- [ ] T011 [US1] In `frontend/static/js/positions_ui.js`:
+- [ ] T011 [US1] Create `frontend/static/js/positions_rows.js` by moving the header and row template code out of `renderPositions()` in `frontend/static/js/positions_ui.js` (importing only `quorum_ui.js` `adviceButton` and pure formatters, which move with it). Make `positions_ui.js` import it. Then:
   - remove the `Quorum` `<th>` and the trailing `quorumButtonCell(...)`/empty `<td>` cells
   - insert `${adviceButton(p.symbol)}` after the symbol in standalone rows and `${adviceButton(group.groupId)}` after the group name in spread summary rows
   - leave leg rows without a button
@@ -131,7 +134,7 @@
   - outer band colour equals `VOTE_COLORS[action]`
   - CLOSE fill is `url(#hatch)` and the SVG contains `<pattern id="hatch"`
   - abstained wedges are labelled `ABSTAIN` and use `VOTE_COLORS.NONE`
-  - every wedge label text contains the vote word (SC-307)
+  - every wedge label text contains the vote word (SC-307), and ROLL wedge labels include the direction (`out`, `up & out`, `down & out`) (US2 scenario 1)
   - centre text: majority ROLL with all ROLL voters `out` → "ROLL" "OUT" and "3 of 5"; split → "NO CONSENSUS" and "5 of 5 voted"; no quorum → "NO QUORUM" and "2 of 5 voted"
   - when ROLL voters' directions differ, the centre shows "ROLL" only (D-307)
 - [ ] T014 [P] [US2] In `tests/unit/test_quorum_ui.py`, test the palette:
@@ -201,7 +204,7 @@
   - title "roll down and out" when every ROLL voter chose `out` → `unavailable`
   - title naming any direction when ROLL voters differ → `unavailable`
   - NO_CONSENSUS with title naming "close" or "roll" → `unavailable`, while "hold" is allowed
-  - title > 120 chars truncated; `why` > 4 items truncated to 4
+  - title > 120 chars truncated; `why` > 4 items truncated to 4; an explanation of 5 sentences keeps the first 3
   - `guard` returns a `reason` code for every non-ok or trimmed outcome
 - [ ] T022 [P] [US3] In `tests/unit/test_quorum_summary.py`, summariser section, using `FakeLlm` from `tests/unit/test_quorum_agents.py` (import it or move it to `tests/conftest.py` if needed):
   - the agent name is `quorum_summariser`, `output_schema` is `SummaryDraft`, and there are no tools

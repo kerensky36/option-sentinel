@@ -68,7 +68,7 @@ Decisions for spec 020. They continue from 018's D-101–D-114, numbered D-301 o
   3. If the title or explanation is dirty, discard the whole summary.
   4. Remove dirty "why" bullets. Split the dissent into sentences and remove the dirty ones. If no bullet remains, discard.
   5. Check the title for action words (close/closing/exit, hold/holding/keep, roll/rolling) and roll directions ("up and out", "down and out"). It must not name an action other than the verdict, nor a direction other than the direction shared by every ROLL voter (when they differ, no direction may be named). For NO_CONSENSUS it must not name close or roll.
-  6. Truncate the fields to their limits.
+  6. Truncate the fields to their limits, and keep only the first 3 sentences of the explanation.
 
   Log a discard or removal at INFO as `quorum summary guard outcome=<discarded|trimmed> reason=<code>`, with no text.
 - **Rationale**: Deterministic, testable, and matches FR-309–FR-311. "Majority direction" (spec FR-310) is read as "the direction every ROLL voter shares". When they differ, only plain "roll" is allowed, which also sets the ring centre text.

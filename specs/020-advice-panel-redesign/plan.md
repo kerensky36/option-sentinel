@@ -40,9 +40,9 @@ Redesign how quorum advice is requested and shown, and add a model-written summa
 **Scale/Scope**:
 - New backend modules: `figure_catalog.py`, `quorum_summary.py`.
 - Backend edits: 4 files (models, quorum_agents, quorum route, deploy script).
-- New frontend module: `quorum_ring.js`.
+- New frontend modules: `quorum_ring.js`, and `positions_rows.js` (pure row HTML builders moved out of `positions_ui.js` so they can be tested in Node).
 - Frontend edits: 4 files (quorum_ui.js rewrite, positions_ui.js, demo_quorum.js, demo_data.js) and 1 template (`data_use.html`).
-- Tests: 3 new test modules and 4 updated.
+- Tests: 3 new test modules, 2 new Node harnesses, and 5 updated.
 
 ## Constitution Check
 
@@ -121,7 +121,8 @@ frontend/
 ├── static/js/
 │   ├── quorum_ring.js             # NEW (pure): ringSvg(result) → SVG string; vote palette constants
 │   ├── quorum_ui.js               # rewrite: button HTML, panel layout, rows, expand-all, summary fetch
-│   ├── positions_ui.js            # button in first cell; drop Quorum <th>/<td>; leg rows unchanged
+│   ├── positions_rows.js          # NEW (pure): header, standalone, spread summary and leg row HTML
+│   ├── positions_ui.js            # uses positions_rows.js; wiring only
 │   ├── demo_quorum.js             # catalog + cited figures + demo token + buildDemoSummary()
 │   └── demo_data.js               # intercept /api/quorum/summary in demo mode
 └── templates/data_use.html        # disclose the summary request (FR-322)
@@ -131,7 +132,7 @@ scripts/deploy_backend.sh          # pass QUORUM_SEAL_KEY like LOG_PEPPER
 tests/
 ├── unit/test_figure_catalog.py            # NEW
 ├── unit/test_quorum_summary.py            # NEW: seal/unseal, guard, prompt shape, timeout, privacy scan
-├── unit/quorum_ui_harness.mjs + test_quorum_ui.py   # NEW: ring + panel render via Node
+├── unit/quorum_ui_harness.mjs + test_quorum_ui.py   # NEW: ring, panel and row HTML via Node
 ├── unit/test_quorum_agents.py             # cited figures, catalog in seat message
 ├── unit/test_demo_quorum.py               # demo summary + cited figures
 ├── contract/test_quorum_api.py            # vote token; summary route auth/limits/403/503/200
