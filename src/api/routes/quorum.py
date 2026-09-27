@@ -10,7 +10,6 @@ from src.api.deps import get_schwab_client
 from src.api.main import limiter, log_security_event
 from src.data.models import QuorumRequest
 from src.services import quorum_agents
-from src.services.news_feeds import fetch_headlines
 from src.services.quorum_agents import build_position_context, quorum_configured, run_quorum
 from src.services.schwab_client import fetch_positions_and_greeks
 
@@ -52,12 +51,10 @@ async def quorum_vote(
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
-    async def _run():
-        headlines = await fetch_headlines(ctx.underlying_symbol)
-        return await run_quorum(ctx, headlines, model=quorum_agents.default_model())
-
     try:
-        result = await asyncio.wait_for(_run(), QUORUM_TIMEOUT_SECONDS)
+        result = await asyncio.wait_for(
+            run_quorum(ctx, model=quorum_agents.default_model()), QUORUM_TIMEOUT_SECONDS
+        )
     except asyncio.TimeoutError as exc:
         raise HTTPException(status_code=504, detail="Quorum timed out") from exc
 

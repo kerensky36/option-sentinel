@@ -1,5 +1,5 @@
 /**
- * quorum_ui.js — Macro news voting quorum panel (specs/017).
+ * quorum_ui.js — Fundamentals-first voting quorum panel (specs/017, specs/018).
  *
  * Each option row / spread summary row carries a [data-quorum-btn] button.
  * Clicking it POSTs the row's leg symbols to /api/quorum/vote and renders the
@@ -76,7 +76,7 @@ function _renderLoading() {
   return `
     <div class="text-gray-300 text-sm flex items-center gap-2">
       <span class="animate-pulse">●</span>
-      Convening the quorum — five analysts are reading the macro news…
+      Convening the quorum — five analysts are reviewing the position…
     </div>${_notice()}`;
 }
 
@@ -152,11 +152,11 @@ export function renderResult(result) {
       <div class="grid grid-cols-1 md:grid-cols-5 gap-2">${_renderVotes(result.votes)}</div>
       ${result.macro_brief ? `
       <div>
-        <div class="text-gray-400 uppercase tracking-wider text-xs mb-1">Macro brief</div>
+        <div class="text-gray-400 uppercase tracking-wider text-xs mb-1">Research brief (Macro &amp; News analyst)</div>
         <div class="text-gray-300 text-xs" style="line-height:1.6">${esc(result.macro_brief)}</div>
       </div>` : ''}
       <div>
-        <div class="text-gray-400 uppercase tracking-wider text-xs mb-1">Headlines used</div>
+        <div class="text-gray-400 uppercase tracking-wider text-xs mb-1">News given to the Macro &amp; News analyst</div>
         ${_renderHeadlines(result.headlines)}
       </div>
       <div class="text-gray-500 text-xs">${esc(result.disclaimer)} · ${esc(result.model)}</div>
@@ -235,7 +235,7 @@ export function initQuorum(container, positionData) {
  */
 export function quorumButtonCell(id) {
   return `<td class="px-2 py-1 text-right">
-      <button data-quorum-btn="${esc(id)}" title="Ask the macro news quorum: close, hold, or roll?"
+      <button data-quorum-btn="${esc(id)}" title="Ask the quorum: close, hold, or roll?"
         class="bg-gray-800 hover:bg-gray-700 text-gray-300 px-2 py-0.5 uppercase tracking-wider text-xs">Quorum</button>
     </td>`;
 }

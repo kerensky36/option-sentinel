@@ -113,7 +113,7 @@
 
 ### Tests (write first, confirm failing)
 
-- [ ] T013 [P] [US1] In `tests/unit/test_news_feeds.py`, add `select_headlines(ticker_items, general_items, *, now, limit=12, ticker_quota=5, max_age=timedelta(hours=48))`:
+- [X] T013 [P] [US1] In `tests/unit/test_news_feeds.py`, add `select_headlines(ticker_items, general_items, *, now, limit=12, ticker_quota=5, max_age=timedelta(hours=48))`:
   - drops items with no `published`
   - drops items older than 48 h
   - dedupes case-folded titles across both lists
@@ -121,7 +121,7 @@
   - fewer ticker items than 5 → more general items fill the gap
   - output is newest first
   - `FEED_TIMEOUT_SECONDS == 3.0`
-- [ ] T014 [P] [US1] Update `tests/unit/test_quorum_agents.py`:
+- [X] T014 [P] [US1] Update `tests/unit/test_quorum_agents.py`:
   - `SEATS` ids are exactly `greeks_exposure, volatility_pricing, time_decay_pnl, strike_assignment, macro_news_overlay` in that order, and only the last has `uses_news=True`
   - with a recording fake `BaseLlm`, seats 1–4 requests contain the FUNDAMENTALS block and no headline title or brief text
   - seat 5's request contains both
@@ -135,21 +135,21 @@
 
 ### Implementation
 
-- [ ] T015 [US1] In `src/services/news_feeds.py`:
+- [X] T015 [US1] In `src/services/news_feeds.py`:
   - set `FEED_TIMEOUT_SECONDS = 3.0`
   - add a pure `select_headlines` (D-112)
   - `fetch_headlines(underlying, *, client=None)` fetches general and ticker feeds separately, then returns `select_headlines(...)` (makes T013 pass)
-- [ ] T016 [US1] In `src/data/models.py`:
+- [X] T016 [US1] In `src/data/models.py`:
   - `PositionLegContext` gains `fundamentals: LegFundamentals`
   - `PositionContext` gains `position_fundamentals: PositionFundamentals` and `as_of: datetime`
   - `QuorumResult` gains `as_of: datetime` and `position_fundamentals: PositionFundamentals`
-- [ ] T017 [US1] In `src/services/quorum_agents.py`:
+- [X] T017 [US1] In `src/services/quorum_agents.py`:
   - `Seat` gains `uses_news: bool`; replace `SEATS` with the FR-114 lenses and focus text
   - split `_SEAT_INSTRUCTION` into a fundamentals template (seats 1–4: "form your vote from the FUNDAMENTALS block; cite at least one specific figure") and an overlay template (seat 5: "judge whether news confirms or overrides the fundamentals; cite a headline or research point, or say news was thin")
   - `_seat_message` builds a fundamentals-only DATA block for seats 1–4 and fundamentals + brief + headlines for seat 5
   - both seat templates state: "A null figure means it is unavailable; never estimate or assume it"
   - refocus `_RESEARCH_INSTRUCTION` on the underlying and scheduled events before expiry (earnings, ex-dividend, macro releases) plus a short macro note
-- [ ] T018 [US1] In `src/services/quorum_agents.py`, rework `run_quorum(ctx, *, model=None, seat_timeout=40.0, research_timeout=15.0, headline_fetcher=None)`:
+- [X] T018 [US1] In `src/services/quorum_agents.py`, rework `run_quorum(ctx, *, model=None, seat_timeout=40.0, research_timeout=15.0, headline_fetcher=None)`:
   - `headline_fetcher=None` resolves to the module-level `fetch_headlines` at call time, so tests can monkeypatch `quorum_agents.fetch_headlines`
   - start seats 1–4, `headline_fetcher(ctx.underlying_symbol)` and `_research` concurrently
   - start seat 5 once headlines and research have both finished
@@ -158,20 +158,20 @@
   - fill `as_of` and `position_fundamentals` on the result
 
   Makes T014 pass.
-- [ ] T019 [US1] In `src/services/quorum_agents.py`, update `build_position_context(legs, *, realised_vols, as_of)`:
+- [X] T019 [US1] In `src/services/quorum_agents.py`, update `build_position_context(legs, *, realised_vols, as_of)`:
   - accept objects exposing the PositionLegContext fields
   - re-derive `LegFundamentals` via `fundamentals.leg_fundamentals`
   - compute `position_fundamentals`
   - raise `ValueError` for 0 legs or more than one underlying
 
   In `src/api/routes/quorum.py`, pass `realised_vols` from each `PositionView.fundamentals.realised_volatility` and `as_of` from the re-fetched views. Remove the route-level `fetch_headlines` call; `run_quorum` now fetches news. The 017 request path stays for this story.
-- [ ] T020 [US1] In `tests/contract/test_quorum_api.py`, update existing 017 contract tests for the new seat ids, `as_of` and `position_fundamentals` in the 200 body, and monkeypatch `src.services.quorum_agents.fetch_headlines` (resolved at call time, T018) instead of the route's `fetch_headlines`.
-- [ ] T021 [US1] In `frontend/static/js/quorum_ui.js`:
+- [X] T020 [US1] In `tests/contract/test_quorum_api.py`, update existing 017 contract tests for the new seat ids, `as_of` and `position_fundamentals` in the 200 body, and monkeypatch `src.services.quorum_agents.fetch_headlines` (resolved at call time, T018) instead of the route's `fetch_headlines`.
+- [X] T021 [US1] In `frontend/static/js/quorum_ui.js`:
   - loading text becomes "five analysts are reviewing the position…"
   - button title becomes "Ask the quorum: close, hold, or roll?"
   - relabel "Headlines used" as "News given to the Macro & News analyst"
   - lens labels come from the server; no hard-coded lens names
-- [ ] T022 [P] [US1] In `frontend/static/js/demo_data.js`, update the canned `/api/quorum/vote` result to the five FR-114 lenses with figure-citing rationales and ≤ 12 headlines, and add `as_of` and `position_fundamentals` (017 FR-018 still client-side only).
+- [X] T022 [P] [US1] In `frontend/static/js/demo_data.js`, update the canned `/api/quorum/vote` result to the five FR-114 lenses with figure-citing rationales and ≤ 12 headlines, and add `as_of` and `position_fundamentals` (017 FR-018 still client-side only).
 
 **Checkpoint**: US1 demoable end to end via the 017 request path.
 

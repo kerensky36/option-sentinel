@@ -149,6 +149,7 @@ class PositionLegContext(BaseModel):
     vega: float | None = None
     implied_volatility: float | None = None
     underlying_price: Decimal | None = None
+    fundamentals: LegFundamentals = LegFundamentals()
 
 
 class PositionContext(BaseModel):
@@ -158,6 +159,8 @@ class PositionContext(BaseModel):
     legs: list[PositionLegContext]
     net_unrealised_pnl: Decimal
     min_days_to_expiry: int
+    position_fundamentals: PositionFundamentals = PositionFundamentals()
+    as_of: datetime
 
 
 class Headline(BaseModel):
@@ -224,4 +227,6 @@ class QuorumResult(BaseModel):
     underlying_symbol: str
     model: str
     generated_at: datetime
+    as_of: datetime
+    position_fundamentals: PositionFundamentals = PositionFundamentals()
     disclaimer: str = QUORUM_DISCLAIMER

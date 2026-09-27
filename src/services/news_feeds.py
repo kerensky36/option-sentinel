@@ -1,4 +1,6 @@
-"""Public financial news feeds for the macro quorum (specs/017 FR-009, research D-004).
+"""Public financial news feeds for the quorum's news overlay seat.
+
+specs/017 FR-009 (research D-004); selection rules from specs/018 FR-116 (D-112).
 
 Headlines only — title, summary, link. Article bodies (often paywalled) are
 never fetched. The only request-specific value sent anywhere is the
@@ -12,7 +14,7 @@ import html
 import logging
 import re
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import feedparser
 import httpx
@@ -21,7 +23,10 @@ from src.data.models import Headline
 
 _log = logging.getLogger(__name__)
 
-FEED_TIMEOUT_SECONDS = 5.0
+FEED_TIMEOUT_SECONDS = 3.0
+HEADLINE_LIMIT = 12
+TICKER_QUOTA = 5
+MAX_AGE = timedelta(hours=48)
 _TITLE_MAX = 300
 _SUMMARY_MAX = 400
 _TICKER_RE = re.compile(r"^[A-Z0-9.\-/^]{1,10}$")
@@ -99,13 +104,46 @@ async def _fetch_one(client: httpx.AsyncClient, source: FeedSource, ticker: str 
     return parse_feed(source.publisher, resp.content)
 
 
+def select_headlines(
+    ticker_items: list[Headline],
+    general_items: list[Headline],
+    *,
+    now: datetime,
+    limit: int = HEADLINE_LIMIT,
+    ticker_quota: int = TICKER_QUOTA,
+    max_age: timedelta = MAX_AGE,
+) -> list[Headline]:
+    """Recent, de-duplicated headlines: up to `ticker_quota` from the underlying's own
+    feed, filled to `limit` with the newest general headlines; newest first."""
+    cutoff = now - max_age
+    seen: set[str] = set()
+
+    def take(items: list[Headline], count: int) -> list[Headline]:
+        kept: list[Headline] = []
+        fresh = (h for h in items if h.published and h.published >= cutoff)
+        for h in sorted(fresh, key=lambda h: h.published, reverse=True):
+            if len(kept) == count:
+                break
+            key = h.title.casefold()
+            if key not in seen:
+                seen.add(key)
+                kept.append(h)
+        return kept
+
+    chosen = take(ticker_items, min(ticker_quota, limit))
+    chosen += take(general_items, limit - len(chosen))
+    chosen.sort(key=lambda h: h.published, reverse=True)
+    return chosen
+
+
 async def fetch_headlines(
     underlying: str,
     *,
     client: httpx.AsyncClient | None = None,
-    limit: int = 30,
+    now: datetime | None = None,
+    limit: int = HEADLINE_LIMIT,
 ) -> list[Headline]:
-    """Fetch all feeds concurrently; de-duplicate by title, newest first, capped at `limit`."""
+    """Fetch all feeds concurrently, then pick recent headlines per `select_headlines`."""
     ticker = underlying.strip().upper()
     if not _TICKER_RE.match(ticker):
         ticker = None
@@ -118,16 +156,11 @@ async def fetch_headlines(
         if own_client:
             await client.aclose()
 
-    seen: set[str] = set()
-    merged: list[Headline] = []
-    for items in results:
-        for h in items:
-            key = h.title.casefold()
-            if key in seen:
-                continue
-            seen.add(key)
-            merged.append(h)
+    ticker_items: list[Headline] = []
+    general_items: list[Headline] = []
+    for source, items in zip(FEEDS, results):
+        (ticker_items if "{ticker}" in source.url else general_items).extend(items)
 
-    epoch = datetime.min.replace(tzinfo=timezone.utc)
-    merged.sort(key=lambda h: h.published or epoch, reverse=True)
-    return merged[:limit]
+    return select_headlines(
+        ticker_items, general_items, now=now or datetime.now(timezone.utc), limit=limit
+    )

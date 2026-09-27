@@ -73,6 +73,8 @@ def _result(**kw) -> QuorumResult:
         underlying_symbol="SPY",
         model="gemini-2.5-flash",
         generated_at=datetime(2026, 9, 25, tzinfo=timezone.utc),
+        as_of=datetime(2026, 9, 25, tzinfo=timezone.utc),
+        position_fundamentals={"breakevens": [564.2], "max_profit": 420.0},
     )
     base.update(kw)
     return QuorumResult(**base)
@@ -96,14 +98,12 @@ def patched():
     with (
         patch("src.api.deps.schwab") as mock_schwab,
         patch("src.api.routes.quorum.fetch_positions_and_greeks", new_callable=AsyncMock) as fetch,
-        patch("src.api.routes.quorum.fetch_headlines", new_callable=AsyncMock) as news,
         patch("src.api.routes.quorum.run_quorum", new_callable=AsyncMock) as run,
     ):
         mock_schwab.auth.client_from_access_functions.return_value = object()
         fetch.return_value = _POSITIONS
-        news.return_value = _HEADLINES
         run.return_value = _result()
-        yield {"fetch": fetch, "news": news, "run": run}
+        yield {"fetch": fetch, "run": run}
 
 
 class TestHappyPath:
@@ -115,6 +115,8 @@ class TestHappyPath:
         assert len(data["votes"]) == 5
         assert [t["action"] for t in data["tally"]] == ["CLOSE", "HOLD", "ROLL"]
         assert data["disclaimer"]
+        assert data["as_of"].startswith("2026-09-25")
+        assert data["position_fundamentals"]["max_profit"] == 420.0
         assert resp.headers["Cache-Control"] == "no-store"
 
     def test_passes_account_hash_to_schwab_fetch(self, client, patched):
@@ -127,9 +129,10 @@ class TestHappyPath:
         assert len(ctx.legs) == 2
         assert ctx.underlying_symbol == "SPY"
 
-    def test_only_ticker_sent_to_news(self, client, patched):
+    def test_route_does_not_fetch_news_itself(self, client, patched):
+        """specs/018 FR-119: run_quorum fetches news concurrently; the route passes only ctx."""
         _post(client, {"symbols": ["SPY   261017C00560000"], "account_hash": _HASH})
-        assert patched["news"].await_args.args == ("SPY",)
+        assert len(patched["run"].await_args.args) == 1
 
 
 class TestErrors:
@@ -190,7 +193,7 @@ class TestPrivacyEndToEnd:
         with (
             patch("src.api.deps.schwab") as mock_schwab,
             patch("src.api.routes.quorum.fetch_positions_and_greeks", new_callable=AsyncMock) as fetch,
-            patch("src.api.routes.quorum.fetch_headlines", new_callable=AsyncMock) as news,
+            patch("src.services.quorum_agents.fetch_headlines", new_callable=AsyncMock) as news,
             patch("src.services.quorum_agents.default_model", return_value=fake),
         ):
             mock_schwab.auth.client_from_access_functions.return_value = object()
