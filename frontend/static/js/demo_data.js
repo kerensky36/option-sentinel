@@ -10,6 +10,8 @@
  *   DEMO_EQUITY_HASH  — covered calls + screener candidates (equities & ETFs)
  */
 
+import { buildDemoQuorum } from './demo_quorum.js';
+
 export const DEMO_SPREADS_HASH = 'demo-spreads-0001';
 export const DEMO_EQUITY_HASH  = 'demo-equity-0002';
 
@@ -125,9 +127,9 @@ export const DEMO_POSITIONS_EQUITY = [
   {
     symbol: 'NVDA 250620C00135000', underlying_symbol: 'NVDA', option_type: 'call',
     strike: '135.00', expiry_date: '2025-06-20', quantity: -1,
-    cost: '-2.45', current_mark: '-1.60', unrealised_pnl: '85.00', days_to_expiry: 29,
-    underlying_price: '127.60',
-    delta: 0.30, gamma: 0.058, theta: -0.14, vega: 0.19, implied_volatility: 0.42,
+    cost: '-2.45', current_mark: '-0.95', unrealised_pnl: '150.00', days_to_expiry: 5,
+    underlying_price: '133.90',
+    delta: 0.42, gamma: 0.121, theta: -0.19, vega: 0.19, implied_volatility: 0.42,
     delta_source: 'calculated', gamma_source: 'calculated',
     theta_source: 'calculated', vega_source: 'calculated', iv_source: 'calculated',
   },
@@ -152,9 +154,9 @@ export const DEMO_POSITIONS_EQUITY = [
   {
     symbol: 'AMD 250620C00175000', underlying_symbol: 'AMD', option_type: 'call',
     strike: '175.00', expiry_date: '2025-06-20', quantity: -2,
-    cost: '-4.80', current_mark: '-3.10', unrealised_pnl: '340.00', days_to_expiry: 29,
+    cost: '-4.80', current_mark: '-1.20', unrealised_pnl: '720.00', days_to_expiry: 29,
     underlying_price: '158.40',
-    delta: 0.32, gamma: 0.062, theta: -0.16, vega: 0.22, implied_volatility: 0.51,
+    delta: 0.22, gamma: 0.041, theta: -0.09, vega: 0.22, implied_volatility: 0.51,
     delta_source: 'calculated', gamma_source: 'calculated',
     theta_source: 'calculated', vega_source: 'calculated', iv_source: 'calculated',
   },
@@ -224,117 +226,107 @@ const _VOO_CANDIDATES = [
 export const DEMO_SCREENER_RESULTS = [
   {
     ticker: 'AAPL', shares: 150, contracts: 1, stock_price: 213.50,
-    iv_rank: 42.0, recommended_strike: 220.00, recommended_expiry: '2026-06-26',
+    implied_volatility: 0.2626, realised_volatility: 0.24, iv_rv_ratio: 1.094, vol_score: 42.0,
+    recommended_strike: 220.00, recommended_expiry: '2026-06-26',
     bid_premium: 3.30, annualised_yield: 0.18, call_delta: 0.27,
     days_to_earnings: 45, composite_score: 78.5,
     recommendation_status: 'recommended', sort_order: 1, candidates: _AAPL_CANDIDATES,
   },
   {
     ticker: 'AMD', shares: 300, contracts: 2, stock_price: 158.40,
-    iv_rank: 61.0, recommended_strike: 163.00, recommended_expiry: '2026-06-26',
+    implied_volatility: 0.3068, realised_volatility: 0.25, iv_rv_ratio: 1.227, vol_score: 61.0,
+    recommended_strike: 163.00, recommended_expiry: '2026-06-26',
     bid_premium: 4.90, annualised_yield: 0.34, call_delta: 0.28,
     days_to_earnings: 38, composite_score: 76.2,
     recommendation_status: 'recommended', sort_order: 2, candidates: _AMD_CANDIDATES,
   },
   {
     ticker: 'NVDA', shares: 200, contracts: 1, stock_price: 127.60,
-    iv_rank: 58.0, recommended_strike: 132.00, recommended_expiry: '2026-06-26',
+    implied_volatility: 0.5427, realised_volatility: 0.45, iv_rv_ratio: 1.206, vol_score: 58.0,
+    recommended_strike: 132.00, recommended_expiry: '2026-06-26',
     bid_premium: 2.50, annualised_yield: 0.21, call_delta: 0.27,
     days_to_earnings: 52, composite_score: 74.8,
     recommendation_status: 'recommended', sort_order: 3, candidates: _NVDA_CANDIDATES,
   },
   {
     ticker: 'META', shares: 175, contracts: 1, stock_price: 592.30,
-    iv_rank: 46.0, recommended_strike: 610.00, recommended_expiry: '2026-06-26',
+    implied_volatility: 0.3703, realised_volatility: 0.33, iv_rv_ratio: 1.122, vol_score: 46.0,
+    recommended_strike: 610.00, recommended_expiry: '2026-06-26',
     bid_premium: 8.40, annualised_yield: 0.17, call_delta: 0.26,
     days_to_earnings: 41, composite_score: 71.3,
     recommendation_status: 'recommended', sort_order: 4, candidates: _META_CANDIDATES,
   },
   {
     ticker: 'SPY', shares: 250, contracts: 2, stock_price: 558.70,
-    iv_rank: 31.0, recommended_strike: 568.00, recommended_expiry: '2026-06-26',
+    implied_volatility: 0.1525, realised_volatility: 0.15, iv_rv_ratio: 1.017, vol_score: 31.0,
+    recommended_strike: 568.00, recommended_expiry: '2026-06-26',
     bid_premium: 3.60, annualised_yield: 0.14, call_delta: 0.25,
     days_to_earnings: null, composite_score: 64.1,
     recommendation_status: 'recommended', sort_order: 5, candidates: _SPY_CANDIDATES,
   },
   {
     ticker: 'VOO', shares: 150, contracts: 1, stock_price: 504.80,
-    iv_rank: 28.0, recommended_strike: 514.00, recommended_expiry: '2026-06-26',
+    implied_volatility: 0.1494, realised_volatility: 0.15, iv_rv_ratio: 0.996, vol_score: 28.0,
+    recommended_strike: 514.00, recommended_expiry: '2026-06-26',
     bid_premium: 3.00, annualised_yield: 0.13, call_delta: 0.23,
     days_to_earnings: null, composite_score: 61.0,
     recommendation_status: 'recommended', sort_order: 6, candidates: _VOO_CANDIDATES,
   },
   {
     ticker: 'AMZN', shares: 120, contracts: 0, stock_price: 218.90,
-    iv_rank: 39.0, recommended_strike: 225.00, recommended_expiry: '2026-06-26',
+    implied_volatility: 0.3004, realised_volatility: 0.28, iv_rv_ratio: 1.073, vol_score: 39.0,
+    recommended_strike: 225.00, recommended_expiry: '2026-06-26',
     bid_premium: 3.10, annualised_yield: 0.17, call_delta: 0.30,
     days_to_earnings: 8, composite_score: 52.4,
     recommendation_status: 'suppressed', sort_order: 7, candidates: [],
   },
   {
     ticker: 'MSFT', shares: 125, contracts: 0, stock_price: 421.10,
-    iv_rank: 55.0, recommended_strike: 430.00, recommended_expiry: '2026-06-26',
+    implied_volatility: 0.2489, realised_volatility: 0.21, iv_rv_ratio: 1.185, vol_score: 55.0,
+    recommended_strike: 430.00, recommended_expiry: '2026-06-26',
     bid_premium: 4.10, annualised_yield: 0.12, call_delta: 0.31,
     days_to_earnings: 12, composite_score: 49.8,
     recommendation_status: 'suppressed', sort_order: 8, candidates: [],
   },
   {
     ticker: 'QQQ', shares: 200, contracts: 0, stock_price: 448.20,
-    iv_rank: 18.0, recommended_strike: null, recommended_expiry: null,
+    implied_volatility: null, realised_volatility: 0.19, iv_rv_ratio: null, vol_score: null,
+    recommended_strike: null, recommended_expiry: null,
     bid_premium: null, annualised_yield: null, call_delta: null,
     days_to_earnings: null, composite_score: 34.0,
     recommendation_status: 'suppressed', sort_order: 9, candidates: [],
   },
   {
     ticker: 'GOOGL', shares: 110, contracts: 0, stock_price: 174.50,
-    iv_rank: 22.0, recommended_strike: null, recommended_expiry: null,
+    implied_volatility: null, realised_volatility: 0.26, iv_rv_ratio: null, vol_score: null,
+    recommended_strike: null, recommended_expiry: null,
     bid_premium: null, annualised_yield: null, call_delta: null,
     days_to_earnings: null, composite_score: 29.5,
     recommendation_status: 'suppressed', sort_order: 10, candidates: [],
   },
 ];
 
-/**
- * Canned quorum result for demo mode (specs/017 FR-018) — no server call.
- * @param {string} underlying
- */
-function _demoQuorum(underlying) {
-  const vote = (seat, lens, action, confidence, rationale, roll_direction = null) => ({
-    seat, lens, action, confidence, rationale, roll_direction, abstained: false,
+// Demo realised volatility per underlying (specs/018 FR-101); other figures stay null.
+const DEMO_REALISED_VOL = { AAPL: 0.24, SPY: 0.15, TSLA: 0.52, QQQ: 0.19, MSFT: 0.21, AMD: 0.60 };
+
+/** Stamp demo positions like a live refresh: one "as of" time plus fundamentals. */
+function _withAsOf(positions) {
+  const asOf = new Date().toISOString();
+  return positions.map((p) => {
+    const rv = DEMO_REALISED_VOL[p.underlying_symbol] ?? null;
+    const iv = p.implied_volatility ?? null;
+    return {
+      ...p,
+      as_of: asOf,
+      fundamentals: {
+        realised_volatility: rv,
+        iv_rv_ratio: rv && iv ? iv / rv : null,
+        moneyness_pct: null, expected_move: null, prob_itm: null,
+        position_delta: null, dollar_delta: null, position_gamma: null,
+        dollar_theta: null, dollar_vega: null,
+      },
+    };
   });
-  return {
-    verdict: 'ROLL',
-    quorum_met: true,
-    seats: 5,
-    valid_votes: 5,
-    tally: [
-      { action: 'CLOSE', votes: 1, mean_confidence: 0.55 },
-      { action: 'HOLD', votes: 1, mean_confidence: 0.5 },
-      { action: 'ROLL', votes: 3, mean_confidence: 0.68 },
-    ],
-    votes: [
-      vote('rates_fed', 'Rates & Fed', 'ROLL', 0.7,
-        'Fed minutes point to an extended pause; a later expiry buys time for the rate path to clear.', 'out'),
-      vote('volatility', 'Volatility Regime', 'HOLD', 0.5,
-        'VIX is subdued and no major event sits before expiry, so theta keeps working as is.'),
-      vote('growth_inflation', 'Growth & Inflation', 'ROLL', 0.65,
-        'Cooling CPI supports the trend, but the next payrolls print lands inside this expiry.', 'up_and_out'),
-      vote('underlying_news', 'Underlying & Sector News', 'CLOSE', 0.55,
-        `Sector rotation headlines weigh on ${underlying}; locking in the gain avoids the next catalyst.`),
-      vote('position_risk', 'Position Risk', 'ROLL', 0.7,
-        'Most of the premium is captured and gamma rises into expiry; rolling out resets risk.', 'out'),
-    ],
-    macro_brief: 'Demo: the Fed held rates at its last meeting; CPI cooled slightly; VIX sits in the mid-teens; earnings season is underway.',
-    headlines: [
-      { publisher: 'CNBC', title: 'Demo headline: Fed holds rates steady, signals patience', link: 'https://www.cnbc.com/', published: null, summary: '' },
-      { publisher: 'Bloomberg', title: 'Demo headline: Treasury yields drift lower after inflation data', link: 'https://www.bloomberg.com/markets', published: null, summary: '' },
-      { publisher: 'Yahoo Finance', title: `Demo headline: What to watch for ${underlying} this week`, link: 'https://finance.yahoo.com/', published: null, summary: '' },
-    ],
-    underlying_symbol: underlying,
-    model: 'demo (no model call)',
-    generated_at: new Date().toISOString(),
-    disclaimer: 'Informational only — not financial advice. Option Sentinel never places trades.',
-  };
 }
 
 function _makeResponse(data) {
@@ -361,7 +353,7 @@ export function demoResponse(url, options = {}) {
   }
   if (u.pathname === '/api/positions/refresh') {
     return _makeResponse(
-      hash === DEMO_EQUITY_HASH ? DEMO_POSITIONS_EQUITY : DEMO_POSITIONS_SPREADS
+      _withAsOf(hash === DEMO_EQUITY_HASH ? DEMO_POSITIONS_EQUITY : DEMO_POSITIONS_SPREADS)
     );
   }
   if (u.pathname === '/api/screener/refresh') {
@@ -370,12 +362,12 @@ export function demoResponse(url, options = {}) {
     );
   }
   if (u.pathname === '/api/quorum/vote') {
-    let underlying = 'DEMO';
+    // specs/019: tailored to the clicked position, computed in the browser.
+    let request = {};
     try {
-      const sym = JSON.parse(options.body || '{}').symbols?.[0] || '';
-      underlying = sym.trim().split(/\s+/)[0] || underlying;
-    } catch { /* keep default */ }
-    return _makeResponse(_demoQuorum(underlying));
+      request = JSON.parse(options.body || '{}');
+    } catch { /* empty request → NO_QUORUM result */ }
+    return _makeResponse(buildDemoQuorum(request));
   }
   return _makeResponse({ detail: 'Demo mode: endpoint not available' });
 }

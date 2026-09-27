@@ -32,7 +32,7 @@ function rescoreResult(result, profile) {
   const annYield = (best.bid / result.stock_price) * (365 / best.dte) * 100;
   const yieldScore = Math.min(100, annYield * 5);
   const deltaSafety = Math.max(0, 100 - Math.abs(best.delta - profile.targetDelta) * 400);
-  const score = (result.iv_rank || 0) * 0.50 + yieldScore * profile.yieldWeight + deltaSafety * profile.safetyWeight;
+  const score = (result.vol_score || 0) * 0.50 + yieldScore * profile.yieldWeight + deltaSafety * profile.safetyWeight;
   return {
     ...result,
     recommended_strike: best.strike,
@@ -173,7 +173,7 @@ export function renderScreener(results) {
       <td class="px-2 py-1 text-gray-200 font-mono">${r.ticker}</td>
       <td class="px-2 py-1 text-right text-gray-300">${r.shares.toLocaleString()}</td>
       <td class="px-2 py-1 text-right text-gray-200">$${fmt(r.stock_price)}</td>
-      <td class="px-2 py-1 text-right text-gray-200">${r.iv_rank !== null && r.iv_rank !== undefined ? fmt(r.iv_rank, 1) : '—'}</td>
+      <td class="px-2 py-1 text-right ${r.iv_rv_ratio >= 1.2 ? 'text-green-400' : 'text-gray-200'}">${r.iv_rv_ratio !== null && r.iv_rv_ratio !== undefined ? fmt(r.iv_rv_ratio, 2) + '×' : '—'}</td>
       <td class="px-2 py-1 text-right text-gray-200">${r.recommended_strike !== null && r.recommended_strike !== undefined ? '$' + fmt(r.recommended_strike) : '—'}</td>
       <td class="px-2 py-1 text-gray-300">${r.recommended_expiry || '—'}</td>
       <td class="px-2 py-1 text-right text-gray-200">${r.bid_premium !== null && r.bid_premium !== undefined ? '$' + fmt(r.bid_premium, 2) : '—'}</td>
@@ -192,7 +192,7 @@ export function renderScreener(results) {
             <th class="px-2 py-1">Ticker</th>
             <th class="px-2 py-1 text-right">Shares</th>
             <th class="px-2 py-1 text-right">Price</th>
-            <th class="px-2 py-1 text-right">IV Rank</th>
+            <th class="px-2 py-1 text-right" title="Implied volatility ÷ 30-day realised volatility">IV/RV</th>
             <th class="px-2 py-1 text-right">Strike</th>
             <th class="px-2 py-1">Expiry</th>
             <th class="px-2 py-1 text-right">Bid</th>

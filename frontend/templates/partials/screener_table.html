@@ -10,13 +10,13 @@
   {% endif %}
 {% endmacro %}
 
-{% macro iv_rank_cell(iv_rank) %}
-  {% if iv_rank is none %}
+{% macro iv_rv_cell(ratio) %}
+  {% if ratio is none %}
     <span class="text-gray-600">—</span>
-  {% elif iv_rank >= 50 %}
-    <span class="text-green-400 font-semibold">{{ iv_rank | round(0) | int }}</span>
+  {% elif ratio >= 1.2 %}
+    <span class="text-green-400 font-semibold">{{ "%.2f" | format(ratio) }}×</span>
   {% else %}
-    <span class="text-gray-300">{{ iv_rank | round(0) | int }}</span>
+    <span class="text-gray-300">{{ "%.2f" | format(ratio) }}×</span>
   {% endif %}
 {% endmacro %}
 
@@ -47,7 +47,7 @@
       <th class="px-2 py-1.5">Ticker</th>
       <th class="px-2 py-1.5 text-right">Shares</th>
       <th class="px-2 py-1.5 text-right">Price</th>
-      <th class="px-2 py-1.5 text-right">IV Rank</th>
+      <th class="px-2 py-1.5 text-right" title="Implied volatility ÷ 30-day realised volatility">IV/RV</th>
       <th class="px-2 py-1.5 text-right">Strike</th>
       <th class="px-2 py-1.5">Expiry</th>
       <th class="px-2 py-1.5 text-right">Bid</th>
@@ -66,7 +66,7 @@
       <td class="px-2 py-1.5 text-gray-100 font-semibold">{{ c.ticker }}</td>
       <td class="px-2 py-1.5 text-right text-gray-300">{{ c.shares }}</td>
       <td class="px-2 py-1.5 text-right text-gray-300">{{ fmt(c.stock_price, 2, '$') }}</td>
-      <td class="px-2 py-1.5 text-right">{{ iv_rank_cell(c.iv_rank) }}</td>
+      <td class="px-2 py-1.5 text-right">{{ iv_rv_cell(c.iv_rv_ratio) }}</td>
       <td class="px-2 py-1.5 text-right text-gray-300">{{ fmt(c.recommended_strike, 2, '$') }}</td>
       <td class="px-2 py-1.5 text-gray-400">{{ c.recommended_expiry or '—' }}</td>
       <td class="px-2 py-1.5 text-right text-gray-300">{{ fmt(c.bid_premium, 2, '$') }}</td>

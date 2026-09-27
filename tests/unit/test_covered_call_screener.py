@@ -227,15 +227,15 @@ class TestRiskToleranceCandidates:
     async def test_balanced_score_matches_current_output(self):
         """Balanced profile composite_score must match _compute_composite_score (regression guard)."""
         from src.services.covered_call_screener import (
-            run_screener, _compute_composite_score, _annualised_yield, _iv_rank_from_chain
+            run_screener, _compute_composite_score, _annualised_yield, _vol_score
         )
 
         client = _make_client()
-        iv_raw = 0.3
         chain_options = [
-            {"dte": 35, "strike": 150.0, "expiry": "2026-06-20", "delta": 0.25, "bid": 1.50, "open_interest": 200},
+            {"dte": 35, "strike": 150.0, "expiry": "2026-06-20", "delta": 0.25, "bid": 1.50,
+             "open_interest": 200, "volatility": 0.30},
         ]
-        pos = {"ticker": "AAPL", "shares": 100, "price": 150.0, "volatility": iv_raw, "days_to_earnings": None}
+        pos = {"ticker": "AAPL", "shares": 100, "price": 150.0, "days_to_earnings": None}
 
         with (
             patch("src.services.covered_call_screener._fetch_stock_positions",
@@ -246,13 +246,14 @@ class TestRiskToleranceCandidates:
                   new=AsyncMock(return_value=chain_options)),
             patch("src.auth.account_resolver.list_accounts",
                   new=AsyncMock(return_value=[{"hashValue": "abc123"}])),
+            patch("src.services.covered_call_screener.fetch_realised_vols",
+                  new=AsyncMock(return_value={"AAPL": 0.25})),
         ):
             results = await run_screener(client=client, account_hash="abc123")
 
         result = results[0]
-        iv_rank = _iv_rank_from_chain(iv_raw) or 0.0
         ann_yield = _annualised_yield(1.50, 150.0, 35)
-        expected = _compute_composite_score(iv_rank, ann_yield, 0.25)
+        expected = _compute_composite_score(_vol_score(0.30 / 0.25), ann_yield, 0.25)
         assert result.composite_score == expected, (
             f"Balanced score {result.composite_score} != expected {expected}"
         )
@@ -298,3 +299,83 @@ class TestFractionalSharesFloor:
         positions = await _fetch_stock_positions(client, "abc123")
         assert len(positions) == 1
         assert positions[0]["shares"] == 150
+
+
+# ---------------------------------------------------------------------------
+# specs/018 T030 — IV relative to realised volatility (FR-109, D-113)
+# ---------------------------------------------------------------------------
+
+class TestIvRvScreener:
+    def test_vol_score_band(self):
+        from src.services.covered_call_screener import _vol_score
+
+        assert _vol_score(0.5) == 0.0
+        assert _vol_score(0.8) == 0.0
+        assert _vol_score(1.15) == pytest.approx(50.0)
+        assert _vol_score(1.5) == 100.0
+        assert _vol_score(3.0) == 100.0
+        assert _vol_score(None) is None
+
+    def test_iv_rank_proxy_removed(self):
+        import src.services.covered_call_screener as screener
+
+        assert not hasattr(screener, "_iv_rank_from_chain")
+
+    async def _run(self, chain, rv, *, open_calls=None):
+        from src.services.covered_call_screener import run_screener
+
+        pos = {"ticker": "AAPL", "shares": 100, "price": 150.0, "days_to_earnings": None}
+        rv_mock = AsyncMock(return_value={"AAPL": rv})
+        with (
+            patch("src.services.covered_call_screener._fetch_stock_positions", new=AsyncMock(return_value=[pos])),
+            patch("src.services.covered_call_screener._fetch_open_calls", new=AsyncMock(return_value=open_calls or [])),
+            patch("src.services.covered_call_screener._fetch_call_chain", new=AsyncMock(return_value=chain)),
+            patch("src.auth.account_resolver.list_accounts", new=AsyncMock(return_value=[{"hashValue": "abc123"}])),
+            patch("src.services.covered_call_screener.fetch_realised_vols", new=rv_mock),
+        ):
+            results = await run_screener(client=_make_client(), account_hash="abc123")
+        return results[0], rv_mock
+
+    _CHAIN = [{"dte": 35, "strike": 155.0, "expiry": "2026-06-20", "delta": 0.25, "bid": 1.50,
+               "open_interest": 200, "volatility": 0.30}]
+
+    async def test_iv_from_recommended_call_and_ratio(self):
+        result, rv_mock = await self._run(self._CHAIN, 0.20)
+        assert result.implied_volatility == pytest.approx(0.30)
+        assert result.realised_volatility == pytest.approx(0.20)
+        assert result.iv_rv_ratio == pytest.approx(1.5)
+        assert result.vol_score == pytest.approx(100.0)
+        rv_mock.assert_awaited_once()
+        assert rv_mock.await_args.args[1] == {"AAPL"}
+
+    async def test_rv_unavailable_contributes_nothing(self):
+        from src.services.covered_call_screener import _annualised_yield, _compute_composite_score
+
+        result, _ = await self._run(self._CHAIN, None)
+        assert result.implied_volatility == pytest.approx(0.30)
+        assert result.iv_rv_ratio is None
+        assert result.vol_score is None
+        expected = _compute_composite_score(0.0, _annualised_yield(1.50, 150.0, 35), 0.25)
+        assert result.composite_score == expected
+
+    async def test_suppressed_row_has_no_iv(self):
+        result, _ = await self._run(self._CHAIN, 0.20, open_calls=[{"underlying": "AAPL"}])
+        assert result.recommendation_status == "suppressed"
+        assert result.implied_volatility is None
+        assert result.iv_rv_ratio is None
+        assert result.vol_score is None
+        assert result.realised_volatility == pytest.approx(0.20)
+
+    async def test_fetch_call_chain_returns_contract_volatility_as_decimal(self):
+        from src.services.covered_call_screener import _fetch_call_chain
+
+        client = _make_client()
+        resp = MagicMock()
+        resp.json.return_value = {"callExpDateMap": {"2026-06-20:35": {"155.0": [
+            {"delta": 0.25, "bid": 1.5, "openInterest": 200, "volatility": 30.0},
+            {"delta": 0.20, "bid": 1.0, "openInterest": 100, "volatility": -999.0},
+        ]}}}
+        client.get_option_chain = AsyncMock(return_value=resp)
+        options = await _fetch_call_chain(client, "AAPL")
+        assert options[0]["volatility"] == pytest.approx(0.30)
+        assert options[1]["volatility"] is None

@@ -153,3 +153,33 @@ class TestPositionsRefresh:
         assert "vega" in first
         assert "implied_volatility" in first
         assert first["delta_source"] == "api"
+
+
+class TestPositionsRefreshFundamentals:
+    """specs/018 T008 — refresh items carry as_of and fundamentals (FR-101, FR-103, D-114)."""
+
+    def test_items_include_as_of_and_fundamentals(self, client):
+        from datetime import datetime, timezone
+        from src.data.models import LegFundamentals
+
+        as_of = datetime(2026, 9, 27, 14, 0, tzinfo=timezone.utc)
+        views = [
+            p.model_copy(update={"as_of": as_of, "fundamentals": LegFundamentals(realised_volatility=0.2)})
+            for p in _FIXTURE_POSITIONS
+        ]
+        with (
+            patch("src.api.deps.schwab") as mock_schwab,
+            patch("src.api.routes.positions.fetch_positions_and_greeks", new_callable=AsyncMock) as mock_fetch,
+        ):
+            mock_schwab.auth.client_from_access_functions.return_value = object()
+            mock_fetch.return_value = views
+            resp = client.get("/api/positions/refresh", headers={"Authorization": _make_auth_header()})
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert isinstance(data, list)
+        expected_keys = set(LegFundamentals.model_fields)
+        for item in data:
+            assert item["as_of"].startswith("2026-09-27T14:00:00")
+            assert set(item["fundamentals"]) == expected_keys
+            assert item["fundamentals"]["realised_volatility"] == 0.2

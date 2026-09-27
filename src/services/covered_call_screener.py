@@ -6,9 +6,11 @@ a list of ScreenerResultView objects. No database reads or writes.
 from __future__ import annotations
 
 import logging
+import math
 from datetime import datetime, timedelta, timezone
 
 from src.data.models import ScreenerResultView
+from src.services.schwab_client import fetch_realised_vols
 
 logger = logging.getLogger(__name__)
 
@@ -26,13 +28,13 @@ def _compute_delta_safety(call_delta: float) -> float:
 
 
 def _compute_composite_score(
-    iv_rank: float,
+    vol_score: float,
     annualised_yield_pct: float,
     call_delta: float,
 ) -> float:
     yield_score  = _compute_yield_score(annualised_yield_pct)
     delta_safety = _compute_delta_safety(call_delta)
-    raw = iv_rank * 0.50 + yield_score * 0.30 + delta_safety * 0.20
+    raw = vol_score * 0.50 + yield_score * 0.30 + delta_safety * 0.20
     return round(min(100.0, max(0.0, raw)), 1)
 
 
@@ -75,13 +77,29 @@ def _recommendation_status(
     return "recommended"
 
 
-# ── IV Rank proxy ─────────────────────────────────────────────────────────────
+# ── Implied vs realised volatility (specs/018 FR-109, research D-113) ─────────
 
-def _iv_rank_from_chain(chain_volatility: float | None) -> float | None:
-    """Normalise raw chain volatility (decimal) to a 0–100 rank proxy."""
-    if chain_volatility is None:
+_VOL_SCORE_LOW = 0.8   # IV/RV at or below this: premium cheap → 0
+_VOL_SCORE_HIGH = 1.5  # IV/RV at or above this: premium rich → 100
+
+
+def _vol_score(iv_rv_ratio: float | None) -> float | None:
+    """Map IV/RV onto 0–100 for the composite score; None when unavailable."""
+    if iv_rv_ratio is None:
         return None
-    return round(min(100.0, float(chain_volatility) * 200.0), 1)
+    frac = (iv_rv_ratio - _VOL_SCORE_LOW) / (_VOL_SCORE_HIGH - _VOL_SCORE_LOW)
+    return round(min(1.0, max(0.0, frac)) * 100.0, 1)
+
+
+def _iv_decimal(raw) -> float | None:
+    """Schwab contract volatility (percent) → decimal; placeholders → None."""
+    try:
+        v = float(raw)
+    except (TypeError, ValueError):
+        return None
+    if not math.isfinite(v) or v <= 0 or v > 1000:
+        return None
+    return v / 100.0
 
 
 # ── Annualised yield ──────────────────────────────────────────────────────────
@@ -126,6 +144,8 @@ async def run_screener(
     stock_positions = await _fetch_stock_positions(client, account_hash)
     open_calls      = await _fetch_open_calls(client, account_hash)
     tickers_with_call = {c["underlying"] for c in open_calls}
+    eligible = {p["ticker"] for p in stock_positions if p["shares"] > 0 and p["shares"] % 100 == 0}
+    realised_vols = await fetch_realised_vols(client, eligible) if eligible else {}
 
     results: list[ScreenerResultView] = []
     sort_order = 0
@@ -134,7 +154,7 @@ async def run_screener(
         ticker      = pos["ticker"]
         shares      = pos["shares"]
         stock_price = pos["price"]
-        iv_rank     = _iv_rank_from_chain(pos.get("volatility"))
+        realised_vol = realised_vols.get(ticker)
         dte_earnings = _days_to_earnings(ticker)
 
         if shares <= 0 or shares % 100 != 0:
@@ -148,7 +168,7 @@ async def run_screener(
                 shares=shares,
                 contracts=contracts,
                 stock_price=stock_price,
-                iv_rank=iv_rank,
+                realised_volatility=realised_vol,
                 days_to_earnings=dte_earnings,
                 composite_score=0.0,
                 recommendation_status="suppressed",
@@ -179,7 +199,7 @@ async def run_screener(
                 shares=shares,
                 contracts=contracts,
                 stock_price=stock_price,
-                iv_rank=iv_rank,
+                realised_volatility=realised_vol,
                 days_to_earnings=dte_earnings,
                 composite_score=0.0,
                 recommendation_status="insufficient_data",
@@ -190,8 +210,11 @@ async def run_screener(
             continue
 
         ann_yield = _annualised_yield(best["bid"], stock_price, best["dte"])
+        implied_vol = best.get("volatility")
+        iv_rv_ratio = implied_vol / realised_vol if implied_vol and realised_vol else None
+        vol_score = _vol_score(iv_rv_ratio)
         score = _compute_composite_score(
-            iv_rank=iv_rank or 0.0,
+            vol_score=vol_score or 0.0,
             annualised_yield_pct=ann_yield,
             call_delta=best["delta"],
         )
@@ -202,7 +225,10 @@ async def run_screener(
             shares=shares,
             contracts=contracts,
             stock_price=stock_price,
-            iv_rank=iv_rank,
+            implied_volatility=implied_vol,
+            realised_volatility=realised_vol,
+            iv_rv_ratio=iv_rv_ratio,
+            vol_score=vol_score,
             recommended_strike=best["strike"],
             recommended_expiry=best["expiry"],
             bid_premium=best["bid"],
@@ -250,7 +276,6 @@ async def _fetch_stock_positions(client, account_hash: str) -> list[dict]:
             "ticker":    instrument.get("symbol", ""),
             "shares":    long_qty,
             "price":     float(pos.get("marketValue", 0)) / long_qty if long_qty else 0.0,
-            "volatility": instrument.get("volatility"),
             "days_to_earnings": _days_to_earnings(instrument.get("symbol", "")),
         })
     return results
@@ -306,6 +331,7 @@ async def _fetch_call_chain(client, ticker: str) -> list[dict]:
                     "delta":         abs(float(contract.get("delta", 0) or 0)),
                     "bid":           float(contract.get("bid", 0) or 0),
                     "open_interest": int(contract.get("openInterest", 0) or 0),
+                    "volatility":    _iv_decimal(contract.get("volatility")),
                 })
     return options
 

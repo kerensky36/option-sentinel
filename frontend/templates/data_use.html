@@ -120,14 +120,14 @@
           </tr>
           <tr>
             <td>Positions</td>
-            <td data-label="Data">Your open option positions, Greeks, P&amp;L, and underlying prices, as returned by Schwab.</td>
-            <td data-label="Sent to">Fetched from Schwab through our server; cached in your browser (sessionStorage).</td>
-            <td data-label="Why">To display the dashboard and payoff graphs.</td>
+            <td data-label="Data">Your open option positions, Greeks, P&amp;L, and underlying prices, as returned by Schwab, plus about two months of daily closing prices for each underlying you hold (public market data), used to calculate its realised volatility.</td>
+            <td data-label="Sent to">Fetched from Schwab through our server; cached in your browser (sessionStorage) together with the calculated figures and the time of the refresh.</td>
+            <td data-label="Why">To display the dashboard and payoff graphs, and to calculate each position's fundamentals (realised volatility, moneyness, expected move, probability of finishing in the money, dollar Greeks).</td>
             <td data-label="Kept for">Browser cache: until you close the tab. Server: only for the duration of the request.</td>
           </tr>
           <tr>
             <td>Covered call screener</td>
-            <td data-label="Data">Your long stock positions and option chains for them.</td>
+            <td data-label="Data">Your long stock positions, option chains for them, and daily closing prices used to compare implied with realised volatility.</td>
             <td data-label="Sent to">Fetched from Schwab through our server; cached in your browser (sessionStorage).</td>
             <td data-label="Why">To rank covered-call opportunities.</td>
             <td data-label="Kept for">Browser cache: until you close the tab. Server: only for the duration of the request.</td>
@@ -148,8 +148,8 @@
           </tr>
           <tr>
             <td>Quorum — Google Vertex AI</td>
-            <td data-label="Data">Only when you click Quorum on a position: that position's underlying symbol, option type, strike, expiry, days to expiry, quantity, cost, mark, unrealised P&amp;L, Greeks, implied volatility, and underlying price, plus public news headlines. <strong class="text-green-400">No user-identifiable or pedigree data</strong> is ever sent — no name, email, address, phone, date of birth, tax ID, account number, account hash, token, or IP address.</td>
-            <td data-label="Sent to">Google Gemini on Vertex AI, in the operator's own Google Cloud project, including Google Search grounding for the macro research step (which is given only the ticker symbol and today's date).</td>
+            <td data-label="Data">Only when you click Quorum on a position: that position's underlying symbol, option type, strike, expiry, days to expiry, quantity, cost, mark, unrealised P&amp;L, Greeks, implied volatility, and underlying price; the figures calculated from them (realised volatility, IV relative to realised volatility, moneyness, expected move, probability of finishing in the money, dollar Greeks, breakevens, maximum profit and loss, share of maximum profit captured, daily time decay); the time when your positions were last refreshed; and, for the news analyst only, public news headlines. Your browser sends these from its last positions refresh. Your account hash is not sent with a quorum request. <strong class="text-green-400">No user-identifiable or pedigree data</strong> is ever sent — no name, email, address, phone, date of birth, tax ID, account number, account hash, token, or IP address.</td>
+            <td data-label="Sent to">Google Gemini on Vertex AI, in the operator's own Google Cloud project, including Google Search grounding for the research step (which is given only the ticker symbol, today's date, and the position's expiry date).</td>
             <td data-label="Why">So five AI analysts can vote CLOSE / HOLD / ROLL. Informational only — not financial advice; no trade is ever placed.</td>
             <td data-label="Kept for">Not stored by Option Sentinel on the server or in your browser. Closing the result panel discards it. Google processes it under the operator's Google Cloud terms.</td>
           </tr>
@@ -157,7 +157,7 @@
             <td>Quorum — news feeds</td>
             <td data-label="Data">Only the underlying ticker symbol (for Yahoo Finance's per-ticker feed). The other feeds receive no data about you.</td>
             <td data-label="Sent to">CNBC, Yahoo Finance, and Bloomberg public RSS feeds, requested by our server.</td>
-            <td data-label="Why">To gather current macro and market headlines for the quorum.</td>
+            <td data-label="Why">To gather recent (last 48 hours) market headlines for the quorum's news analyst.</td>
             <td data-label="Kept for">Headlines are held in memory for one request and shown in the result panel only.</td>
           </tr>
           <tr>
