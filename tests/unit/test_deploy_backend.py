@@ -23,6 +23,11 @@ _REQUIRED = {
 
 _VERTEX = ("GOOGLE_GENAI_USE_VERTEXAI", "GOOGLE_CLOUD_PROJECT", "GOOGLE_CLOUD_LOCATION", "QUORUM_MODEL")
 
+# Vars a real local .env may set that would otherwise leak into the subprocess env
+# below and shadow the test's fixed values (e.g. deploy_backend.sh prefers
+# SCHWAB_REDIRECT_URI_PROD over SCHWAB_REDIRECT_URI when both are present).
+_LEAKY = ("SCHWAB_REDIRECT_URI_PROD",)
+
 
 @pytest.fixture
 def fake_gcloud(tmp_path):
@@ -41,7 +46,7 @@ def fake_gcloud(tmp_path):
 
 def _deploy_env_vars(fake_gcloud, **overrides) -> dict[str, str]:
     bindir, log = fake_gcloud
-    env = {k: v for k, v in os.environ.items() if k not in _VERTEX and k not in _REQUIRED}
+    env = {k: v for k, v in os.environ.items() if k not in _VERTEX and k not in _REQUIRED and k not in _LEAKY}
     env.update(_REQUIRED)
     env.update(overrides)
     env["PATH"] = f"{bindir}{os.pathsep}{env['PATH']}"
