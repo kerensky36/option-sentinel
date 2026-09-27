@@ -69,6 +69,13 @@ frontend/templates/login.html            MODIFY — link to /data-use
 frontend/templates/base.html             MODIFY — nav link to /data-use
 src/api/routes/dashboard.py              MODIFY — GET /data-use (no auth)
 
+scripts/build_frontend.py                MODIFY — pre-render /data-use for Firebase Hosting
+scripts/backend_changed.sh               NEW — "did the backend change since the deployed commit?"
+scripts/deploy.sh                        MODIFY — deploy backend only when it changed
+scripts/deploy_backend.sh                MODIFY — --update-env-vars, Vertex AI vars, commit-sha label
+
+tests/unit/test_build_frontend.py        NEW
+tests/unit/test_backend_changed.py       NEW
 tests/unit/test_quorum_tally.py          NEW
 tests/unit/test_news_feeds.py            NEW
 tests/unit/test_quorum_agents.py         NEW
