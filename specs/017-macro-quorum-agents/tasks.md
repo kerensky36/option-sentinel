@@ -62,6 +62,7 @@
 - [x] T025 `tests/unit/test_backend_changed.py` + `scripts/backend_changed.sh` — decide whether the backend needs redeploying by diffing the deployed commit (Cloud Run service label `commit-sha`) against the working tree for backend paths (write test first, confirm failing)
 - [x] T026 `scripts/deploy.sh` — single entry point: deploy backend only when T025 says it changed (`--force-backend` / `--skip-backend` overrides), always deploy frontend
 - [x] T027 `scripts/deploy_backend.sh` — use `--update-env-vars` (stop wiping vars set outside the script), pass optional `GOOGLE_GENAI_USE_VERTEXAI`, `GOOGLE_CLOUD_PROJECT`, `GOOGLE_CLOUD_LOCATION`, `QUORUM_MODEL`, `LOG_PEPPER` when set, label the service with `commit-sha`
+- [ ] T028 `tests/unit/test_deploy_backend.py` + `scripts/deploy_backend.sh` — always pass the Vertex AI variables: `GOOGLE_GENAI_USE_VERTEXAI` defaults to `TRUE`, `GOOGLE_CLOUD_PROJECT` to `GCP_PROJECT_ID`, `GOOGLE_CLOUD_LOCATION` to the Cloud Run region; `.env` values override; `GOOGLE_GENAI_USE_VERTEXAI=FALSE` disables the quorum (write test first, confirm failing)
 
 ## Dependencies
 
