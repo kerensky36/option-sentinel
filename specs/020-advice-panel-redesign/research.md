@@ -81,7 +81,7 @@ Decisions for spec 020. They continue from 018's D-101–D-114, numbered D-301 o
 ## D-309 — Ring rendering
 
 - **Decision**: A pure `ringSvg(result, {animate})` in `quorum_ring.js` returns an SVG string:
-  - five 72° wedges starting at 12 o'clock, 3° gaps, inner radius 50, outer radius 104 in a 348×280 viewBox;
+  - five 72° wedges starting at 12 o'clock, 3° gaps, inner radius 50, outer radius 104 in a 460×280 viewBox (wide enough for side labels such as "ROLL down & out 70%"); the dashed ring at 50% confidence has no text label, because it collided with the top wedge's label;
   - fill radius = inner + (outer − inner) × confidence;
   - a 4-unit outer band in the vote colour;
   - CLOSE fill uses an SVG `<pattern>` hatch;

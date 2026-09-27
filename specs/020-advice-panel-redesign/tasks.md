@@ -149,7 +149,7 @@
 ### Implementation
 
 - [X] T016 [US2] Create `frontend/static/js/quorum_ring.js` (pure ES module, no DOM access) exporting `VOTE_COLORS` and `ringSvg(result, {animate=false})` per D-309:
-  - 348×280 viewBox, inner radius 50, outer 104, 3° gaps, band at 107–111, labels at radius 128
+  - 460×280 viewBox, inner radius 50, outer 104, 3° gaps, band at 107–111, labels at radius 128
   - hatch `<pattern>`
   - all text escaped
 
@@ -337,12 +337,12 @@
 
 ## Phase 7: Polish & Cross-Cutting
 
-- [ ] T039 [P] In `tests/contract/test_data_use_page.py`, assert the page lists the summary request (Vertex AI; data: the analysts' votes and rationales plus the same position figures; purpose: a one-paragraph summary; retention: none). Then update `frontend/templates/data_use.html` (FR-322).
-- [ ] T040 [P] In `tests/unit/test_deploy_backend.py`, assert `QUORUM_SEAL_KEY` is in the pass-through env var list and that a missing value prints a warning. Then update `scripts/deploy_backend.sh` (header comment, the `for var in …` list, and the warning) (D-303).
-- [ ] T041 [P] In `tests/unit/test_quorum_ui.py`, add a test that no user-visible string in `quorum_ui.js` or `quorum_ring.js` other than the button label contains "Advice"/"advice" (except the accessible "not financial advice" note) (FR-302).
-- [ ] T042 Update `frontend/static/js/quorum_ui.js` module doc comment and `README.md` quorum section (if present) to describe the ADVICE(Agentic) button, the two-step summary and `QUORUM_SEAL_KEY`.
-- [ ] T043 Run `pytest -q` (full suite) and `bash scripts/audit.sh` if it runs offline. Fix any regressions.
-- [ ] T044 Browser verification per `specs/020-advice-panel-redesign/quickstart.md` items 1–4, 8 and 11 in demo mode (Playwright screenshot at 1400 px and 360 px; greyscale emulation), and record the results in the PR. Items 2, 5–7, 9, 10 and 12 need live Schwab + Vertex AI and are listed in the PR as pending for the user.
+- [X] T039 [P] In `tests/contract/test_data_use_page.py`, assert the page lists the summary request (Vertex AI; data: the analysts' votes and rationales plus the same position figures; purpose: a one-paragraph summary; retention: none). Then update `frontend/templates/data_use.html` (FR-322).
+- [X] T040 [P] In `tests/unit/test_deploy_backend.py`, assert `QUORUM_SEAL_KEY` is in the pass-through env var list and that a missing value prints a warning. Then update `scripts/deploy_backend.sh` (header comment, the `for var in …` list, and the warning) (D-303).
+- [X] T041 [P] In `tests/unit/test_quorum_ui.py`, add a test that no user-visible string in `quorum_ui.js` or `quorum_ring.js` other than the button label contains "Advice"/"advice" (except the accessible "not financial advice" note) (FR-302).
+- [X] T042 Update `frontend/static/js/quorum_ui.js` module doc comment and `README.md` quorum section (if present) to describe the ADVICE(Agentic) button, the two-step summary and `QUORUM_SEAL_KEY`.
+- [X] T043 Run `pytest -q` (full suite) and `bash scripts/audit.sh` if it runs offline. Fix any regressions.
+- [X] T044 Browser verification per `specs/020-advice-panel-redesign/quickstart.md` items 1–4, 8 and 11 in demo mode (Playwright screenshot at 1400 px and 360 px; greyscale emulation), and record the results in the PR. Items 2, 5–7, 9, 10 and 12 need live Schwab + Vertex AI and are listed in the PR as pending for the user.
 
 ---
 
