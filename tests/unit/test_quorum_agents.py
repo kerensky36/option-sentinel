@@ -415,3 +415,35 @@ class TestQuorumLegInContext:
             text = _request_text(r) + str(r.config.system_instruction)
             assert "account_hash" not in text
             assert "_source" not in text
+
+
+class TestSpec020Models:
+    """specs/020 T004 — cited figures and summary token on the result models."""
+
+    def test_ballot_cited_defaults_empty_and_truncates_to_five(self):
+        from src.data.models import AnalystBallot
+
+        assert AnalystBallot(action="HOLD", confidence=0.5, rationale="x").cited == []
+        b = AnalystBallot(action="HOLD", confidence=0.5, rationale="x", cited=[f"n{i}" for i in range(8)])
+        assert b.cited == ["n0", "n1", "n2", "n3", "n4"]
+
+    def test_vote_has_cited_figures(self):
+        from src.data.models import AnalystVote, CitedFigure
+
+        v = AnalystVote(seat="s", lens="l", action="HOLD", confidence=0.5, rationale="r")
+        assert v.cited_figures == []
+        v = AnalystVote(
+            seat="s", lens="l", action="HOLD", confidence=0.5, rationale="r",
+            cited_figures=[CitedFigure(name="dte", label="DTE", display="12 d")],
+        )
+        assert v.model_dump()["cited_figures"] == [{"name": "dte", "label": "DTE", "display": "12 d"}]
+
+    def test_result_has_summary_token_and_keeps_018_fields(self):
+        from src.data.models import QuorumResult
+
+        fields = set(QuorumResult.model_fields)
+        assert "summary_token" in fields
+        assert QuorumResult.model_fields["summary_token"].default is None
+        for f in ("verdict", "quorum_met", "seats", "valid_votes", "tally", "votes", "macro_brief",
+                  "headlines", "underlying_symbol", "model", "generated_at", "as_of", "position_fundamentals"):
+            assert f in fields

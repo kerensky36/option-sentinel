@@ -15,12 +15,12 @@
 
 ## Phase 1: Setup
 
-- [ ] T001 [P] Create the Node harness `tests/unit/quorum_ui_harness.mjs`, following the pattern of `tests/unit/demo_quorum_harness.mjs`:
+- [X] T001 [P] Create the Node harness `tests/unit/quorum_ui_harness.mjs`, following the pattern of `tests/unit/demo_quorum_harness.mjs`:
   - read a JSON command from argv (`{"fn": "...", "args": [...]}`)
   - dynamically import `frontend/static/js/quorum_ring.js` and `frontend/static/js/quorum_ui.js`
   - print the JSON result
   - provide a minimal DOM/storage stub: `document` absent; `sessionStorage`/`localStorage` spies that record writes
-- [ ] T002 [P] Create `tests/unit/test_quorum_ui.py` with the `node` skip marker and a `_run(fn, *args)` helper that calls the harness (same pattern as `tests/unit/test_demo_quorum.py`). Add a fixture module-level `RESULT_MAJORITY`, `RESULT_SPLIT` and `RESULT_NO_QUORUM` (dicts in the 018 QuorumResult shape: SPY put credit spread, votes as in the mock: majority = HOLD .55, HOLD .50, ROLL out .60, ROLL out .60, ROLL out .55; split = HOLD, CLOSE, ROLL, ROLL, HOLD; no quorum = HOLD, abstain, ROLL, abstain, abstain).
+- [X] T002 [P] Create `tests/unit/test_quorum_ui.py` with the `node` skip marker and a `_run(fn, *args)` helper that calls the harness (same pattern as `tests/unit/test_demo_quorum.py`). Add a fixture module-level `RESULT_MAJORITY`, `RESULT_SPLIT` and `RESULT_NO_QUORUM` (dicts in the 018 QuorumResult shape: SPY put credit spread, votes as in the mock: majority = HOLD .55, HOLD .50, ROLL out .60, ROLL out .60, ROLL out .55; split = HOLD, CLOSE, ROLL, ROLL, HOLD; no quorum = HOLD, abstain, ROLL, abstain, abstain).
 
 ---
 
@@ -30,7 +30,7 @@
 
 ### Tests (write first, confirm failing)
 
-- [ ] T003 [P] Create `tests/unit/test_figure_catalog.py` for `src/services/figure_catalog.py` (D-304, data-model.md FigureCatalog). Build contexts with `build_position_context` from `src/services/quorum_agents.py` for a long call, a short put, a put credit spread and an iron condor, then assert:
+- [X] T003 [P] Create `tests/unit/test_figure_catalog.py` for `src/services/figure_catalog.py` (D-304, data-model.md FigureCatalog). Build contexts with `build_position_context` from `src/services/quorum_agents.py` for a long call, a short put, a put credit spread and an iron condor, then assert:
   - names match `^[a-z][a-z0-9_]{0,39}$` and are unique
   - labels are ≤ 24 chars
   - position names present when available: `net_delta`, `net_theta_day`, `net_vega`, `max_profit`, `max_loss`, `captured_pct`, `breakeven_1` (and `breakeven_2` for the condor), `dte`
@@ -40,21 +40,21 @@
   - no value is NaN or infinite
   - `add_tally(catalog, tally, votes)` adds `votes_close`, `votes_hold`, `votes_roll`, `valid_votes`, `seats`, and `confidence_<seat_id>` for voting seats only (display pct)
   - `resolve_cited(["leg1_iv_rv", "nope", "leg1_iv_rv", "a", "b", "c", "d", "e"], catalog)` returns known names only, deduplicated, at most 5, each as `{name, label, display}`
-- [ ] T004 [P] In `tests/unit/test_quorum_agents.py`, add model-level tests:
+- [X] T004 [P] In `tests/unit/test_quorum_agents.py`, add model-level tests:
   - `AnalystBallot` accepts `cited` (default `[]`) and truncates it to 5
   - `AnalystVote` has `cited_figures: list[CitedFigure] = []`
   - `QuorumResult` has `summary_token: str | None = None` and still serialises every 018 field
 
 ### Implementation
 
-- [ ] T005 In `src/data/models.py`:
+- [X] T005 In `src/data/models.py`:
   - add `CitedFigure(name: str, label: str, display: str)`
   - add `AnalystBallot.cited: list[str] = []` with a validator truncating to 5
   - add `AnalystVote.cited_figures: list[CitedFigure] = []`
   - add `QuorumResult.summary_token: str | None = None`
 
   Makes T004 pass.
-- [ ] T006 Create `src/services/figure_catalog.py` (pure, no I/O):
+- [X] T006 Create `src/services/figure_catalog.py` (pure, no I/O):
   - `Figure` dataclass `(name, label, value, display)`
   - `build(ctx: PositionContext) -> dict[str, Figure]` (ordered)
   - `add_tally(catalog, tally, votes) -> dict[str, Figure]` (returns a new dict)

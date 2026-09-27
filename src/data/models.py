@@ -237,11 +237,17 @@ class AnalystBallot(BaseModel):
     confidence: float = Field(ge=0.0, le=1.0)
     rationale: str
     roll_direction: RollDirection | None = None
+    cited: list[str] = []  # figure-catalog names the seat relied on (specs/020 FR-315)
 
     @field_validator("rationale")
     @classmethod
     def _truncate(cls, v: str) -> str:
         return v.strip()[:600]
+
+    @field_validator("cited")
+    @classmethod
+    def _cap_cited(cls, v: list[str]) -> list[str]:
+        return [str(n)[:40] for n in v[:5]]
 
     @model_validator(mode="after")
     def _roll_needs_direction(self) -> "AnalystBallot":
@@ -250,6 +256,14 @@ class AnalystBallot(BaseModel):
         if self.action != "ROLL":
             self.roll_direction = None
         return self
+
+
+class CitedFigure(BaseModel):
+    """A figure-catalog entry a seat cited; label and display come from the server (specs/020 FR-315)."""
+
+    name: str
+    label: str
+    display: str
 
 
 class AnalystVote(BaseModel):
@@ -262,6 +276,7 @@ class AnalystVote(BaseModel):
     rationale: str = ""
     roll_direction: RollDirection | None = None
     abstained: bool = False
+    cited_figures: list[CitedFigure] = []
 
 
 class TallyEntry(BaseModel):
@@ -287,3 +302,5 @@ class QuorumResult(BaseModel):
     as_of: datetime
     position_fundamentals: PositionFundamentals = PositionFundamentals()
     disclaimer: str = QUORUM_DISCLAIMER
+    # Opaque, HMAC-signed summariser input (specs/020 D-302); None for NO_QUORUM or no seal key.
+    summary_token: str | None = None
