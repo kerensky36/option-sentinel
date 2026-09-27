@@ -212,3 +212,113 @@ def test_click_elsewhere_is_ignored(tmp_path):
 def test_closing_panels_only_touches_quorum_rows(tmp_path):
     out = _call(tmp_path, "quorum_ui", "closeQuorumPanel", {"__fake_root__": True})
     assert out["logs"][0] == [".quorum-panel-row"]
+
+
+# ── US2: radial vote ring, palette, panel header (FR-304, FR-305, FR-316, FR-317) ──
+
+PALETTE = {"CLOSE": "#e8703a", "HOLD": "#8c93a8", "ROLL": "#3aa8e0", "NONE": "#3a3a4a"}
+
+
+def _wedges(svg):
+    return re.findall(r'<g class="wedge"(.*?)</g>', svg, re.S)
+
+
+def _centre(svg):
+    return " ".join(re.findall(r'<text[^>]*class="centre[^"]*"[^>]*>(.*?)</text>', svg))
+
+
+@pytest.mark.parametrize("result", [RESULT_MAJORITY, RESULT_SPLIT, RESULT_NO_QUORUM])
+def test_ring_has_five_accessible_wedges_in_seat_order(tmp_path, result):
+    svg = _call(tmp_path, "quorum_ring", "ringSvg", result)
+    wedges = _wedges(svg)
+    assert len(wedges) == 5
+    assert re.findall(r'<g class="wedge" data-seat="([a-z_]+)"', svg) == SEAT_IDS
+    for w, v in zip(wedges, result["votes"]):
+        assert 'tabindex="0"' in w and 'role="button"' in w
+        label = re.search(r'aria-label="([^"]*)"', w).group(1)
+        assert v["lens"].replace("&", "&amp;") in label
+        if v["abstained"]:
+            assert "abstained" in label
+            assert "ABSTAIN" in w
+            assert PALETTE["NONE"] in w
+        else:
+            assert v["action"] in label and f"{round(v['confidence'] * 100)}%" in label
+            assert v["action"] in re.sub(r"<[^>]+>", " ", w)  # visible text label (SC-307)
+            radius = float(re.search(r'class="wedge-fill[^"]*"[^>]*d="M[^A]*A([\d.]+),', w).group(1))
+            assert abs(radius - (50 + 54 * v["confidence"])) <= 0.5
+            band = re.search(r'class="wedge-band"[^>]*fill="([^"]+)"', w).group(1)
+            assert band == PALETTE[v["action"]]
+
+
+def test_ring_close_uses_hatch_and_roll_labels_show_direction(tmp_path):
+    svg = _call(tmp_path, "quorum_ring", "ringSvg", RESULT_SPLIT)
+    assert '<pattern id="hatch"' in svg
+    close_wedge = _wedges(svg)[1]
+    assert 'fill="url(#hatch)"' in close_wedge
+    assert "ROLL out" in _wedges(svg)[2]
+    assert "ROLL up &amp; out" in _wedges(svg)[3]
+
+
+def test_ring_centre_text(tmp_path):
+    assert _centre(_call(tmp_path, "quorum_ring", "ringSvg", RESULT_MAJORITY)) == "ROLL OUT 3 of 5"
+    assert _centre(_call(tmp_path, "quorum_ring", "ringSvg", RESULT_SPLIT)) == "NO CONSENSUS 5 of 5 voted"
+    assert _centre(_call(tmp_path, "quorum_ring", "ringSvg", RESULT_NO_QUORUM)) == "NO QUORUM 2 of 5 voted"
+    assert _centre(_call(tmp_path, "quorum_ring", "ringSvg", RESULT_MIXED_ROLL)) == "ROLL 3 of 5"
+
+
+def test_vote_palette_constants(tmp_path):
+    out = _call(tmp_path, "quorum_ring", "VOTE_COLORS")
+    assert out["__value__"] == PALETTE
+
+
+def test_vote_palette_avoids_pnl_and_warning_colours():
+    base = (ROOT / "frontend" / "templates" / "base.html").read_text().lower()
+    for reserved in ("#2ec82e", "#48d848", "#d43c3c", "#e05050", "#c8a820", "#d4b840"):
+        assert reserved not in {c.lower() for c in PALETTE.values()}
+        assert reserved in base  # still the app's P&L / warning colours
+    ui = (JS / "quorum_ui.js").read_text()
+    assert "ACTION_BAR" not in ui and "#b33" not in ui and "#56c" not in ui
+
+
+def _panel(tmp_path, result):
+    return _call(tmp_path, "quorum_ui", "renderResult", result)
+
+
+def test_panel_header_order_and_warning_banner(tmp_path):
+    html = _panel(tmp_path, RESULT_MAJORITY)
+    order = [
+        html.index('class="verdict"'),
+        html.index("3 of 5 analysts agree"),
+        html.index("Data as of"),
+        html.index("AI-generated opinion. Not financial advice. Option Sentinel never places trades."),
+        html.index("<svg"),
+    ]
+    assert order == sorted(order)
+    assert re.search(r'class="verdict"[^>]*>ROLL OUT<', html)
+
+
+def test_panel_header_notes_for_split_and_no_quorum(tmp_path):
+    split = _panel(tmp_path, RESULT_SPLIT)
+    assert re.search(r'class="verdict"[^>]*>NO CONSENSUS<', split)
+    assert "No action reached a 3-of-5 majority" in split
+    nq = _panel(tmp_path, RESULT_NO_QUORUM)
+    assert re.search(r'class="verdict"[^>]*>NO QUORUM<', nq)
+    assert "Only 2 of 5 analysts voted" in nq
+
+
+def test_tally_lists_counts_and_marks_the_winner(tmp_path):
+    html = _panel(tmp_path, RESULT_MAJORITY)
+    tally = re.search(r'<div class="tally[^"]*">(.*?)</div>', html, re.S).group(1)
+    text = re.sub(r"<[^>]+>", " ", tally)
+    assert "CLOSE 0" in text and "HOLD 2" in text and "ROLL 3" in text
+    assert "ABSTAIN" not in text
+    assert re.search(r'class="win"[^>]*>.*?ROLL 3', tally, re.S)
+    nq = re.search(r'<div class="tally[^"]*">(.*?)</div>', _panel(tmp_path, RESULT_NO_QUORUM), re.S).group(1)
+    assert "ABSTAIN 3" in re.sub(r"<[^>]+>", " ", nq)
+
+
+def test_panel_escapes_model_and_feed_text(tmp_path):
+    html = _panel(tmp_path, RESULT_MAJORITY)
+    assert "<b>bold</b>" not in html and "&lt;b&gt;bold&lt;/b&gt;" in html
+    assert "Fed <holds>" not in html and "Fed &lt;holds&gt;" in html
+    assert "javascript:" not in html

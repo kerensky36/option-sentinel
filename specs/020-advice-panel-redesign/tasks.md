@@ -127,7 +127,7 @@
 
 ### Tests (write first, confirm failing)
 
-- [ ] T013 [P] [US2] In `tests/unit/test_quorum_ui.py`, test `ringSvg(result)` from `frontend/static/js/quorum_ring.js` for each of RESULT_MAJORITY, RESULT_SPLIT and RESULT_NO_QUORUM:
+- [X] T013 [P] [US2] In `tests/unit/test_quorum_ui.py`, test `ringSvg(result)` from `frontend/static/js/quorum_ring.js` for each of RESULT_MAJORITY, RESULT_SPLIT and RESULT_NO_QUORUM:
   - exactly 5 `<g class="wedge"` groups in seat order (`data-seat` values)
   - each has `tabindex="0"`, `role="button"` and an `aria-label` naming the lens, the vote and the confidence percentage (or "abstained")
   - fill arc outer radius = 50 + 54 × confidence (parse from the path, ±0.5)
@@ -137,24 +137,24 @@
   - every wedge label text contains the vote word (SC-307), and ROLL wedge labels include the direction (`out`, `up & out`, `down & out`) (US2 scenario 1)
   - centre text: majority ROLL with all ROLL voters `out` → "ROLL" "OUT" and "3 of 5"; split → "NO CONSENSUS" and "5 of 5 voted"; no quorum → "NO QUORUM" and "2 of 5 voted"
   - when ROLL voters' directions differ, the centre shows "ROLL" only (D-307)
-- [ ] T014 [P] [US2] In `tests/unit/test_quorum_ui.py`, test the palette:
+- [X] T014 [P] [US2] In `tests/unit/test_quorum_ui.py`, test the palette:
   - `VOTE_COLORS` equals `{CLOSE: '#e8703a', HOLD: '#8c93a8', ROLL: '#3aa8e0', NONE: '#3a3a4a'}`
   - none of these values appears in `frontend/templates/base.html` as a P&L or warning colour (`#2ec82e`, `#48d848`, `#d43c3c`, `#e05050`, `#c8a820`, `#d4b840`)
   - `quorum_ui.js` no longer contains the old `ACTION_BAR` colours (FR-305)
-- [ ] T015 [P] [US2] In `tests/unit/test_quorum_ui.py`, test the top of `renderResult(result)`:
+- [X] T015 [P] [US2] In `tests/unit/test_quorum_ui.py`, test the top of `renderResult(result)`:
   - order: the verdict badge (class `verdict`, text such as `ROLL OUT`, `NO CONSENSUS`, `NO QUORUM`), then the note ("3 of 5 analysts agree" / "No action reached a 3-of-5 majority" / "Only 2 of 5 analysts voted"), then "Data as of", then the warning banner with exact text `AI-generated opinion. Not financial advice. Option Sentinel never places trades.`, then the ring
   - the tally lists CLOSE, HOLD and ROLL counts and ABSTAIN only when non-zero, with the verdict's entry marked `win`
   - all rationale, headline and brief text is HTML-escaped (017 FR-016)
 
 ### Implementation
 
-- [ ] T016 [US2] Create `frontend/static/js/quorum_ring.js` (pure ES module, no DOM access) exporting `VOTE_COLORS` and `ringSvg(result, {animate=false})` per D-309:
+- [X] T016 [US2] Create `frontend/static/js/quorum_ring.js` (pure ES module, no DOM access) exporting `VOTE_COLORS` and `ringSvg(result, {animate=false})` per D-309:
   - 348×280 viewBox, inner radius 50, outer 104, 3° gaps, band at 107–111, labels at radius 128
   - hatch `<pattern>`
   - all text escaped
 
   Makes T013 and T014 pass.
-- [ ] T017 [US2] In `frontend/static/js/quorum_ui.js`, rewrite `renderResult(result)` (FR-316) to output:
+- [X] T017 [US2] In `frontend/static/js/quorum_ui.js`, rewrite `renderResult(result)` (FR-316) to output:
   - the header row (badge using tints of `VOTE_COLORS`; neutral grey for NO_CONSENSUS and NO_QUORUM)
   - the warning banner (FR-317)
   - `.overview` grid with the ring card (ring, tally, note "Wedge length = confidence…") and an empty `<div class="summary-area" data-state="…">` placeholder
@@ -162,11 +162,11 @@
   - disclaimer and data-use notice
 
   Remove `ACTION_BAR`, `_renderTally` and the bar chart. Makes T015 pass.
-- [ ] T018 [US2] In `frontend/static/js/quorum_ui.js`, wire the ring interactions after inserting the panel:
+- [X] T018 [US2] In `frontend/static/js/quorum_ui.js`, wire the ring interactions after inserting the panel:
   - `mouseenter`/`focus` on `.wedge[data-seat]` toggles the `hl` class on matching `[data-seat]` elements
   - `click` or Enter/Space opens `details.member[data-seat]` and calls `scrollIntoView({block:'nearest'})`
   - respect `prefers-reduced-motion` (no grow animation)
-- [ ] T019 [US2] In `frontend/templates/base.html` `<style>`, add the panel CSS from the mock:
+- [X] T019 [US2] In `frontend/templates/base.html` `<style>`, add the panel CSS from the mock:
   - `.quorum-panel .result`, `.verdict`, `.warn-strip`, `.overview` (2 columns ≥ 761 px, 1 column below), `.radial-card`, `.tally`, `.wedge` hover dimming, `.sw` swatches
   - the panel inner wrapper is `position: sticky; left: 0`
 
