@@ -36,7 +36,7 @@ Move the demo quorum into a new pure ES module, `frontend/static/js/demo_quorum.
 | `thetaDay` | Σ theta × quantity × 100 |
 | `keyLeg` | short leg closest to the money (else leg closest to the money) |
 | `moneyness` | keyLeg: call (S−K)/S×100, put (K−S)/S×100 (positive = in the money) |
-| `probItm` | ≈ \|keyLeg.delta\| |
+| `probItm` | Black-Scholes N(d2) (call) / N(−d2) (put) with the leg's IV, T = max(dte, 1)/365, r = 0.045 |
 | `breakevens` | `analyzePayoff` from `payoff_math.js` |
 
 ## Seat rules (first match wins)

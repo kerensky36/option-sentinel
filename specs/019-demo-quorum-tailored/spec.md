@@ -60,12 +60,12 @@ A visitor in demo mode clicks Quorum on different demo positions. Each result qu
 
 ### Measurable Outcomes
 
-- **SC-201**: Across the demo positions, at least two distinct tallies are produced (verified by automated test).
+- **SC-201**: Across the demo positions, at least two distinct tallies and all three verdicts HOLD, ROLL and CLOSE are produced (verified by automated test). Two demo covered calls (NVDA, AMD) were adjusted so the demo data exercises the ROLL and CLOSE rules.
 - **SC-202**: 100% of fundamentals-card rationales in demo mode contain a figure that matches the clicked position (verified by automated test).
 - **SC-203**: No network request is made when clicking Quorum in demo mode (017 SC unchanged; verified by browser check).
 
 ## Assumptions
 
 - Demo data uses its own conventions (signed cost, per-contract quantities of ±1 or ±2); the rules only need to be internally consistent with that data.
-- Probability of finishing in the money is approximated by |delta| in demo mode and labelled "≈".
+- Probability of finishing in the money uses the Black-Scholes N(±d2) estimate (as the live quorum does) and is labelled "≈". |delta| was tried first but the demo deltas are not realistic, which produced contradictions such as an in-the-money leg with a 24% chance.
 - No server, data-use, or privacy change: demo mode sends nothing anywhere.

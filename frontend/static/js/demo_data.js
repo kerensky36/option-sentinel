@@ -10,6 +10,8 @@
  *   DEMO_EQUITY_HASH  — covered calls + screener candidates (equities & ETFs)
  */
 
+import { buildDemoQuorum } from './demo_quorum.js';
+
 export const DEMO_SPREADS_HASH = 'demo-spreads-0001';
 export const DEMO_EQUITY_HASH  = 'demo-equity-0002';
 
@@ -125,9 +127,9 @@ export const DEMO_POSITIONS_EQUITY = [
   {
     symbol: 'NVDA 250620C00135000', underlying_symbol: 'NVDA', option_type: 'call',
     strike: '135.00', expiry_date: '2025-06-20', quantity: -1,
-    cost: '-2.45', current_mark: '-1.60', unrealised_pnl: '85.00', days_to_expiry: 29,
-    underlying_price: '127.60',
-    delta: 0.30, gamma: 0.058, theta: -0.14, vega: 0.19, implied_volatility: 0.42,
+    cost: '-2.45', current_mark: '-0.95', unrealised_pnl: '150.00', days_to_expiry: 5,
+    underlying_price: '133.90',
+    delta: 0.42, gamma: 0.121, theta: -0.19, vega: 0.19, implied_volatility: 0.42,
     delta_source: 'calculated', gamma_source: 'calculated',
     theta_source: 'calculated', vega_source: 'calculated', iv_source: 'calculated',
   },
@@ -152,9 +154,9 @@ export const DEMO_POSITIONS_EQUITY = [
   {
     symbol: 'AMD 250620C00175000', underlying_symbol: 'AMD', option_type: 'call',
     strike: '175.00', expiry_date: '2025-06-20', quantity: -2,
-    cost: '-4.80', current_mark: '-3.10', unrealised_pnl: '340.00', days_to_expiry: 29,
+    cost: '-4.80', current_mark: '-1.20', unrealised_pnl: '720.00', days_to_expiry: 29,
     underlying_price: '158.40',
-    delta: 0.32, gamma: 0.062, theta: -0.16, vega: 0.22, implied_volatility: 0.51,
+    delta: 0.22, gamma: 0.041, theta: -0.09, vega: 0.22, implied_volatility: 0.51,
     delta_source: 'calculated', gamma_source: 'calculated',
     theta_source: 'calculated', vega_source: 'calculated', iv_source: 'calculated',
   },
@@ -304,60 +306,8 @@ export const DEMO_SCREENER_RESULTS = [
   },
 ];
 
-/**
- * Canned quorum result for demo mode (specs/017 FR-018, specs/018 FR-114) — no server call.
- * @param {string} underlying
- * @param {string|null} asOf - the data "as of" time sent with the request, if any
- */
-function _demoQuorum(underlying, asOf = null) {
-  const vote = (seat, lens, action, confidence, rationale, roll_direction = null) => ({
-    seat, lens, action, confidence, rationale, roll_direction, abstained: false,
-  });
-  const hoursAgo = (h) => new Date(Date.now() - h * 3600 * 1000).toISOString();
-  return {
-    verdict: 'ROLL',
-    quorum_met: true,
-    seats: 5,
-    valid_votes: 5,
-    tally: [
-      { action: 'CLOSE', votes: 1, mean_confidence: 0.6 },
-      { action: 'HOLD', votes: 1, mean_confidence: 0.5 },
-      { action: 'ROLL', votes: 3, mean_confidence: 0.68 },
-    ],
-    votes: [
-      vote('greeks_exposure', 'Greeks & Exposure', 'ROLL', 0.65,
-        'Net gamma of -3.8 shares per $1 is climbing into expiry; rolling out lowers it while keeping delta near -25.', 'out'),
-      vote('volatility_pricing', 'Volatility & Pricing', 'HOLD', 0.5,
-        'IV/RV of 1.3× means the premium is still rich, and the 1-σ expected move of $14 stays inside the breakeven.'),
-      vote('time_decay_pnl', 'Time Decay & P&L', 'ROLL', 0.7,
-        '63% of max profit is captured with 29 days left; theta is only 1.9% of the remaining premium per day.', 'out'),
-      vote('strike_assignment', 'Strike & Assignment', 'ROLL', 0.7,
-        'The short strike is 2.8% out of the money with a 24% chance of finishing in the money; rolling down and out adds cushion.', 'down_and_out'),
-      vote('macro_news_overlay', 'Macro & News Overlay', 'CLOSE', 0.6,
-        `A CPI release lands before expiry and ${underlying} headlines are mixed; the news argues for banking the gain.`),
-    ],
-    macro_brief: `Demo: ${underlying} has no earnings before expiry; CPI and a Fed speaker are scheduled inside the window. Macro backdrop: rates on hold, VIX in the mid-teens.`,
-    headlines: [
-      { publisher: 'Yahoo Finance', title: `Demo headline: What to watch for ${underlying} this week`, link: 'https://finance.yahoo.com/', published: hoursAgo(3), summary: '' },
-      { publisher: 'CNBC', title: 'Demo headline: Fed holds rates steady, signals patience', link: 'https://www.cnbc.com/', published: hoursAgo(9), summary: '' },
-      { publisher: 'Bloomberg', title: 'Demo headline: Treasury yields drift lower after inflation data', link: 'https://www.bloomberg.com/markets', published: hoursAgo(20), summary: '' },
-    ],
-    underlying_symbol: underlying,
-    model: 'demo (no model call)',
-    generated_at: new Date().toISOString(),
-    as_of: asOf || new Date().toISOString(),
-    position_fundamentals: {
-      net_position_delta: -25, net_dollar_delta: -13375, net_position_gamma: -3.8,
-      net_dollar_theta: 12, net_dollar_vega: -18, breakevens: [515.8],
-      max_profit: 420, max_loss: 51580, max_profit_unbounded: false, max_loss_unbounded: false,
-      pct_max_profit_captured: 63, theta_pct_of_remaining: 1.9, single_expiry: true,
-    },
-    disclaimer: 'Informational only — not financial advice. Option Sentinel never places trades.',
-  };
-}
-
 // Demo realised volatility per underlying (specs/018 FR-101); other figures stay null.
-const DEMO_REALISED_VOL = { AAPL: 0.24, SPY: 0.15, TSLA: 0.52, QQQ: 0.19, MSFT: 0.21 };
+const DEMO_REALISED_VOL = { AAPL: 0.24, SPY: 0.15, TSLA: 0.52, QQQ: 0.19, MSFT: 0.21, AMD: 0.60 };
 
 /** Stamp demo positions like a live refresh: one "as of" time plus fundamentals. */
 function _withAsOf(positions) {
@@ -412,15 +362,12 @@ export function demoResponse(url, options = {}) {
     );
   }
   if (u.pathname === '/api/quorum/vote') {
-    let underlying = 'DEMO';
-    let asOf = null;
+    // specs/019: tailored to the clicked position, computed in the browser.
+    let request = {};
     try {
-      const body = JSON.parse(options.body || '{}');
-      const sym = body.legs?.[0]?.underlying_symbol || body.symbols?.[0] || '';
-      underlying = sym.trim().split(/\s+/)[0] || underlying;
-      asOf = body.as_of || null;
-    } catch { /* keep default */ }
-    return _makeResponse(_demoQuorum(underlying, asOf));
+      request = JSON.parse(options.body || '{}');
+    } catch { /* empty request → NO_QUORUM result */ }
+    return _makeResponse(buildDemoQuorum(request));
   }
   return _makeResponse({ detail: 'Demo mode: endpoint not available' });
 }
