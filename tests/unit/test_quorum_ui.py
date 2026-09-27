@@ -407,3 +407,66 @@ def test_stale_panel_is_not_updated(tmp_path):
     body = {"status": "ok", "trimmed": False, "summary": SUMMARY}
     value, _, _ = _request_summary(tmp_path, RESULT_MAJORITY, {"status": 200, "body": body}, current=False)
     assert value is None
+
+
+# ── US4: analyst rows, expand all, brief section (FR-315, FR-316, FR-320) ──────
+
+def _members(html):
+    return re.findall(r'<details class="member"[^>]*data-seat="([a-z_]+)"[^>]*>(.*?)</details>', html, re.S)
+
+
+def test_five_collapsed_rows_in_seat_order(tmp_path):
+    html = _panel(tmp_path, RESULT_SPLIT)
+    rows = _members(html)
+    assert [seat for seat, _ in rows] == SEAT_IDS
+    assert not re.search(r'<details class="member"[^>]*\bopen\b', html)
+    for (seat, body), v in zip(rows, RESULT_SPLIT["votes"]):
+        summary = re.search(r"<summary>(.*?)</summary>", body, re.S).group(1)
+        assert PALETTE[v["action"]] in summary  # stripe colour
+        assert v["lens"].replace("&", "&amp;") in summary
+        assert f">{v['action']}<" in summary
+        pct = round(v["confidence"] * 100)
+        assert f"width:{pct}%" in summary and f"{pct}%" in re.sub(r"<[^>]+>", " ", summary)
+    roll = dict(rows)["strike_assignment"]
+    assert "roll up &amp; out" in roll
+
+
+def test_abstained_row(tmp_path):
+    rows = dict(_members(_panel(tmp_path, RESULT_NO_QUORUM)))
+    summary = re.search(r"<summary>(.*?)</summary>", rows["volatility_pricing"], re.S).group(1)
+    assert ">ABSTAINED<" in summary and "—" in summary and PALETTE["NONE"] in summary
+
+
+def test_row_body_has_rationale_and_figure_chips(tmp_path):
+    rows = dict(_members(_panel(tmp_path, RESULT_MAJORITY)))
+    body = rows["volatility_pricing"]
+    assert "&lt;b&gt;bold&lt;/b&gt;" in body
+    chips = re.findall(r'<span class="fig">(.*?)</span>\s*(?=<span class="fig">|</div>)', body, re.S)
+    assert len(chips) == 1 and "IV/RV" in chips[0] and "1.08×" in chips[0]
+    assert '<span class="fig">' not in rows["greeks_exposure"]
+
+
+def test_expand_all_control_and_collapsed_brief(tmp_path):
+    html = _panel(tmp_path, RESULT_MAJORITY)
+    assert re.search(r'<button[^>]*class="toggle-all"[^>]*>Expand all</button>', html)
+    extra = re.search(r'<details class="extra">(.*?)</details>', html, re.S)
+    assert extra and "<details class=\"extra\" open" not in html
+    assert "Research brief &amp; headlines (2)" in extra.group(1)
+    assert "Jobs report &lt;Oct 2&gt;" in extra.group(1)
+    assert 'href="https://www.cnbc.com/a" target="_blank" rel="noopener noreferrer"' in extra.group(1)
+    assert "javascript:" not in extra.group(1)
+
+
+def test_toggle_all_helper(tmp_path):
+    out = _run_calls([
+        {"module": "quorum_ui", "fn": "toggleAll", "args": [[{"open": False}, {"open": True}]]},
+        {"module": "quorum_ui", "fn": "toggleAll", "args": [[{"open": True}, {"open": True}]]},
+    ], tmp_path)["results"]
+    assert out == ["Collapse all", "Expand all"]
+
+
+def test_panel_section_order(tmp_path):
+    html = _panel(tmp_path, RESULT_MAJORITY)
+    order = [html.index("<svg"), html.index('class="summary-area"'), html.index('<details class="member"'),
+             html.index('<details class="extra">'), html.index("How we use your data")]
+    assert order == sorted(order)

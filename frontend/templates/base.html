@@ -269,6 +269,40 @@
     .quorum-panel .reason h3 { margin: 0; font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase; color: #626270; font-weight: 600; }
     .quorum-panel .reason ul { margin: 0; padding-left: 14px; color: #90909c; display: grid; gap: 3px; line-height: 1.55; list-style: disc; }
     .quorum-panel .reason p { margin: 0; color: #90909c; line-height: 1.55; }
+
+    /* ── Analyst rows and brief section (specs/020 US4) ── */
+    .quorum-panel .members { border: 1px solid #22222e; }
+    .quorum-panel .members-head { display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; border-bottom: 1px solid #22222e; background: #1c1c24; }
+    .quorum-panel .toggle-all { background: none; border: 0; color: #626270; font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase; cursor: pointer; font-family: inherit; }
+    .quorum-panel .toggle-all:hover { color: #aeaeb8; }
+    .quorum-panel details.member { border-bottom: 1px solid #22222e; }
+    .quorum-panel details.member:last-child { border-bottom: 0; }
+    .quorum-panel details.member > summary { cursor: pointer; display: grid; align-items: center; gap: 10px; grid-template-columns: 4px minmax(140px, 1.4fr) 140px minmax(90px, 1fr) 14px; padding: 7px 10px 7px 0; }
+    .quorum-panel details.member > summary:hover, .quorum-panel details.member.hl > summary { background: rgba(34,34,50,0.55); }
+    .quorum-panel .stripe { align-self: stretch; }
+    .quorum-panel .lens { color: #d2d2d8; min-width: 0; }
+    .quorum-panel .vote-chip { display: inline-flex; gap: 6px; align-items: baseline; }
+    .quorum-panel .vote-chip b { letter-spacing: 0.14em; font-weight: 700; }
+    .quorum-panel .vote-chip .dir { color: #626270; font-size: 9px; }
+    .quorum-panel .conf { display: flex; align-items: center; gap: 8px; }
+    .quorum-panel .conf-track { flex: 1; height: 5px; background: #252532; position: relative; }
+    .quorum-panel .conf-fill { position: absolute; top: 0; bottom: 0; left: 0; }
+    .quorum-panel .conf-num { color: #90909c; min-width: 3ch; text-align: right; }
+    .quorum-panel .caret { color: #626270; font-size: 9px; transition: transform 0.15s; display: inline-block; }
+    .quorum-panel details[open] > summary .caret { transform: rotate(90deg); }
+    .quorum-panel .member-body { padding: 4px 14px 12px; display: grid; gap: 8px; border-top: 1px dashed #22222e; background: rgba(12,12,16,0.35); }
+    .quorum-panel .member-body p { margin: 0; padding-top: 6px; color: #aeaeb8; line-height: 1.65; max-width: 80ch; }
+    .quorum-panel .figs { display: flex; flex-wrap: wrap; gap: 6px; }
+    .quorum-panel .fig { border: 1px solid #2c2c3a; padding: 2px 6px; color: #90909c; font-size: 10px; }
+    .quorum-panel .fig b { color: #d2d2d8; font-weight: 500; }
+    @media (max-width: 560px) {
+      .quorum-panel details.member > summary { grid-template-columns: 4px 1fr 14px; row-gap: 4px; }
+      .quorum-panel details.member > summary .vote-chip, .quorum-panel details.member > summary .conf { grid-column: 2; }
+    }
+    .quorum-panel details.extra { border: 1px solid #22222e; }
+    .quorum-panel details.extra > summary { cursor: pointer; padding: 6px 10px; color: #626270; font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase; display: flex; gap: 8px; }
+    .quorum-panel .extra-body { padding: 0 10px 10px; display: grid; gap: 8px; color: #90909c; }
+    .quorum-panel .extra-body p { margin: 0; line-height: 1.6; }
   </style>
 </head>
 <body class="bg-gray-950 text-gray-100 min-h-screen flex flex-col">

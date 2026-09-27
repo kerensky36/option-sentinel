@@ -300,30 +300,30 @@
 
 ### Tests (write first, confirm failing)
 
-- [ ] T034 [P] [US4] In `tests/unit/test_quorum_agents.py`:
+- [X] T034 [P] [US4] In `tests/unit/test_quorum_agents.py`:
   - the fundamentals and overlay seat messages include a `FIGURES` list of catalog `name: label` pairs after FUNDAMENTALS, inside the DATA block
   - the seat instructions ask for up to 5 `cited` names from FIGURES and still require a cited figure in the rationale (018 FR-115)
   - a fake ballot with `cited: ["leg1_iv_rv", "bogus", "leg1_iv_rv"]` yields `cited_figures == [{name:"leg1_iv_rv", label:"IV/RV", display:"1.08×"}]` (value from the catalog)
   - abstained votes → `[]`
   - `test_seat_instructions_contain_no_braces` still passes
-- [ ] T035 [P] [US4] In `tests/unit/test_quorum_ui.py`, test the rows section of `renderResult`:
+- [X] T035 [P] [US4] In `tests/unit/test_quorum_ui.py`, test the rows section of `renderResult`:
   - five `<details class="member" data-seat=…>` in seat order, none `open`
   - each summary shows the stripe coloured `VOTE_COLORS[action]`, the lens name, the vote text (`ABSTAINED` when abstained), `roll out` / `roll up & out` / `roll down & out` for ROLL, a confidence bar whose width is the percentage, and a `NN%` label (or `—`)
   - the body holds the escaped rationale and one `.fig` chip per cited figure (`label` + `display`)
   - the "Expand all" button is present
   - `details.extra` titled `Research brief & headlines (N)` with N = headline count, not `open`, containing the brief and escaped headline links with `target="_blank" rel="noopener noreferrer"`
-- [ ] T036 [P] [US4] In `tests/unit/test_quorum_ui.py`, test `toggleAll(rows)` (exported pure helper): when any row is closed it opens all and returns the label "Collapse all"; otherwise it closes all and returns "Expand all".
+- [X] T036 [P] [US4] In `tests/unit/test_quorum_ui.py`, test `toggleAll(rows)` (exported pure helper): when any row is closed it opens all and returns the label "Collapse all"; otherwise it closes all and returns "Expand all".
 
 ### Implementation
 
-- [ ] T037 [US4] In `src/services/quorum_agents.py`:
+- [X] T037 [US4] In `src/services/quorum_agents.py`:
   - `_seat_message` gains a `figures` argument and appends `"FIGURES": [{"name", "label"}]` inside DATA
   - update `_FUNDAMENTALS_INSTRUCTION` and `_OVERLAY_INSTRUCTION` (no braces) to ask for up to 5 `cited` names
   - `_vote` resolves `ballot.cited` via `figure_catalog.resolve_cited` into `AnalystVote.cited_figures`
   - `run_quorum` passes the catalog built in T030 to both messages
 
   Makes T034 pass.
-- [ ] T038 [US4] In `frontend/static/js/quorum_ui.js`:
+- [X] T038 [US4] In `frontend/static/js/quorum_ui.js`:
   - replace the 018 vote cards with `_renderMembers(votes)` producing the `<details class="member">` rows
   - add `toggleAll(rows)` and wire the "Expand all" button
   - move the brief and headlines into `details.extra`

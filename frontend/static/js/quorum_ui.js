@@ -104,6 +104,12 @@ function _wireRing(root) {
       if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openRow(seat); }
     });
   });
+  const toggle = root.querySelector('.toggle-all');
+  if (toggle) {
+    toggle.addEventListener('click', () => {
+      toggle.textContent = toggleAll([...root.querySelectorAll('details.member')]);
+    });
+  }
   root.querySelectorAll('details.member[data-seat]').forEach((d) => {
     const seat = d.getAttribute('data-seat');
     d.addEventListener('mouseenter', () => highlight(seat, true));
@@ -144,22 +150,43 @@ function _renderTally(result) {
   return parts.join('');
 }
 
-function _renderVotes(votes) {
-  return votes
-    .map((v) => {
-      const action = v.abstained
-        ? '<span class="text-gray-500">abstained</span>'
-        : `<span class="font-semibold" style="color:${VOTE_COLORS[v.action] || '#aaa'}">${esc(v.action)}</span>
-           <span class="text-gray-400">${pct(v.confidence)}</span>
-           ${v.roll_direction ? `<span class="text-gray-300">· ${esc(ROLL_LABEL[v.roll_direction] || v.roll_direction)}</span>` : ''}`;
-      return `
-      <div class="border border-gray-800 bg-gray-900 px-3 py-2" style="border-radius:2px">
-        <div class="text-gray-400 uppercase tracking-wider text-xs mb-1">${esc(v.lens)}</div>
-        <div class="text-sm mb-1">${action}</div>
-        <div class="text-gray-300 text-xs" style="line-height:1.5">${esc(v.rationale)}</div>
-      </div>`;
-    })
-    .join('');
+function _renderMembers(votes) {
+  const rows = votes.map((v) => {
+    const abstained = v.abstained || !v.action;
+    const colour = VOTE_COLORS[abstained ? 'NONE' : v.action];
+    const conf = abstained ? 0 : Math.round(Number(v.confidence) * 100);
+    const dir = !abstained && v.action === 'ROLL' && v.roll_direction
+      ? `<span class="dir">${esc(ROLL_LABEL[v.roll_direction] || v.roll_direction)}</span>` : '';
+    const chips = (v.cited_figures || [])
+      .map((c) => `<span class="fig">${esc(c.label)} <b>${esc(c.display)}</b></span>`)
+      .join('');
+    return `<details class="member" data-seat="${esc(v.seat)}" style="--c:${colour}">
+      <summary>
+        <span class="stripe" style="background:${colour}"></span>
+        <span class="lens">${esc(v.lens)}</span>
+        <span class="vote-chip"><b style="color:${colour}">${abstained ? 'ABSTAINED' : esc(v.action)}</b>${dir}</span>
+        <span class="conf" aria-label="Confidence ${abstained ? 'not given' : `${conf}%`}"><span class="conf-track"><span class="conf-fill" style="width:${conf}%;background:${colour}"></span></span><span class="conf-num">${abstained ? '—' : `${conf}%`}</span></span>
+        <span class="caret" aria-hidden="true">▶</span>
+      </summary>
+      <div class="member-body"><p>${esc(v.rationale || (abstained ? 'This analyst did not vote.' : ''))}</p>${chips ? `<div class="figs">${chips}</div>` : ''}</div>
+    </details>`;
+  }).join('');
+  const valid = votes.filter((v) => !v.abstained && v.action).length;
+  return `<div class="members">
+      <div class="members-head"><span class="eyebrow">Quorum members · ${valid} of ${votes.length} voted</span><button type="button" class="toggle-all">Expand all</button></div>
+      ${rows}
+    </div>`;
+}
+
+/**
+ * Open every row when any is closed, otherwise close them all. Returns the
+ * control's next label (FR-316).
+ * @param {Array<{open: boolean}>} rows
+ */
+export function toggleAll(rows) {
+  const openAll = rows.some((r) => !r.open);
+  rows.forEach((r) => { r.open = openAll; });
+  return openAll ? 'Collapse all' : 'Expand all';
 }
 
 function _renderHeadlines(headlines) {
@@ -208,16 +235,15 @@ export function renderResult(result) {
         </div>
         <div class="summary-area" data-state="${_initialSummaryState(result)}">${renderSummary(_initialSummaryState(result), null, result)}</div>
       </div>
-      <div class="members grid grid-cols-1 md:grid-cols-5 gap-2">${_renderVotes(result.votes)}</div>
-      ${result.macro_brief ? `
-      <div>
-        <div class="text-gray-400 uppercase tracking-wider text-xs mb-1">Research brief (Macro &amp; News analyst)</div>
-        <div class="text-gray-300 text-xs" style="line-height:1.6">${esc(result.macro_brief)}</div>
-      </div>` : ''}
-      <div>
-        <div class="text-gray-400 uppercase tracking-wider text-xs mb-1">News given to the Macro &amp; News analyst</div>
-        ${_renderHeadlines(result.headlines)}
-      </div>
+      ${_renderMembers(result.votes)}
+      <details class="extra">
+        <summary><span class="caret" aria-hidden="true">▶</span>Research brief &amp; headlines (${(result.headlines || []).length})</summary>
+        <div class="extra-body">
+          ${result.macro_brief ? `<p>${esc(result.macro_brief)}</p>` : ''}
+          <div class="eyebrow">News given to the Macro &amp; News analyst</div>
+          ${_renderHeadlines(result.headlines)}
+        </div>
+      </details>
       <div class="foot">${esc(result.disclaimer)} · ${esc(result.model)}</div>
     </div>${_notice()}`;
 }

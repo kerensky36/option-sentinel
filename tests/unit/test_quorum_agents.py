@@ -447,3 +447,42 @@ class TestSpec020Models:
         for f in ("verdict", "quorum_met", "seats", "valid_votes", "tally", "votes", "macro_brief",
                   "headlines", "underlying_symbol", "model", "generated_at", "as_of", "position_fundamentals"):
             assert f in fields
+
+
+class TestCitedFigures:
+    """specs/020 T034 — seats cite catalog figures by name; the server supplies values."""
+
+    async def _run(self, replies):
+        fake = _fake(replies)
+        result = await run_quorum(
+            build_position_context([_leg()]), model=fake, headline_fetcher=_fetcher(_HEADLINES)
+        )
+        return fake, result
+
+    async def test_seat_messages_list_figures_inside_data(self):
+        fake, _ = await self._run({sid: _ballot("HOLD") for sid in _SEAT_IDS})
+        reqs = _seat_requests(fake, _SEAT_IDS)
+        for sid in _SEAT_IDS:
+            text = _request_text(reqs[sid])
+            start, end = text.index("DATA START"), text.index("DATA END")
+            figures = text.index("FIGURES", start)
+            assert text.index("FUNDAMENTALS", start) < figures < end
+            assert "leg1_iv_rv" in text[figures:end] and "IV/RV" in text[figures:end]
+
+    def test_instructions_ask_for_cited_names_without_braces(self):
+        for tmpl in (quorum_agents._FUNDAMENTALS_INSTRUCTION, quorum_agents._OVERLAY_INSTRUCTION):
+            lowered = tmpl.lower()
+            assert "cited" in lowered and "figures" in lowered and "up to five" in lowered
+        assert "cite at least one specific figure" in quorum_agents._FUNDAMENTALS_INSTRUCTION.lower()
+
+    async def test_cited_names_resolve_to_catalog_values(self):
+        replies = {sid: _ballot("HOLD") for sid in _SEAT_IDS}
+        replies["volatility_pricing"] = _ballot("HOLD", cited=["leg1_iv_rv", "bogus", "leg1_iv_rv"])
+        replies["greeks_exposure"] = RuntimeError("down")
+        _, result = await self._run(replies)
+        vol = next(v for v in result.votes if v.seat == "volatility_pricing")
+        assert [c.model_dump() for c in vol.cited_figures] == [
+            {"name": "leg1_iv_rv", "label": "IV/RV", "display": "1.50×"}
+        ]
+        greeks = next(v for v in result.votes if v.seat == "greeks_exposure")
+        assert greeks.abstained and greeks.cited_figures == []
