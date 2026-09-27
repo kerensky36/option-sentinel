@@ -6,7 +6,7 @@
 
 **Status**: Draft
 
-**Amends**: `specs/017-macro-quorum-agents/spec.md` FR-001, FR-016, FR-018/`specs/019-demo-quorum-tailored/spec.md` FR-201 (demo result shape), and `specs/018-fundamentals-first-quorum/spec.md` FR-120 (data-use page). Everything else in specs 017–019 is unchanged, including the five seats, the deterministic 3-of-5 tally, the vote request shape and its 60-second limit (018 FR-118), the rate limit, and the rule that results are never stored.
+**Amends**: `specs/017-macro-quorum-agents/spec.md` FR-001, FR-015 (session cache, Session 2026-09-27 b), FR-016, FR-018/`specs/019-demo-quorum-tailored/spec.md` FR-201 (demo result shape), and `specs/018-fundamentals-first-quorum/spec.md` FR-120 (data-use page). Everything else in specs 017–019 is unchanged, including the five seats, the deterministic 3-of-5 tally, the vote request shape and its 60-second limit (018 FR-118), the rate limit, and the rule that results are never stored.
 
 **Input**: User description: "Advice panel redesign for the quorum. Replace the Quorum column with an ADVICE(Agentic) button on each position row, carrying a hazard-stripe warning label. Show results as a radial vote ring, a master summary written by a model from the five votes, and a collapsible row per analyst. Vote colours must not be confused with P&L red/green or the warning yellow. Exit rules are out of scope."
 
@@ -25,6 +25,12 @@
 - Q: Should the votes appear as soon as they are counted, with the summary following, or should everything appear together? → A: Two steps. The vote request returns the verdict, ring and rows as today; the panel then makes a separate summary request and shows "Writing summary…" until it arrives or fails. The summary never delays the verdict.
 - Q: How are numbers in the summary kept honest? → A: The summariser never writes numbers. It receives a catalog of named figures and writes placeholders (e.g. `{captured_pct}`); the server fills in the values. A digit typed by the model or an unknown placeholder removes that "why" bullet or dissent sentence; if it is in the title or explanation, the whole summary is discarded. Seats cite figures the same way, by catalog name.
 
+### Session 2026-09-27 (b) — post-review enhancements
+
+- Q: How should the ADVICE(Agentic) button look? → A: Same font and colours as the red "Erase All Data" button in the top bar (dark red background, light red text, same size, letter-spacing and uppercase). The hazard stripe stays as its warning label.
+- Q: Should clicking the button again re-run the quorum? → A: No. The first successful result for a position is kept for the rest of the browser session and shown again on every later click, with no new request, until the user signs out (or uses Erase All Data, or closes the tab). This replaces 017 FR-015's "closing the panel discards it" for successful results.
+- Q: What counts as "the same position"? → A: The same row (spread or single option) with the same set of legs. If the legs change (a leg is closed or rolled), the next click runs a fresh quorum. Price or Greek changes alone do not.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Request advice from any position row (Priority: P1) 🎯 MVP
@@ -42,6 +48,9 @@ A trader looking at the positions dashboard sees an "ADVICE(Agentic)" button, ma
 3. **Given** an open result panel, **When** the trader clicks the same button again, **Then** the panel closes; **When** they click another row's button, **Then** the first panel closes and a new one opens under the other row.
 4. **Given** leg rows inside an expanded spread, **When** they render, **Then** they carry no advice button (advice is per position, not per leg).
 5. **Given** a phone-width screen (360 px), **When** the dashboard renders, **Then** the button is visible without horizontal scrolling.
+6. **Given** the top bar's "Erase All Data" button, **When** the dashboard renders, **Then** every ADVICE(Agentic) button uses the same background, text colour, hover colour, font size, letter-spacing and uppercase styling, plus its hazard stripe.
+7. **Given** a position whose quorum already returned a result in this session, **When** the trader clicks its button again (after closing the panel, reloading the page, visiting the screener, or refreshing positions without changing that position's legs), **Then** the saved result, including its summary, is shown at once and no vote or summary request is sent.
+8. **Given** a saved result, **When** the trader signs out, uses Erase All Data, or closes the tab, **Then** the saved result is gone and the next click runs a fresh quorum.
 
 ---
 
@@ -116,7 +125,11 @@ Below the ring and summary, each analyst has one collapsed row showing their len
 - **Very long position names on narrow screens**: the name truncates with an ellipsis before the button wraps or disappears.
 - **Both the advice panel and the payoff graph open on the same row**: both stay open; neither closes the other.
 - **Wedge labels on a 360 px screen**: the ring scales down but labels stay at least as large as the table's smallest text; the summary stacks below the ring.
-- **Result arrives after the trader closed the panel or opened another**: it is discarded, as today.
+- **Result arrives after the trader closed the panel or opened another**: it is not shown, but a successful result is still saved for the session, so reopening the panel shows it without a new request.
+- **Summary still pending when the panel is closed**: the summary request keeps running; its outcome (summary or "Summary unavailable") is saved with the result.
+- **Failed quorum** (stale data, timeout, rate limit, network error): nothing is saved; the next click tries again.
+- **Browser storage unavailable or full**: results are kept in memory for the page's lifetime instead; nothing breaks.
+- **Legs changed after a refresh**: a spread whose legs differ from the saved result's legs is treated as a new position and gets a fresh quorum.
 
 ## Requirements *(mandatory)*
 
@@ -149,20 +162,24 @@ Below the ring and summary, each analyst has one collapsed row showing their len
 - **FR-315**: Each seat MUST additionally return up to 5 cited figures, as names from the figure catalog for its inputs; the server supplies each figure's label and value. Unknown names MUST be dropped. Seats that cite none show the rationale only.
 - **FR-316** *(replaces 017 FR-016's layout)*: The panel MUST show, in order: verdict badge with the position and "N of 5" note and "Data as of" time; the warning banner (FR-317); the ring and tally beside the summary area, which reads "Writing summary…" while the summary request is pending (stacked on narrow screens); the five collapsible analyst rows with an Expand all / Collapse all control; a collapsed "Research brief & headlines (N)" section; the disclaimer and data-use notice (017 FR-017, FR-020).
 - **FR-317**: The warning banner MUST read "AI-generated opinion. Not financial advice. Option Sentinel never places trades." and MUST be visible without expanding anything.
-- **FR-318**: Row expansion state MUST NOT be persisted (017 FR-015 unchanged); closing the panel discards it.
+- **FR-318**: Row expansion state MUST NOT be persisted; closing the panel discards it.
+- **FR-323**: The ADVICE(Agentic) button MUST use the same background, hover background, text colour, font size, letter-spacing and uppercase styling as the "Erase All Data" button, and keep its hazard-stripe warning label (FR-302).
+- **FR-324** *(replaces 017 FR-015 for successful results)*: The first successful quorum result for a position MUST be saved in the browser's sessionStorage, keyed by the position's row id and its sorted leg symbols, together with its summary outcome once known. Later clicks for the same key MUST show the saved result and MUST NOT send a vote or summary request. Failed requests MUST NOT be saved. Saved results MUST be cleared by sign-out, Erase All Data and tab close (all of which already clear sessionStorage), and MUST NOT be sent to the server or to any other destination. If sessionStorage is unavailable, results MUST be kept in memory for the page's lifetime.
+- **FR-325**: A panel showing a saved result MUST say so next to the "Data as of" time ("Saved for this session").
 - **FR-319**: The panel MUST be usable at 360 px width without horizontal page scrolling: the panel stays within the visible width even when the table scrolls sideways; ring labels, row fields and the summary remain legible.
 - **FR-320**: Wedges and rows MUST be operable by keyboard (focusable, Enter/Space to expand) and have visible focus.
 
 ### Demo mode and disclosure
 
 - **FR-321** *(amends 019 FR-201)*: In demo mode the result MUST also include a summary and cited figures built in the browser from fixed templates over the demo votes and figures, with no network request, and labelled as demo.
-- **FR-322** *(amends 018 FR-120)*: The "How we use your data" page MUST state that one additional Vertex AI request per quorum sends the analysts' votes and rationales together with the same position fields, to produce the summary, and that nothing is retained.
+- **FR-322** *(amends 018 FR-120)*: The "How we use your data" page MUST state that one additional Vertex AI request per quorum sends the analysts' votes and rationales together with the same position fields, to produce the summary, and that nothing is retained on the server. It MUST also state that quorum results are saved in the browser's sessionStorage for the session and cleared on sign-out, Erase All Data or tab close (FR-324).
 
 ### Key Entities
 
 - **Figure Catalog**: The named figures the server makes available to seats and summariser (name, label, display value), built from the position fundamentals and the tally. Values always come from the server, never from a model.
 - **Cited Figure**: A catalog figure a seat chose to cite (e.g. "IV/RV" → "1.08×"). Belongs to one analyst vote; at most 5 per vote.
 - **Quorum Summary**: Title, explanation, "why" bullets, dissent paragraph. Returned by the summary request for one quorum result; shown in the panel as pending, available, unavailable, or fixed (NO_QUORUM text). Never stored.
+- **Saved Quorum Result** (browser only): a successful vote result plus its summary outcome, keyed by row id and sorted leg symbols; lives in sessionStorage until sign-out, Erase All Data or tab close (FR-324).
 - **Quorum Result** *(extended)*: Gains, per vote, the cited figures, and a server-issued integrity seal that lets the server later confirm it produced the result unaltered and when. All other fields as in spec 018.
 
 ## Success Criteria *(mandatory)*
@@ -175,6 +192,7 @@ Below the ring and summary, each analyst has one collapsed row showing their len
 - **SC-304**: When the summariser fails or times out, 100% of results still show the verdict, ring, tally and all analyst rows.
 - **SC-305**: No NO_QUORUM result triggers a summariser call (verified by automated test).
 - **SC-306**: The time to show the verdict, ring and analyst rows is no longer than in the spec 018 build for the same position (the summary adds nothing to it). The summary appears or is marked unavailable within 15 seconds of the verdict in every case.
+- **SC-311**: A second click on the same unchanged position in the same session sends zero network requests and shows the same verdict and summary (verified by automated test and browser check).
 - **SC-310**: 100% of summary requests carrying an altered, foreign, NO_QUORUM, or older-than-15-minute result are rejected before any model call (verified by automated test).
 - **SC-307**: A trader can tell every vote apart without relying on colour (text label on every vote mark; hatch on CLOSE), verified by checking the panel in greyscale.
 - **SC-308**: No identifying data appears in any model request, including the summariser call (017 SC-003 re-verified).

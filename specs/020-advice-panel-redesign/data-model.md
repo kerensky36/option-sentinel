@@ -103,3 +103,14 @@ The string `base64url(payload) + "." + base64url(HMAC_SHA256(QUORUM_SEAL_KEY, ba
 | ROLL | `#3aa8e0` | — |
 | CLOSE | `#e8703a` | diagonal hatch on filled areas |
 | Abstain | `#3a3a4a` | "ABSTAIN" label, empty wedge |
+
+## SavedQuorumResult (browser sessionStorage, specs/020 FR-324)
+
+| Field | Type | Notes |
+|-------|------|-------|
+| key | string | `quorum:v1:<row id>\|<sorted leg symbols, comma-joined>` (storage key, not stored in the value) |
+| `result` | QuorumResult | As returned by `/api/quorum/vote`; `summary_token` is set to `null` once the summary settles |
+| `summary.state` | `pending` \| `ok` \| `unavailable` \| `fixed` | |
+| `summary.summary` | {title, explanation, why[], dissent} \| null | Present when `ok` |
+
+Lifetime: the browser session. Cleared by sign-out (`/auth/logout`), Erase All Data (`eraseAll()`) and tab close. Never sent anywhere. When sessionStorage throws, an in-memory Map with the same keys is used for the page's lifetime.

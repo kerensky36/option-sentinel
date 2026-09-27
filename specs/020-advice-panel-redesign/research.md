@@ -113,3 +113,23 @@ Decisions for spec 020. They continue from 018's D-101–D-114, numbered D-301 o
   - The summary intercept decodes that payload and calls `buildDemoSummary(payload)`, which composes title, explanation, "why" and dissent from templates keyed by verdict (majority or NO_CONSENSUS) using `{name}` placeholders. The placeholders are filled with the catalog `display` values, and the summary is labelled "demo".
   - A token without the `demo.` prefix is answered "unavailable".
 - **Rationale**: FR-321. No network request; the pending → ok states behave as in live mode; one rendering path to test.
+
+## D-313 — ADVICE(Agentic) button styling (FR-323)
+
+- **Decision**: Put the same Tailwind classes the "Erase All Data" button uses (`bg-red-900 hover:bg-red-800 text-red-300 uppercase tracking-wider text-xs transition-colors`) on the advice button. Its own CSS keeps only layout: inline-flex, the hazard stripe and compact padding. The bold weight and custom letter-spacing are dropped so the font matches.
+- **Rationale**: One source of truth for the red "danger" style; if the top-bar button is restyled, the advice button follows.
+
+## D-314 — Session cache of quorum results (FR-324, FR-325)
+
+- **Decision**: New pure-ish module `quorum_cache.js`:
+  - `cacheKey(id, legs)` = `quorum:v1:<id>|<sorted leg symbols joined by ",">`;
+  - `load(key)` and `save(key, entry)` use `sessionStorage` behind try/catch, with a module-level `Map` fallback when storage throws (private mode, quota);
+  - an entry is `{result, summary: {state, summary}}`.
+
+  `quorum_ui.js` checks the cache before posting a vote. It saves the result as soon as the vote succeeds (summary state `pending`, token kept) and replaces the summary part when the summary request settles; the token is then dropped. The summary request is no longer tied to the panel staying open: its outcome is saved even if the panel was closed, and the DOM is updated only if that panel is still showing. Failed votes are never saved.
+- **Clearing**: Nothing new needed. `/auth/logout`, `eraseAll()` and tab close already clear all of sessionStorage (constitution Principle I).
+- **Rationale**: This matches the user's "until they log out" exactly and survives reloads and page switches within the tab. The constitution already permits trader data in sessionStorage. Keying by sorted leg symbols means a rolled or partly closed spread gets a fresh vote, while price moves alone do not.
+- **Alternatives**:
+  - In-memory only: lost on reload or on navigating to the screener and back.
+  - localStorage: forbidden by the constitution, and it outlives the tab.
+  - Server-side cache: forbidden (stateless server).
