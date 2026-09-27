@@ -470,3 +470,15 @@ def test_panel_section_order(tmp_path):
     order = [html.index("<svg"), html.index('class="summary-area"'), html.index('<details class="member"'),
              html.index('<details class="extra">'), html.index("How we use your data")]
     assert order == sorted(order)
+
+
+def test_advice_wording_only_on_the_button():
+    """FR-302: 'Advice' appears only as the button label (plus the 'not financial advice' notes)."""
+    for name in ("quorum_ui.js", "quorum_ring.js"):
+        src = (JS / name).read_text()
+        strings = re.findall(r"'[^'\n]*'|\"[^\"\n]*\"|`[^`]*`", src)
+        for s in strings:
+            for m in re.finditer(r"(?<![-.\w])advice(?![-\w])", s, re.I):  # skip ids/classes like advice-btn
+                context = s[max(0, m.start() - 20): m.end() + 12]
+                assert ("ADVICE(Agentic)" in s[m.start(): m.start() + 15]
+                        or re.search(r"financial advice", context, re.I)), (name, s[:120])

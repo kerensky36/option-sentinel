@@ -19,7 +19,7 @@ Option Sentinel connects to your Charles Schwab account and gives you a **live, 
 | **Greeks** | Delta, gamma, theta, vega, IV — sourced from Schwab API, Black-Scholes fallback |
 | **Thesis groups** | Group positions by named thesis — stored in your browser only |
 | **Covered call screener** | Ranks long stock positions by covered-call income opportunity, using implied volatility relative to 30-day realised volatility (IV/RV) |
-| **Fundamentals-first quorum** | Five Google ADK analyst agents vote CLOSE / HOLD / ROLL on a position: four judge its Greeks, volatility, time decay and strikes; one overlays recent CNBC / Yahoo Finance / Bloomberg news (Gemini on Vertex AI — no identifying data sent). Setup: `specs/017-macro-quorum-agents/quickstart.md`; design: `specs/018-fundamentals-first-quorum/` |
+| **Fundamentals-first quorum** | Five Google ADK analyst agents vote CLOSE / HOLD / ROLL on a position: four judge its Greeks, volatility, time decay and strikes; one overlays recent CNBC / Yahoo Finance / Bloomberg news (Gemini on Vertex AI — no identifying data sent). Opened from the ADVICE(Agentic) button; results shown as a vote ring, a model-written summary and per-analyst rows. Setup: `specs/017-macro-quorum-agents/quickstart.md`; design: `specs/018-fundamentals-first-quorum/`, `specs/020-advice-panel-redesign/` |
 | **Mobile-ready** | Visual-first responsive dashboard — readable on your phone mid-session |
 | **Erase All** | One button wipes every piece of your data from the browser instantly |
 
@@ -117,7 +117,16 @@ Because all data is browser-local, your data on one device is not available on a
 
 ## Fundamentals-First Quorum
 
-Any option position on the dashboard can be sent to a five-member AI advisory quorum. Click the quorum button on a position row (or a spread's summary row) and a panel expands beneath it with the verdict, tally, each seat's reasoning, the headlines the news analyst read, and the time the position data is from. Nothing is persisted — the result lives only in the DOM for that page session.
+Any option position on the dashboard can be sent to a five-member AI advisory quorum. Click the **ADVICE(Agentic)** button (marked with a hazard stripe) next to a position's name, or a spread's name, without expanding it. A panel opens beneath that row showing:
+
+- the verdict and a radial vote ring: one wedge per analyst, filled to its confidence, in slate (hold), blue (roll) or hatched orange (close);
+- a model-written summary of the reasoning;
+- a collapsible row for each analyst with its rationale and the figures it cited;
+- the research brief and headlines, in a collapsed section.
+
+Nothing is persisted. The result lives only in the DOM for that page session.
+
+The summary arrives in a second request after the votes, so it never delays the verdict. The vote response carries an HMAC-signed token (key: `QUORUM_SEAL_KEY`, shared by all instances) that the browser returns unchanged; the server verifies it without storing anything. The summariser never writes numbers. It names figures such as `{captured_pct}`, the server fills in the values, and any text with a number the model typed itself is removed. Design: [`specs/020-advice-panel-redesign/`](specs/020-advice-panel-redesign/).
 
 Each seat is an independent agent (Gemini on Vertex AI, via Google ADK) that votes **CLOSE / HOLD / ROLL** without seeing any other seat's vote. A seat that errors or times out (40s) simply abstains rather than blocking the quorum. The verdict is a deterministic 3-of-5 tally, never a model decision.
 
@@ -132,7 +141,7 @@ Each seat is an independent agent (Gemini on Vertex AI, via Google ADK) that vot
 ### Where the numbers come from
 
 - **Greeks and IV** come from Schwab's option chain (narrowed to the contracts you hold), with a Black-Scholes fallback when Schwab returns nothing or a placeholder such as −999.
-- **Fundamentals** are calculated in code at every positions refresh (`src/services/fundamentals.py`): realised volatility from ~2 months of Schwab daily closes, IV/RV, moneyness, expected move, probability of finishing in the money, and dollar Greeks. When you click Quorum, the server recalculates them from the legs your browser sends and adds position-level figures: net Greeks, breakevens, max profit/loss, share of max profit captured, daily decay. The model never does the arithmetic; unavailable figures are sent as null.
+- **Fundamentals** are calculated in code at every positions refresh (`src/services/fundamentals.py`): realised volatility from ~2 months of Schwab daily closes, IV/RV, moneyness, expected move, probability of finishing in the money, and dollar Greeks. When you request a quorum, the server recalculates them from the legs your browser sends and adds position-level figures: net Greeks, breakevens, max profit/loss, share of max profit captured, daily decay. The model never does the arithmetic; unavailable figures are sent as null.
 - **The quorum uses your browser's data** from the last refresh, so it does not re-fetch positions from Schwab. The server validates every field strictly, rejects data older than 15 minutes, and confirms your Schwab login with one lightweight call before any model call. No account hash is sent.
 
 ### Where the news comes from

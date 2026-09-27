@@ -105,9 +105,7 @@ export function ringSvg(result, { animate = false } = {}) {
   const half = R_IN + (R_OUT - R_IN) * 0.5;
   let body = `
     <circle cx="${CX}" cy="${CY}" r="${half}" fill="none" stroke="#2c2c3a" stroke-dasharray="2,3"/>
-    <circle cx="${CX}" cy="${CY}" r="${R_OUT}" fill="none" stroke="#2c2c3a"/>
-    <text x="${CX + 3}" y="${CY - half - 3}" font-size="7" fill="#626270">50%</text>
-    <text x="${CX + 3}" y="${CY - R_OUT - 3}" font-size="7" fill="#626270">100%</text>`;
+    <circle cx="${CX}" cy="${CY}" r="${R_OUT}" fill="none" stroke="#2c2c3a"/>`;
 
   votes.forEach((v, i) => {
     const a0 = i * seg - seg / 2 + GAP / 2;
@@ -143,7 +141,7 @@ export function ringSvg(result, { animate = false } = {}) {
     ${mid ? `<text class="centre" x="${CX}" y="${CY + 6}" text-anchor="middle" font-size="${mid.length > 6 ? 9 : 13}" font-weight="700" letter-spacing="1" fill="${badge.fg}">${esc(mid)}</text>` : ''}
     <text class="centre centre-sub" x="${CX}" y="${CY + 22}" text-anchor="middle" font-size="10" fill="#90909c">${esc(sub)}</text>`;
 
-  return `<svg class="vote-ring" viewBox="-34 0 348 280" font-family="JetBrains Mono, monospace" role="img" aria-label="Vote ring">
+  return `<svg class="vote-ring" viewBox="-90 0 460 280" font-family="JetBrains Mono, monospace" role="img" aria-label="Vote ring">
     <defs><pattern id="hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="${VOTE_COLORS.CLOSE}"/><rect width="2" height="6" fill="#14141a" fill-opacity="0.55"/></pattern></defs>${body}
   </svg>`;
 }
