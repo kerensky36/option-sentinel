@@ -295,12 +295,12 @@
 **Goal**: FR-106, FR-107, D-109.
 **Independent test**: delta −999 → recalculated and labelled `calculated`; gamma 0 → kept and labelled `api`.
 
-- [ ] T036 [P] [US4] In `tests/unit/test_schwab_client.py` (or a new `tests/unit/test_greeks_service.py`), test `build_greeks`:
+- [X] T036 [P] [US4] In a new `tests/unit/test_greeks_service.py`, test `build_greeks`:
   - each of −999, NaN, inf and out-of-range values for delta, gamma, theta, vega and IV → `None` then the BS value with `*_source="calculated"`
   - gamma 0.0 → 0.0 with source `api`, and no fallback when all four Greeks are present and one is 0
   - IV 25.3 → 0.253
   - IV −999 → `None`, falling back to a sigma of 0.25
-- [ ] T037 [US4] In `src/services/greeks_service.py`:
+- [X] T037 [US4] In `src/services/greeks_service.py`:
   - add `_valid(value, lo, hi)` requiring a finite float in range, with ranges delta [−1,1], gamma [0,10], theta [−10000,10000], vega [0,10000], raw IV (0,1000]
   - apply it before building the result
   - change the fallback trigger to `any(v is None for v in (delta, gamma, theta, vega))`

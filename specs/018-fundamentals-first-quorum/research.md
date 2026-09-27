@@ -142,7 +142,7 @@ message. Two minutes of forward skew tolerates client/server clock drift.
 **Decision**: In `greeks_service.build_greeks`, a raw value is kept only if it is a finite
 float within its valid range; otherwise it is `None` and the Black-Scholes fallback
 applies. Ranges: delta [−1, 1]; gamma [0, 10]; theta [−10 000, 10 000]; vega [0, 10 000];
-IV (Schwab percent) (0, 1000] then ÷ 100. The fallback trigger changes from
+IV (Schwab percent) (0, 1000] then ÷ 100. Schwab's −999 placeholder is rejected explicitly as well, because it falls inside the theta range. The fallback trigger changes from
 `not all([delta, gamma, theta, vega])` (true for a 0) to "any value is None".
 
 **Rationale**: Covers −999, NaN, ±inf, and absurd magnitudes with one rule; zero survives.

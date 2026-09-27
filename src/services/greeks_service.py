@@ -6,11 +6,34 @@ Falls back to Black-Scholes when API values are absent.
 """
 from __future__ import annotations
 
+import math
 import os
 
 from src.services.bs_calculator import bs_greeks
 
 RISK_FREE_RATE = float(os.getenv("RISK_FREE_RATE", "0.045"))
+
+# Valid ranges for Schwab chain values (specs/018 FR-106, research D-109). Anything
+# outside — including placeholders such as -999 or NaN — is treated as missing.
+_RANGES = {
+    "delta": (-1.0, 1.0),
+    "gamma": (0.0, 10.0),
+    "theta": (-10_000.0, 10_000.0),
+    "vega": (0.0, 10_000.0),
+}
+_IV_PERCENT_MAX = 1000.0
+_PLACEHOLDERS = {-999.0}  # Schwab's "not available" value, which can fall inside a range
+
+
+def _valid(value, lo: float, hi: float, *, exclusive_lo: bool = False) -> float | None:
+    """Return value as a float if it is finite and in range, else None."""
+    try:
+        v = float(value)
+    except (TypeError, ValueError):
+        return None
+    if not math.isfinite(v) or v in _PLACEHOLDERS or v > hi or v < lo or (exclusive_lo and v == lo):
+        return None
+    return v
 
 
 def build_greeks(
@@ -40,11 +63,11 @@ def build_greeks(
     def _src(val) -> str | None:
         return "api" if val is not None else None
 
-    delta = raw.get("delta")
-    gamma = raw.get("gamma")
-    theta = raw.get("theta")
-    vega = raw.get("vega")
-    iv_raw = raw.get("implied_volatility")
+    delta = _valid(raw.get("delta"), *_RANGES["delta"])
+    gamma = _valid(raw.get("gamma"), *_RANGES["gamma"])
+    theta = _valid(raw.get("theta"), *_RANGES["theta"])
+    vega = _valid(raw.get("vega"), *_RANGES["vega"])
+    iv_raw = _valid(raw.get("implied_volatility"), 0.0, _IV_PERCENT_MAX, exclusive_lo=True)
 
     # Convert Schwab IV from percentage to decimal if needed
     if iv_raw is not None and iv_raw > 2:
@@ -64,7 +87,7 @@ def build_greeks(
     }
 
     # Fill missing fields via Black-Scholes if we have enough data
-    missing = not all([delta, gamma, theta, vega])
+    missing = any(v is None for v in (delta, gamma, theta, vega))  # a 0 is a real value (FR-107)
     if missing and T > 0 and K > 0 and underlying_price > 0:
         sigma = iv_raw or 0.25  # use IV if available, else assume 25%
         try:
