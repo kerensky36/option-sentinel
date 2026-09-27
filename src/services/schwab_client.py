@@ -86,41 +86,82 @@ async def _fetch_positions(client, account_hash: str | None = None) -> list[dict
     return result
 
 
+def _match_greeks(data: dict, sym_list: list[str]) -> dict[str, dict]:
+    """Pick the held contracts' Greeks out of one option-chain response."""
+    underlying_price = data.get("underlyingPrice") or data.get("underlying", {}).get("last")
+    wanted = {s.strip(): s for s in sym_list}
+    result: dict[str, dict] = {}
+    for side in ("callExpDateMap", "putExpDateMap"):
+        for exp_strikes in data.get(side, {}).values():
+            for strike_opts in exp_strikes.values():
+                for opt in strike_opts:
+                    req_sym = wanted.get(opt.get("symbol", "").strip())
+                    if req_sym is not None:
+                        result[req_sym] = {
+                            "delta": opt.get("delta"),
+                            "gamma": opt.get("gamma"),
+                            "theta": opt.get("theta"),
+                            "vega": opt.get("vega"),
+                            "implied_volatility": opt.get("volatility"),
+                            "underlying_price": underlying_price,
+                        }
+    return result
+
+
+def _narrowing(client, sym_list: list[str]) -> dict:
+    """Chain filters covering only the held contracts (FR-108, research D-110)."""
+    parsed = [p for p in (_parse_occ_symbol(s) for s in sym_list) if p]
+    if len(parsed) != len(sym_list):
+        return {}
+    expiries = [p[1] for p in parsed]
+    strikes = {p[3] for p in parsed}
+    types = {p[2] for p in parsed}
+    contract_types = client.Options.ContractType
+    kwargs = {
+        "contract_type": (
+            contract_types.CALL if types == {"call"}
+            else contract_types.PUT if types == {"put"}
+            else contract_types.ALL
+        ),
+        "from_date": min(expiries),
+        "to_date": max(expiries),
+    }
+    if len(strikes) == 1:
+        kwargs["strike"] = strikes.pop()
+    return kwargs
+
+
 async def _fetch_greeks(symbols: list[str], client) -> dict[str, dict]:
-    """Fetch Greeks for a list of OCC symbols via the option chain endpoint."""
+    """Fetch Greeks for a list of OCC symbols via narrowed option-chain requests.
+
+    One request per underlying, limited to the held expiries (and strike when only
+    one is held). Any held contract missing from that reply triggers a single
+    full-chain retry for its underlying.
+    """
     if not symbols:
         return {}
 
     underlying_to_symbols: dict[str, list[str]] = {}
     for symbol in symbols:
-        underlying = symbol[:6].strip()
+        parsed = _parse_occ_symbol(symbol)
+        underlying = parsed[0] if parsed else symbol[:6].strip()
         underlying_to_symbols.setdefault(underlying, []).append(symbol)
+
+    async def _query(underlying: str, sym_list: list[str], **filters) -> dict[str, dict]:
+        resp = await client.get_option_chain(
+            symbol=underlying, include_underlying_quote=True, **filters
+        )
+        return _match_greeks(resp.json(), sym_list)
 
     async def _fetch_one(underlying: str, sym_list: list[str]) -> dict[str, dict]:
         try:
-            resp = await client.get_option_chain(
-                symbol=underlying,
-                contract_type=client.Options.ContractType.ALL,
-                include_underlying_quote=True,
-            )
-            data = resp.json()
-            underlying_price = data.get("underlyingPrice") or data.get("underlying", {}).get("last")
-            result: dict[str, dict] = {}
-            for side in ("callExpDateMap", "putExpDateMap"):
-                for exp_strikes in data.get(side, {}).values():
-                    for strike_opts in exp_strikes.values():
-                        for opt in strike_opts:
-                            opt_symbol = opt.get("symbol", "").strip()
-                            for req_sym in sym_list:
-                                if opt_symbol == req_sym.strip():
-                                    result[req_sym] = {
-                                        "delta": opt.get("delta"),
-                                        "gamma": opt.get("gamma"),
-                                        "theta": opt.get("theta"),
-                                        "vega": opt.get("vega"),
-                                        "implied_volatility": opt.get("volatility"),
-                                        "underlying_price": underlying_price,
-                                    }
+            filters = _narrowing(client, sym_list)
+            result = await _query(underlying, sym_list, **filters) if filters else {}
+            missing = [s for s in sym_list if s not in result]
+            if missing:
+                result.update(
+                    await _query(underlying, missing, contract_type=client.Options.ContractType.ALL)
+                )
             return result
         except Exception:
             return {}

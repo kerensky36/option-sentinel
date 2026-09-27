@@ -314,14 +314,14 @@
 **Goal**: FR-108, D-110, SC-108.
 **Independent test**: the chain request kwargs for one held SPY contract include `from_date`, `to_date` and `strike`, and the Greeks match the full-chain fixture.
 
-- [ ] T038 [P] [US5] In `tests/unit/test_schwab_client.py`, test `_fetch_greeks` with a recording fake client:
+- [X] T038 [P] [US5] In `tests/unit/test_schwab_client.py`, test `_fetch_greeks` with a recording fake client:
   - the underlying is parsed via `_parse_occ_symbol`, not `symbol[:6]`
   - `from_date` is the min held expiry and `to_date` the max
   - `strike=` is set only when exactly one distinct strike is held
   - `contract_type` is CALL or PUT when all held legs share a type, otherwise ALL
   - a held symbol missing from the narrowed response triggers exactly one full-chain retry for that underlying
   - Greeks are identical to the current full-chain behaviour for every held contract (SC-108)
-- [ ] T039 [US5] In `src/services/schwab_client.py`, implement the narrowed `_fetch_greeks` with the single full-chain retry (makes T038 pass).
+- [X] T039 [US5] In `src/services/schwab_client.py`, implement the narrowed `_fetch_greeks` with the single full-chain retry (makes T038 pass).
 
 ---
 

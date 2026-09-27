@@ -53,7 +53,7 @@ def _client(responses: dict[str, dict], *, raise_for: set[str] | None = None) ->
     `raise_for` is a set of underlying symbols whose fetch should raise."""
     raise_for = raise_for or set()
 
-    async def get_option_chain(symbol, contract_type, include_underlying_quote):
+    async def get_option_chain(symbol, **kwargs):
         if symbol in raise_for:
             raise ConnectionError(f"simulated error for {symbol}")
         data = responses.get(symbol, {"underlyingPrice": 0, "callExpDateMap": {}, "putExpDateMap": {}})
@@ -143,7 +143,7 @@ async def test_fetch_greeks_issues_calls_concurrently():
     active = 0
     max_active = 0
 
-    async def get_option_chain(symbol, contract_type, include_underlying_quote):
+    async def get_option_chain(symbol, **kwargs):
         nonlocal active, max_active
         active += 1
         max_active = max(max_active, active)
@@ -377,3 +377,94 @@ async def test_fetch_positions_and_greeks_runs_price_history_concurrently_with_c
         await fetch_positions_and_greeks(client)
 
     assert max_active == 2
+
+
+# ---------------------------------------------------------------------------
+# specs/018 T038 — narrowed option-chain request (FR-108, D-110, SC-108)
+# ---------------------------------------------------------------------------
+
+from datetime import date as _date
+
+
+def _chain_multi(contracts: list[tuple[str, float]], underlying_price: float = 100.0) -> dict:
+    """Chain response holding each (occ_symbol, delta) under its own expiry/strike."""
+    data = {"underlyingPrice": underlying_price, "callExpDateMap": {}, "putExpDateMap": {}}
+    for sym, delta in contracts:
+        side = "putExpDateMap" if sym.strip()[-9].upper() == "P" else "callExpDateMap"
+        data[side].setdefault("2026-06-18:32", {}).setdefault(sym[-8:], []).append({
+            "symbol": sym, "delta": delta, "gamma": 0.01, "theta": -0.05, "vega": 0.2, "volatility": 25.0,
+        })
+    return data
+
+
+def _recording_client(full: dict[str, dict], narrowed: dict[str, dict] | None = None):
+    """narrowed[u] is returned when the call carries from_date; full[u] otherwise."""
+    calls = []
+
+    async def get_option_chain(symbol, **kwargs):
+        calls.append((symbol, kwargs))
+        source = narrowed if (narrowed is not None and "from_date" in kwargs) else full
+        resp = MagicMock()
+        resp.json.return_value = source.get(symbol, {"callExpDateMap": {}, "putExpDateMap": {}})
+        return resp
+
+    client = MagicMock()
+    client.get_option_chain = get_option_chain
+    client.Options.ContractType.ALL = "ALL"
+    client.Options.ContractType.CALL = "CALL"
+    client.Options.ContractType.PUT = "PUT"
+    return client, calls
+
+
+async def test_fetch_greeks_narrows_to_single_held_contract():
+    client, calls = _recording_client({"SPY": _chain(SPY_SYM, 560.0, 0.55)})
+    result = await _fetch_greeks([SPY_SYM], client)
+    assert len(calls) == 1
+    symbol, kwargs = calls[0]
+    assert symbol == "SPY"
+    assert kwargs["from_date"] == _date(2026, 6, 18)
+    assert kwargs["to_date"] == _date(2026, 6, 18)
+    assert kwargs["strike"] == 600.0
+    assert kwargs["contract_type"] == "CALL"
+    assert kwargs["include_underlying_quote"] is True
+    assert result[SPY_SYM]["delta"] == 0.55
+
+
+async def test_fetch_greeks_date_range_and_no_strike_for_multiple_strikes():
+    near = "SPY   260618P00500000"
+    far = "SPY   260918C00650000"
+    client, calls = _recording_client({"SPY": _chain_multi([(near, -0.2), (far, 0.3)])})
+    await _fetch_greeks([near, far], client)
+    _, kwargs = calls[0]
+    assert kwargs["from_date"] == _date(2026, 6, 18)
+    assert kwargs["to_date"] == _date(2026, 9, 18)
+    assert "strike" not in kwargs
+    assert kwargs["contract_type"] == "ALL"
+
+
+async def test_fetch_greeks_uses_occ_parser_for_underlying():
+    sym = "SPXW  260618P05500000"
+    client, calls = _recording_client({"SPXW": _chain_multi([(sym, -0.1)])})
+    await _fetch_greeks([sym], client)
+    assert calls[0][0] == "SPXW"
+
+
+async def test_fetch_greeks_full_chain_retry_once_for_missing_symbol():
+    other = "SPY   260618C00610000"
+    full = {"SPY": _chain_multi([(SPY_SYM, 0.55), (other, 0.40)])}
+    narrowed = {"SPY": _chain_multi([(other, 0.40)])}  # held SPY_SYM missing from narrowed reply
+    client, calls = _recording_client(full, narrowed)
+    result = await _fetch_greeks([SPY_SYM], client)
+    assert len(calls) == 2
+    assert "from_date" in calls[0][1]
+    assert "from_date" not in calls[1][1] and calls[1][1]["contract_type"] == "ALL"
+    assert result[SPY_SYM]["delta"] == 0.55
+
+
+async def test_fetch_greeks_narrowed_matches_full_chain_values():
+    """SC-108: identical Greeks whether served from the narrowed or the full chain."""
+    held = [SPY_SYM, "SPY   260618P00550000"]
+    chain = _chain_multi([(held[0], 0.55), (held[1], -0.25)])
+    narrowed_client, _ = _recording_client({"SPY": chain})
+    full_client, _ = _recording_client({"SPY": chain}, narrowed={})  # narrowed empty → full retry
+    assert await _fetch_greeks(held, narrowed_client) == await _fetch_greeks(held, full_client)
