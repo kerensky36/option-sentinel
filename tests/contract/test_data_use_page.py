@@ -95,3 +95,36 @@ class TestDataUseFundamentalsFirstQuorum:
         html = client.get("/data-use").text
         vertex_row = html.split("Quorum — Google Vertex AI", 1)[1].split("</tr>", 1)[0]
         assert "Your account hash is not sent with a quorum request" in vertex_row
+
+
+class TestSummaryDisclosure:
+    """specs/020 FR-322: the quorum summary request is disclosed."""
+
+    def _row(self, client):
+        html = client.get("/data-use").text
+        assert "Quorum summary — Google Vertex AI" in html
+        return html.split("Quorum summary — Google Vertex AI", 1)[1].split("</tr>", 1)[0]
+
+    def test_summary_row_lists_data_destination_purpose_and_retention(self, client):
+        row = self._row(client)
+        assert "votes and rationales" in row
+        assert "same position figures" in row
+        assert "Vertex AI" in row
+        assert "one-paragraph summary" in row
+        assert "Not stored" in row
+
+    def test_summary_row_states_no_identifying_data(self, client):
+        row = self._row(client)
+        assert "No user-identifiable or pedigree data" in row
+
+
+class TestSessionCacheDisclosure:
+    """specs/020 FR-322 / FR-324: saved quorum results are disclosed."""
+
+    def test_states_session_storage_and_clearing(self, client):
+        html = client.get("/data-use").text
+        row = html.split("Quorum results — your browser", 1)[1].split("</tr>", 1)[0]
+        assert "sessionStorage" in row
+        for phrase in ("sign out", "Erase All Data", "close the tab"):
+            assert phrase in row, phrase
+        assert "never sent" in row

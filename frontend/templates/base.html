@@ -211,6 +211,98 @@
       opacity: 1;
       box-shadow: 0 0 8px rgba(40,90,220,0.7), 0 1px 4px rgba(30,70,200,0.5), inset 0 1px 0 rgba(120,170,255,0.35);
     }
+
+    /* ── ADVICE(Agentic) button (specs/020 FR-301, FR-302) ── */
+    .pos-name { display: inline-block; max-width: 22ch; overflow: hidden; text-overflow: ellipsis; vertical-align: middle; }
+    /* Colours and font come from the Erase All Data classes on the button (FR-323). */
+    .advice-btn {
+      display: inline-flex; align-items: stretch; margin-left: 8px; padding: 0; vertical-align: middle;
+      border: 0; border-radius: 2px; cursor: pointer; font-family: inherit;
+    }
+    .advice-btn[aria-expanded="true"] { outline: 1px solid #fca5a5; outline-offset: 1px; }
+    .advice-btn .hazard { width: 8px; flex: none; background: repeating-linear-gradient(135deg, #c8a820 0 3px, #16140a 3px 6px); }
+    .advice-btn .advice-label { padding: 4px 8px 4px 6px; white-space: nowrap; }
+    .advice-btn[aria-busy="true"] .advice-label::after { content: " …"; }
+    .advice-btn:focus-visible, .quorum-panel .wedge:focus-visible, .quorum-panel summary:focus-visible { outline: 1px solid #60a5fa; outline-offset: 2px; }
+    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+
+    /* ── Advice panel (specs/020 FR-304, FR-316, FR-317, FR-319) ── */
+    .quorum-panel-cell { padding: 0 !important; background: rgba(20,20,26,0.6); white-space: normal; }
+    .quorum-panel-inner { position: sticky; left: 0; box-sizing: border-box; max-width: 100%; padding: 12px 14px 14px; }
+    .quorum-panel { display: grid; gap: 12px; }
+    .quorum-panel .result-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
+    .quorum-panel .verdict { padding: 3px 10px; font-weight: 700; letter-spacing: 0.2em; font-size: 12px; border-radius: 1px; }
+    .quorum-panel .verdict-note { color: #90909c; }
+    .quorum-panel .asof { color: #484856; font-size: 9px; margin-left: auto; }
+    .quorum-panel .saved-note { color: #90909c; }
+    .quorum-panel .warn-strip { color: #c8a820; background: #1e1a08; border: 1px solid #3a3210; padding: 5px 10px; font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; }
+    .quorum-panel .overview { display: grid; grid-template-columns: minmax(260px, 420px) 1fr; gap: 18px; align-items: start; }
+    @media (max-width: 760px) { .quorum-panel .overview { grid-template-columns: 1fr; } }
+    .quorum-panel .radial-card { display: grid; gap: 8px; justify-items: center; }
+    .quorum-panel .vote-ring { width: 100%; max-width: 420px; height: auto; display: block; overflow: visible; }
+    .quorum-panel .wedge { cursor: pointer; transition: opacity 0.15s; outline: none; }
+    .quorum-panel .vote-ring:hover .wedge { opacity: 0.45; }
+    .quorum-panel .vote-ring .wedge:hover, .quorum-panel .vote-ring .wedge.hl, .quorum-panel .wedge:focus-visible { opacity: 1; }
+    .quorum-panel .wedge:focus-visible .wedge-track { stroke: #60a5fa; }
+    .quorum-panel .tally { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; color: #90909c; font-size: 10px; }
+    .quorum-panel .tally span { display: inline-flex; align-items: center; gap: 5px; }
+    .quorum-panel .tally .win { color: #d2d2d8; font-weight: 600; }
+    .quorum-panel .sw { width: 9px; height: 9px; display: inline-block; border-radius: 1px; }
+    .quorum-panel .radial-note { color: #626270; font-size: 9px; text-align: center; max-width: 34ch; }
+    .quorum-panel .foot { color: #484856; font-size: 9px; }
+    @keyframes wedge-grow { from { transform: scale(0.2); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+    .quorum-panel .wedge-fill.anim { transform-box: view-box; transform-origin: 140px 140px; animation: wedge-grow 0.45s cubic-bezier(.2,.8,.3,1) both; }
+    @media (prefers-reduced-motion: reduce) { .quorum-panel .wedge-fill.anim { animation: none; } }
+
+    /* ── Quorum summary area (specs/020 US3) ── */
+    .quorum-panel .summary-area { display: grid; gap: 10px; min-width: 0; }
+    .quorum-panel .eyebrow { color: #626270; font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase; display: flex; gap: 8px; align-items: center; }
+    .quorum-panel .tag-new { color: #aeaeb8; border: 1px solid #2c2c3a; padding: 0 5px; font-size: 8px; letter-spacing: 0.12em; }
+    .quorum-panel .summary-title { margin: 0; font-size: 14px; font-weight: 600; color: #d2d2d8; text-wrap: balance; }
+    .quorum-panel .summary-text { margin: 0; color: #aeaeb8; line-height: 1.65; max-width: 72ch; }
+    .quorum-panel .summary-status { margin: 0; color: #90909c; }
+    .quorum-panel .summary-status .dot { color: #c8a820; animation: quorum-pulse 1s infinite; }
+    @keyframes quorum-pulse { 50% { opacity: 0.2; } }
+    @media (prefers-reduced-motion: reduce) { .quorum-panel .summary-status .dot { animation: none; } }
+    .quorum-panel .reason-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }
+    .quorum-panel .reason { border-top: 1px solid #2c2c3a; padding-top: 6px; display: grid; gap: 4px; align-content: start; }
+    .quorum-panel .reason h3 { margin: 0; font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase; color: #626270; font-weight: 600; }
+    .quorum-panel .reason ul { margin: 0; padding-left: 14px; color: #90909c; display: grid; gap: 3px; line-height: 1.55; list-style: disc; }
+    .quorum-panel .reason p { margin: 0; color: #90909c; line-height: 1.55; }
+
+    /* ── Analyst rows and brief section (specs/020 US4) ── */
+    .quorum-panel .members { border: 1px solid #22222e; }
+    .quorum-panel .members-head { display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; border-bottom: 1px solid #22222e; background: #1c1c24; }
+    .quorum-panel .toggle-all { background: none; border: 0; color: #626270; font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase; cursor: pointer; font-family: inherit; }
+    .quorum-panel .toggle-all:hover { color: #aeaeb8; }
+    .quorum-panel details.member { border-bottom: 1px solid #22222e; }
+    .quorum-panel details.member:last-child { border-bottom: 0; }
+    .quorum-panel details.member > summary { cursor: pointer; display: grid; align-items: center; gap: 10px; grid-template-columns: 4px minmax(140px, 1.4fr) 140px minmax(90px, 1fr) 14px; padding: 7px 10px 7px 0; }
+    .quorum-panel details.member > summary:hover, .quorum-panel details.member.hl > summary { background: rgba(34,34,50,0.55); }
+    .quorum-panel .stripe { align-self: stretch; }
+    .quorum-panel .lens { color: #d2d2d8; min-width: 0; }
+    .quorum-panel .vote-chip { display: inline-flex; gap: 6px; align-items: baseline; }
+    .quorum-panel .vote-chip b { letter-spacing: 0.14em; font-weight: 700; }
+    .quorum-panel .vote-chip .dir { color: #626270; font-size: 9px; }
+    .quorum-panel .conf { display: flex; align-items: center; gap: 8px; }
+    .quorum-panel .conf-track { flex: 1; height: 5px; background: #252532; position: relative; }
+    .quorum-panel .conf-fill { position: absolute; top: 0; bottom: 0; left: 0; }
+    .quorum-panel .conf-num { color: #90909c; min-width: 3ch; text-align: right; }
+    .quorum-panel .caret { color: #626270; font-size: 9px; transition: transform 0.15s; display: inline-block; }
+    .quorum-panel details[open] > summary .caret { transform: rotate(90deg); }
+    .quorum-panel .member-body { padding: 4px 14px 12px; display: grid; gap: 8px; border-top: 1px dashed #22222e; background: rgba(12,12,16,0.35); }
+    .quorum-panel .member-body p { margin: 0; padding-top: 6px; color: #aeaeb8; line-height: 1.65; max-width: 80ch; }
+    .quorum-panel .figs { display: flex; flex-wrap: wrap; gap: 6px; }
+    .quorum-panel .fig { border: 1px solid #2c2c3a; padding: 2px 6px; color: #90909c; font-size: 10px; }
+    .quorum-panel .fig b { color: #d2d2d8; font-weight: 500; }
+    @media (max-width: 560px) {
+      .quorum-panel details.member > summary { grid-template-columns: 4px 1fr 14px; row-gap: 4px; }
+      .quorum-panel details.member > summary .vote-chip, .quorum-panel details.member > summary .conf { grid-column: 2; }
+    }
+    .quorum-panel details.extra { border: 1px solid #22222e; }
+    .quorum-panel details.extra > summary { cursor: pointer; padding: 6px 10px; color: #626270; font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase; display: flex; gap: 8px; }
+    .quorum-panel .extra-body { padding: 0 10px 10px; display: grid; gap: 8px; color: #90909c; }
+    .quorum-panel .extra-body p { margin: 0; line-height: 1.6; }
   </style>
 </head>
 <body class="bg-gray-950 text-gray-100 min-h-screen flex flex-col">

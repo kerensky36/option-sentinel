@@ -55,7 +55,8 @@ export function demoFigures(legs) {
   const netDelta = sumOrNull((l) => (l.delta === null ? null : l.delta * l.quantity * 100));
   const thetaDay = sumOrNull((l) => (l.theta === null ? null : l.theta * l.quantity * 100));
 
-  const volLeg = parsed.find((l) => l.iv && l.rv);
+  const volIndex = parsed.findIndex((l) => l.iv && l.rv);
+  const volLeg = volIndex >= 0 ? parsed[volIndex] : null;
   const ivRv = volLeg ? volLeg.iv / volLeg.rv : null;
 
   const dte = Math.min(...parsed.map((l) => l.days_to_expiry));
@@ -85,6 +86,9 @@ export function demoFigures(legs) {
   }
 
   return {
+    legs: parsed,
+    volIndex,
+    keyIndex: parsed.indexOf(keyLeg),
     netDelta: netDelta === null ? null : Math.round(netDelta),
     thetaDay,
     ivRv,
@@ -195,6 +199,143 @@ function tally(votes) {
   return { rows, verdict: winner ? winner.action : 'NO_CONSENSUS' };
 }
 
+// ── specs/020: figure catalog, cited figures, demo summary token ─────────────
+
+const _sign = (v) => (v < 0 ? '-' : '');
+const FORMAT = {
+  money: (v) => `${_sign(v)}$${Math.abs(v) >= 1000
+    ? Math.abs(v).toLocaleString('en-US', { maximumFractionDigits: 0 })
+    : Math.abs(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+  pct: (v) => `${_sign(v)}${Math.abs(v) < 10 ? Math.abs(v).toFixed(1) : Math.abs(v).toFixed(0)}%`,
+  ratio: (v) => `${v.toFixed(2)}×`,
+  shares: (v) => `${v >= 0 ? '+' : '-'}${Math.abs(v).toFixed(0)} sh`,
+  days: (v) => `${Math.trunc(v)} d`,
+  count: (v) => String(Math.trunc(v)),
+};
+
+const SEAT_SHORT = {
+  greeks_exposure: 'Greeks', volatility_pricing: 'Volatility', time_decay_pnl: 'Time decay',
+  strike_assignment: 'Strike', macro_news_overlay: 'Macro',
+};
+
+/** Same names, labels and display formats as the server catalog (specs/020 D-304). */
+export function demoCatalog(f, votes, tally) {
+  const cat = {};
+  const add = (name, label, value, kind, scale = 1) => {
+    if (value === null || value === undefined || !Number.isFinite(Number(value) * scale)) return;
+    cat[name] = { label, display: FORMAT[kind](Number(value) * scale) };
+  };
+  add('net_delta', 'Net delta', f.netDelta, 'shares');
+  add('net_theta_day', 'Theta/day', f.thetaDay, 'money');
+  if (f.credit > 0) {
+    add('max_profit', 'Max profit', f.credit * 100, 'money');
+    add('captured_pct', 'Captured', f.pctCaptured, 'pct');
+  }
+  f.breakevens.slice(0, 4).forEach((b, i) => add(`breakeven_${i + 1}`, i ? `Breakeven ${i + 1}` : 'Breakeven', b, 'money'));
+  add('dte', 'DTE', f.dte, 'days');
+  const single = f.legs.length === 1;
+  f.legs.forEach((l, i) => {
+    const n = i + 1;
+    const label = (t) => (single ? t[0].toUpperCase() + t.slice(1) : `Leg ${n} ${t}`);
+    add(`leg${n}_strike`, label('strike'), l.strike, 'money');
+    add(`leg${n}_spot`, label('spot'), l.price, 'money');
+    add(`leg${n}_iv`, label('IV'), l.iv, 'pct', 100);
+    add(`leg${n}_rv`, label('RV'), l.rv, 'pct', 100);
+    if (l.iv && l.rv) add(`leg${n}_iv_rv`, label('IV/RV'), l.iv / l.rv, 'ratio');
+    if (l.price) {
+      const m = ((l.option_type === 'call' ? l.price - l.strike : l.strike - l.price) / l.price) * 100;
+      add(`leg${n}_moneyness`, label('moneyness'), m, 'pct');
+    }
+  });
+  if (f.probItm !== null && f.keyIndex >= 0) add(`leg${f.keyIndex + 1}_prob_itm`, single ? 'P(ITM)' : `Leg ${f.keyIndex + 1} P(ITM)`, f.probItm, 'pct', 100);
+  const counts = Object.fromEntries(tally.map((t) => [t.action, t.votes]));
+  add('votes_close', 'Close votes', counts.CLOSE || 0, 'count');
+  add('votes_hold', 'Hold votes', counts.HOLD || 0, 'count');
+  add('votes_roll', 'Roll votes', counts.ROLL || 0, 'count');
+  add('valid_votes', 'Valid votes', votes.length, 'count');
+  add('seats', 'Seats', 5, 'count');
+  for (const v of votes) add(`confidence_${v.seat}`, `${SEAT_SHORT[v.seat]} confidence`, v.confidence, 'pct', 100);
+  return cat;
+}
+
+function demoCitedNames(seat, f) {
+  const vol = f.volIndex >= 0 ? `leg${f.volIndex + 1}` : null;
+  const key = f.keyIndex >= 0 ? `leg${f.keyIndex + 1}` : null;
+  switch (seat) {
+    case 'greeks_exposure': return ['net_delta', 'dte'];
+    case 'volatility_pricing': return vol ? [`${vol}_iv_rv`, `${vol}_iv`, `${vol}_rv`] : [];
+    case 'time_decay_pnl': return f.credit > 0 ? ['captured_pct', 'max_profit', 'dte'] : ['dte', 'net_theta_day'];
+    case 'strike_assignment': return key ? [`${key}_moneyness`, `${key}_prob_itm`, 'breakeven_1'] : [];
+    default: return [];
+  }
+}
+
+function _b64url(text) {
+  const bytes = new TextEncoder().encode(text);
+  let bin = '';
+  bytes.forEach((b) => { bin += String.fromCharCode(b); });
+  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+function _unb64url(text) {
+  const b64 = text.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - (text.length % 4)) % 4);
+  const bin = atob(b64);
+  return new TextDecoder().decode(Uint8Array.from(bin, (c) => c.charCodeAt(0)));
+}
+
+/** Decode a "demo." summary token; null for anything else. Never leaves the browser. */
+export function decodeDemoToken(token) {
+  if (typeof token !== 'string' || !token.startsWith('demo.')) return null;
+  try {
+    return JSON.parse(_unb64url(token.slice(5)));
+  } catch {
+    return null;
+  }
+}
+
+const VERB = { CLOSE: 'close', HOLD: 'hold', ROLL: 'roll' };
+const DIR = { out: ' out', up_and_out: ' up and out', down_and_out: ' down and out' };
+
+/**
+ * Template summary for demo mode (specs/020 FR-321, D-312). Uses the same
+ * {name} placeholders as the live summariser and fills them from the catalog,
+ * so every number shown comes from the demo figures.
+ */
+export function buildDemoSummary(payload) {
+  const figs = payload.figures || {};
+  const fill = (text) => text.replace(/\{([a-z0-9_]+)\}/g, (_, n) => (figs[n] ? figs[n].display : ''));
+  const votes = (payload.votes || []).filter((v) => !v.abstained && v.action);
+  const cites = (v) => {
+    const names = (v.cited || []).filter((n) => figs[n]).slice(0, 2);
+    return names.length ? ` It cited ${names.map((n) => `{${n}}`).join(' and ')}.` : '';
+  };
+  const verdict = payload.verdict;
+  let title; let explanation; let why; let dissent;
+  if (verdict === 'NO_CONSENSUS') {
+    title = 'Demo: no majority, so the status quo is to hold.';
+    explanation = 'No action reached a majority of the {seats} demo analysts. These demo votes come from fixed rules, not a model.';
+    why = ['CLOSE', 'HOLD', 'ROLL']
+      .filter((a) => votes.some((v) => v.action === a))
+      .map((a) => `${a[0]}${a.slice(1).toLowerCase()}: {votes_${a.toLowerCase()}} of {seats} — ${votes.filter((v) => v.action === a).map((v) => v.lens).join(', ')}.`);
+    dissent = 'With no majority there is no single dissent.';
+  } else {
+    const verb = VERB[verdict];
+    title = `Demo: ${verb} the position${verdict === 'ROLL' && payload.roll_direction ? DIR[payload.roll_direction] : ''}.`;
+    explanation = `{votes_${verb}} of {seats} demo analysts voted to ${verb}. These demo votes come from fixed rules, not a model.`;
+    why = votes.filter((v) => v.action === verdict).slice(0, 4)
+      .map((v) => `${v.lens}: ${verb} with {confidence_${v.seat}} confidence.${cites(v)}`);
+    const others = votes.filter((v) => v.action !== verdict);
+    dissent = others.length
+      ? others.map((v) => `${v.lens} voted to ${VERB[v.action]}.`).join(' ')
+      : 'No dissent: every voting demo analyst agreed.';
+  }
+  return {
+    status: 'ok',
+    trimmed: false,
+    summary: { title: fill(title), explanation: fill(explanation), why: why.map(fill), dissent: fill(dissent) },
+  };
+}
+
 /**
  * Build a demo QuorumResult for a v2 quorum request body (specs/019 FR-201–FR-206).
  * @param {{as_of: string, legs: Array<object>}} request
@@ -206,13 +347,43 @@ export function buildDemoQuorum(request) {
 
   let votes = [];
   let breakevens = [];
+  let f = null;
   if (legs.length) {
-    const f = demoFigures(legs);
+    f = demoFigures(legs);
     breakevens = f.breakevens;
     const fundamentals = [greeksVote(f), volatilityVote(f), timeDecayVote(f), strikeVote(f)];
     votes = [...fundamentals, overlayVote(fundamentals, underlying)];
   }
   const { rows, verdict } = tally(votes);
+
+  // specs/020: cited figures and a demo summary token, all built in the browser.
+  let summaryToken = null;
+  if (f) {
+    const catalog = demoCatalog(f, votes, rows);
+    for (const v of votes) {
+      v.cited_figures = demoCitedNames(v.seat, f)
+        .filter((n) => catalog[n])
+        .slice(0, 5)
+        .map((n) => ({ name: n, label: catalog[n].label, display: catalog[n].display }));
+    }
+    if (votes.length) {
+      const rollDirs = new Set(votes.filter((v) => v.action === 'ROLL').map((v) => v.roll_direction));
+      const payload = {
+        v: 1,
+        underlying_symbol: underlying,
+        verdict,
+        roll_direction: rollDirs.size === 1 ? [...rollDirs][0] : null,
+        tally: rows,
+        votes: votes.map((v) => ({
+          seat: v.seat, lens: v.lens, action: v.action, confidence: v.confidence,
+          roll_direction: v.roll_direction, rationale: v.rationale,
+          cited: v.cited_figures.map((c) => c.name), abstained: false,
+        })),
+        figures: catalog,
+      };
+      summaryToken = `demo.${_b64url(JSON.stringify(payload))}`;
+    }
+  }
 
   return {
     verdict: votes.length ? verdict : 'NO_QUORUM',
@@ -233,5 +404,6 @@ export function buildDemoQuorum(request) {
     as_of: request?.as_of || new Date().toISOString(),
     position_fundamentals: { breakevens },
     disclaimer: DISCLAIMER,
+    summary_token: summaryToken,
   };
 }

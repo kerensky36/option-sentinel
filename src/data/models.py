@@ -237,11 +237,17 @@ class AnalystBallot(BaseModel):
     confidence: float = Field(ge=0.0, le=1.0)
     rationale: str
     roll_direction: RollDirection | None = None
+    cited: list[str] = []  # figure-catalog names the seat relied on (specs/020 FR-315)
 
     @field_validator("rationale")
     @classmethod
     def _truncate(cls, v: str) -> str:
         return v.strip()[:600]
+
+    @field_validator("cited")
+    @classmethod
+    def _cap_cited(cls, v: list[str]) -> list[str]:
+        return [str(n)[:40] for n in v[:5]]
 
     @model_validator(mode="after")
     def _roll_needs_direction(self) -> "AnalystBallot":
@@ -250,6 +256,14 @@ class AnalystBallot(BaseModel):
         if self.action != "ROLL":
             self.roll_direction = None
         return self
+
+
+class CitedFigure(BaseModel):
+    """A figure-catalog entry a seat cited; label and display come from the server (specs/020 FR-315)."""
+
+    name: str
+    label: str
+    display: str
 
 
 class AnalystVote(BaseModel):
@@ -262,6 +276,7 @@ class AnalystVote(BaseModel):
     rationale: str = ""
     roll_direction: RollDirection | None = None
     abstained: bool = False
+    cited_figures: list[CitedFigure] = []
 
 
 class TallyEntry(BaseModel):
@@ -287,3 +302,95 @@ class QuorumResult(BaseModel):
     as_of: datetime
     position_fundamentals: PositionFundamentals = PositionFundamentals()
     disclaimer: str = QUORUM_DISCLAIMER
+    # Opaque, HMAC-signed summariser input (specs/020 D-302); None for NO_QUORUM or no seal key.
+    summary_token: str | None = None
+
+
+# ── specs/020: quorum summary (data-model.md) ─────────────────────────────────
+
+class SummaryDraft(BaseModel):
+    """Structured output the summariser model must return (specs/020 D-306).
+
+    Over-long text is truncated rather than rejected; an empty `why` is invalid.
+    """
+
+    title: str
+    explanation: str
+    why: list[str] = Field(min_length=1)
+    dissent: str = ""
+
+    @field_validator("title")
+    @classmethod
+    def _title(cls, v: str) -> str:
+        return v.strip()[:120]
+
+    @field_validator("explanation")
+    @classmethod
+    def _explanation(cls, v: str) -> str:
+        return v.strip()[:600]
+
+    @field_validator("why")
+    @classmethod
+    def _why(cls, v: list[str]) -> list[str]:
+        return [str(w).strip()[:200] for w in v[:4]]
+
+    @field_validator("dissent")
+    @classmethod
+    def _dissent(cls, v: str) -> str:
+        return v.strip()[:400]
+
+
+class SummaryBody(BaseModel):
+    title: str
+    explanation: str
+    why: list[str]
+    dissent: str
+
+
+class QuorumSummary(BaseModel):
+    """Body of POST /api/quorum/summary (specs/020 contracts). Never stored."""
+
+    status: Literal["ok", "unavailable"]
+    trimmed: bool = False
+    summary: SummaryBody | None = None
+
+
+class SummaryRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    summary_token: str = Field(max_length=20_000)
+
+
+class PayloadFigure(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    label: str
+    display: str
+
+
+class PayloadVote(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    seat: str
+    lens: str
+    action: QuorumAction | None = None
+    confidence: float | None = None
+    roll_direction: RollDirection | None = None
+    rationale: str = ""
+    cited: list[str] = []
+    abstained: bool = False
+
+
+class SummaryPayload(BaseModel):
+    """Signed summariser input carried by the summary token (specs/020 data-model.md)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    v: int
+    issued_at: datetime
+    underlying_symbol: str
+    verdict: QuorumVerdict
+    roll_direction: RollDirection | None = None
+    tally: list[TallyEntry]
+    votes: list[PayloadVote]
+    figures: dict[str, PayloadFigure]

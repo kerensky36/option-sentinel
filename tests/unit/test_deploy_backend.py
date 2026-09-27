@@ -93,3 +93,21 @@ def test_schwab_vars_still_passed(fake_gcloud):
     env_vars = _deploy_env_vars(fake_gcloud)
     for key in ("SCHWAB_CLIENT_ID", "SCHWAB_REDIRECT_URI", "SCHWAB_AUTH_URL", "SCHWAB_TOKEN_URL"):
         assert env_vars[key] == _REQUIRED[key]
+
+
+def test_quorum_seal_key_passed_through(fake_gcloud):
+    """specs/020 D-303: the summary token key is shared by every instance via env."""
+    env_vars = _deploy_env_vars(fake_gcloud, QUORUM_SEAL_KEY="k" * 48)
+    assert env_vars["QUORUM_SEAL_KEY"] == "k" * 48
+
+
+def test_missing_seal_key_warns(fake_gcloud):
+    bindir, _ = fake_gcloud
+    env = {k: v for k, v in os.environ.items() if k not in _VERTEX and k not in _REQUIRED and k not in _LEAKY}
+    env.pop("QUORUM_SEAL_KEY", None)
+    env.update(_REQUIRED)
+    env["PATH"] = f"{bindir}{os.pathsep}{env['PATH']}"
+    result = subprocess.run(["bash", "scripts/deploy_backend.sh"], cwd=_REPO, env=env, capture_output=True, text=True)
+    assert result.returncode == 0
+    assert "QUORUM_SEAL_KEY" in result.stdout + result.stderr
+    assert "Summary unavailable" in result.stdout + result.stderr

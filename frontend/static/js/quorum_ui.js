@@ -1,32 +1,28 @@
 /**
- * quorum_ui.js — Fundamentals-first voting quorum panel (specs/017, specs/018).
+ * quorum_ui.js — Advice panel for the voting quorum (specs/017, 018, 020).
  *
- * Each option row / spread summary row carries a [data-quorum-btn] button.
- * Clicking it POSTs the row's legs — as held from the last positions refresh,
- * with their realised volatility and "as of" time — to /api/quorum/vote
- * (specs/018 FR-110) and renders the verdict, tally, analyst cards, and
- * headlines in a panel row beneath it. No account identifier is sent.
+ * Each standalone option row and spread summary row carries an ADVICE(Agentic)
+ * button next to its name (specs/020 FR-301). Clicking it POSTs the row's legs
+ * — as held from the last positions refresh, with their realised volatility and
+ * "as of" time — to /api/quorum/vote (specs/018 FR-110) and renders the verdict,
+ * the radial vote ring and the analysts beneath that row. No account identifier
+ * is sent.
  *
  * The result is held only in the DOM — never written to sessionStorage or any
  * other store (FR-015). Every string is escaped before rendering (FR-016).
  */
 
 import { fetchWithAuth } from './auth.js';
+import { VERDICT_BADGE, VOTE_COLORS, esc, ringSvg, verdictLabel } from './quorum_ring.js';
+import * as quorumCache from './quorum_cache.js';
 
 const PANEL_CLASS = 'quorum-panel-row';
-const COLSPAN = 15;
-
-const VERDICT_STYLE = {
-  CLOSE: { label: 'CLOSE', cls: 'bg-red-900 text-red-200' },
-  HOLD: { label: 'HOLD', cls: 'bg-gray-700 text-gray-100' },
-  ROLL: { label: 'ROLL', cls: 'bg-indigo-800 text-indigo-100' },
-  NO_CONSENSUS: { label: 'NO CONSENSUS', cls: 'bg-amber-900 text-amber-200' },
-  NO_QUORUM: { label: 'NO QUORUM', cls: 'bg-gray-800 text-gray-300' },
-};
-
-const ACTION_BAR = { CLOSE: '#b33', HOLD: '#778', ROLL: '#56c' };
+const COLSPAN = 14;
+const WARNING_NOTE_ID = 'advice-warning-note';
 
 const ROLL_LABEL = { out: 'roll out', up_and_out: 'roll up & out', down_and_out: 'roll down & out' };
+
+const WARNING_TEXT = 'AI-generated opinion. Not financial advice. Option Sentinel never places trades.';
 
 const STALE_MESSAGE = 'Position data is more than 15 minutes old — refresh positions and try again.';
 
@@ -38,15 +34,7 @@ const LEG_FIELDS = [
 ];
 
 let _openId = null;
-
-function esc(value) {
-  return String(value ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
+let _openBtn = null;
 
 function safeLink(url) {
   try {
@@ -61,17 +49,73 @@ function pct(x) {
   return x === null || x === undefined ? '—' : `${Math.round(Number(x) * 100)}%`;
 }
 
-/** Remove any open quorum panel. */
-export function closeQuorumPanel() {
-  document.querySelectorAll(`.${PANEL_CLASS}`).forEach((row) => row.remove());
+/** Remove any open quorum panel. Only quorum panel rows are touched — never the payoff graph. */
+export function closeQuorumPanel(root = globalThis.document) {
+  if (root) root.querySelectorAll(`.${PANEL_CLASS}`).forEach((row) => row.remove());
+  if (_openBtn) {
+    _openBtn.setAttribute('aria-expanded', 'false');
+    _openBtn.removeAttribute('aria-busy');
+  }
+  _openBtn = null;
   _openId = null;
 }
 
 function _panelShell(inner) {
   const row = document.createElement('tr');
   row.className = PANEL_CLASS;
-  row.innerHTML = `<td colspan="${COLSPAN}" class="px-4 py-3 bg-gray-900/60">${inner}</td>`;
+  row.innerHTML = `<td colspan="${COLSPAN}" class="quorum-panel-cell"><div class="quorum-panel-inner">${inner}</div></td>`;
   return row;
+}
+
+// Keep the panel as wide as the visible table area so it never scrolls
+// sideways with a wide table on a phone (FR-319, D-310).
+function _fitPanel() {
+  const inner = document.querySelector(`.${PANEL_CLASS} .quorum-panel-inner`);
+  const scroller = inner?.closest('.overflow-x-auto');
+  if (inner && scroller) inner.style.width = `${scroller.clientWidth}px`;
+}
+
+let _resizeWired = false;
+function _wireResize() {
+  if (_resizeWired || typeof window === 'undefined') return;
+  window.addEventListener('resize', _fitPanel);
+  _resizeWired = true;
+}
+
+// Wedge ↔ analyst-row linking (FR-304, FR-320).
+function _wireRing(root) {
+  const highlight = (seat, on) => {
+    root.querySelectorAll(`[data-seat="${CSS.escape(seat)}"]`).forEach((el) => el.classList.toggle('hl', on));
+  };
+  const openRow = (seat) => {
+    const row = root.querySelector(`details.member[data-seat="${CSS.escape(seat)}"]`);
+    if (!row) return;
+    row.open = true;
+    const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    row.scrollIntoView({ block: 'nearest', behavior: reduce ? 'auto' : 'smooth' });
+  };
+  root.querySelectorAll('.wedge[data-seat]').forEach((w) => {
+    const seat = w.getAttribute('data-seat');
+    w.addEventListener('mouseenter', () => highlight(seat, true));
+    w.addEventListener('mouseleave', () => highlight(seat, false));
+    w.addEventListener('focus', () => highlight(seat, true));
+    w.addEventListener('blur', () => highlight(seat, false));
+    w.addEventListener('click', () => openRow(seat));
+    w.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openRow(seat); }
+    });
+  });
+  const toggle = root.querySelector('.toggle-all');
+  if (toggle) {
+    toggle.addEventListener('click', () => {
+      toggle.textContent = toggleAll([...root.querySelectorAll('details.member')]);
+    });
+  }
+  root.querySelectorAll('details.member[data-seat]').forEach((d) => {
+    const seat = d.getAttribute('data-seat');
+    d.addEventListener('mouseenter', () => highlight(seat, true));
+    d.addEventListener('mouseleave', () => highlight(seat, false));
+  });
 }
 
 function _notice() {
@@ -95,37 +139,55 @@ function _renderError(message) {
 }
 
 function _renderTally(result) {
-  return result.tally
-    .map((t) => {
-      const width = result.seats ? (t.votes / result.seats) * 100 : 0;
-      return `
-      <div class="flex items-center gap-2 text-xs">
-        <span class="w-12 text-gray-300">${esc(t.action)}</span>
-        <div class="flex-1 bg-gray-800" style="height:8px; border-radius:1px">
-          <div style="width:${width}%; height:8px; background:${ACTION_BAR[t.action] || '#666'}; border-radius:1px"></div>
-        </div>
-        <span class="w-20 text-right text-gray-200">${t.votes}/${result.seats}${t.mean_confidence !== null ? ` · ${pct(t.mean_confidence)}` : ''}</span>
-      </div>`;
-    })
-    .join('');
+  const counts = { CLOSE: 0, HOLD: 0, ROLL: 0 };
+  let abstain = 0;
+  for (const v of result.votes) {
+    if (v.abstained || !v.action) abstain += 1;
+    else counts[v.action] += 1;
+  }
+  const item = (key, n) => `<span${result.verdict === key ? ' class="win"' : ''}><i class="sw" style="background:${VOTE_COLORS[key]}"></i>${key} ${n}</span>`;
+  const parts = Object.keys(counts).map((k) => item(k, counts[k]));
+  if (abstain) parts.push(`<span><i class="sw" style="background:${VOTE_COLORS.NONE}"></i>ABSTAIN ${abstain}</span>`);
+  return parts.join('');
 }
 
-function _renderVotes(votes) {
-  return votes
-    .map((v) => {
-      const action = v.abstained
-        ? '<span class="text-gray-500">abstained</span>'
-        : `<span class="font-semibold" style="color:${ACTION_BAR[v.action] || '#aaa'}">${esc(v.action)}</span>
-           <span class="text-gray-400">${pct(v.confidence)}</span>
-           ${v.roll_direction ? `<span class="text-gray-300">· ${esc(ROLL_LABEL[v.roll_direction] || v.roll_direction)}</span>` : ''}`;
-      return `
-      <div class="border border-gray-800 bg-gray-900 px-3 py-2" style="border-radius:2px">
-        <div class="text-gray-400 uppercase tracking-wider text-xs mb-1">${esc(v.lens)}</div>
-        <div class="text-sm mb-1">${action}</div>
-        <div class="text-gray-300 text-xs" style="line-height:1.5">${esc(v.rationale)}</div>
-      </div>`;
-    })
-    .join('');
+function _renderMembers(votes) {
+  const rows = votes.map((v) => {
+    const abstained = v.abstained || !v.action;
+    const colour = VOTE_COLORS[abstained ? 'NONE' : v.action];
+    const conf = abstained ? 0 : Math.round(Number(v.confidence) * 100);
+    const dir = !abstained && v.action === 'ROLL' && v.roll_direction
+      ? `<span class="dir">${esc(ROLL_LABEL[v.roll_direction] || v.roll_direction)}</span>` : '';
+    const chips = (v.cited_figures || [])
+      .map((c) => `<span class="fig">${esc(c.label)} <b>${esc(c.display)}</b></span>`)
+      .join('');
+    return `<details class="member" data-seat="${esc(v.seat)}" style="--c:${colour}">
+      <summary>
+        <span class="stripe" style="background:${colour}"></span>
+        <span class="lens">${esc(v.lens)}</span>
+        <span class="vote-chip"><b style="color:${colour}">${abstained ? 'ABSTAINED' : esc(v.action)}</b>${dir}</span>
+        <span class="conf" aria-label="Confidence ${abstained ? 'not given' : `${conf}%`}"><span class="conf-track"><span class="conf-fill" style="width:${conf}%;background:${colour}"></span></span><span class="conf-num">${abstained ? '—' : `${conf}%`}</span></span>
+        <span class="caret" aria-hidden="true">▶</span>
+      </summary>
+      <div class="member-body"><p>${esc(v.rationale || (abstained ? 'This analyst did not vote.' : ''))}</p>${chips ? `<div class="figs">${chips}</div>` : ''}</div>
+    </details>`;
+  }).join('');
+  const valid = votes.filter((v) => !v.abstained && v.action).length;
+  return `<div class="members">
+      <div class="members-head"><span class="eyebrow">Quorum members · ${valid} of ${votes.length} voted</span><button type="button" class="toggle-all">Expand all</button></div>
+      ${rows}
+    </div>`;
+}
+
+/**
+ * Open every row when any is closed, otherwise close them all. Returns the
+ * control's next label (FR-316).
+ * @param {Array<{open: boolean}>} rows
+ */
+export function toggleAll(rows) {
+  const openAll = rows.some((r) => !r.open);
+  rows.forEach((r) => { r.open = openAll; });
+  return openAll ? 'Collapse all' : 'Expand all';
 }
 
 function _renderHeadlines(headlines) {
@@ -156,28 +218,106 @@ function _verdictNote(result) {
   return `${winner ? winner.votes : '?'} of ${result.seats} analysts agree.`;
 }
 
-export function renderResult(result) {
-  const style = VERDICT_STYLE[result.verdict] || VERDICT_STYLE.NO_QUORUM;
+export function renderResult(result, { saved = false } = {}) {
+  const badge = VERDICT_BADGE[result.verdict] || VERDICT_BADGE.NO_QUORUM;
   return `
-    <div class="flex flex-col gap-3">
-      <div class="flex flex-wrap items-center gap-3">
-        <span class="px-2 py-1 text-sm font-semibold tracking-widest ${style.cls}" style="border-radius:1px">${esc(style.label)}</span>
-        <span class="text-gray-300 text-sm">${esc(result.underlying_symbol)} · ${esc(_verdictNote(result))}</span>
-        ${result.as_of ? `<span class="text-gray-500 text-xs">${esc(_asOfLabel(result.as_of))}</span>` : ''}
+    <div class="quorum-panel">
+      <div class="result-head">
+        <span class="verdict" style="background:${badge.bg};color:${badge.fg}">${esc(verdictLabel(result))}</span>
+        <span class="verdict-note">${esc(result.underlying_symbol)} · ${esc(_verdictNote(result))}</span>
+        ${result.as_of ? `<span class="asof">${esc(_asOfLabel(result.as_of))}${saved ? ' · <span class="saved-note">Saved for this session</span>' : ''}</span>` : (saved ? '<span class="asof"><span class="saved-note">Saved for this session</span></span>' : '')}
       </div>
-      <div class="flex flex-col gap-1" style="max-width:420px">${_renderTally(result)}</div>
-      <div class="grid grid-cols-1 md:grid-cols-5 gap-2">${_renderVotes(result.votes)}</div>
-      ${result.macro_brief ? `
-      <div>
-        <div class="text-gray-400 uppercase tracking-wider text-xs mb-1">Research brief (Macro &amp; News analyst)</div>
-        <div class="text-gray-300 text-xs" style="line-height:1.6">${esc(result.macro_brief)}</div>
-      </div>` : ''}
-      <div>
-        <div class="text-gray-400 uppercase tracking-wider text-xs mb-1">News given to the Macro &amp; News analyst</div>
-        ${_renderHeadlines(result.headlines)}
+      <div class="warn-strip" role="note"><span aria-hidden="true">⚠</span> ${esc(WARNING_TEXT)}</div>
+      <div class="overview">
+        <div class="radial-card">
+          ${ringSvg(result)}
+          <div class="tally">${_renderTally(result)}</div>
+          <div class="radial-note">Wedge length = the analyst's confidence. Outer band = their vote. Three matching votes make a majority.</div>
+        </div>
+        <div class="summary-area" data-state="${_initialSummaryState(result)}">${renderSummary(_initialSummaryState(result), null, result)}</div>
       </div>
-      <div class="text-gray-500 text-xs">${esc(result.disclaimer)} · ${esc(result.model)}</div>
+      ${_renderMembers(result.votes)}
+      <details class="extra">
+        <summary><span class="caret" aria-hidden="true">▶</span>Research brief &amp; headlines (${(result.headlines || []).length})</summary>
+        <div class="extra-body">
+          ${result.macro_brief ? `<p>${esc(result.macro_brief)}</p>` : ''}
+          <div class="eyebrow">News given to the Macro &amp; News analyst</div>
+          ${_renderHeadlines(result.headlines)}
+        </div>
+      </details>
+      <div class="foot">${esc(result.disclaimer)} · ${esc(result.model)}</div>
     </div>${_notice()}`;
+}
+
+const SUMMARY_TIMEOUT_MS = 20000;
+
+function _initialSummaryState(result) {
+  if (result.verdict === 'NO_QUORUM') return 'fixed';
+  return result.summary_token ? 'pending' : 'unavailable';
+}
+
+/**
+ * Summary area HTML for one state (specs/020 FR-309, FR-312, FR-313).
+ * @param {'pending'|'ok'|'unavailable'|'fixed'} state
+ * @param {{title, explanation, why, dissent}|null} summary
+ * @param {object} result - the vote result (verdict, votes)
+ */
+export function renderSummary(state, summary, result) {
+  const head = '<div class="eyebrow">Quorum summary <span class="tag-new">LLM-written</span></div>';
+  if (state === 'pending') {
+    return `${head}<p class="summary-status"><span class="dot" aria-hidden="true">●</span> Writing summary…</p>`;
+  }
+  if (state === 'fixed') {
+    const valid = result.votes.filter((v) => !v.abstained && v.action).length;
+    const seats = result.seats || result.votes.length;
+    return `<div class="eyebrow">Quorum summary</div><p class="summary-status">Only ${valid} of ${seats} analysts voted — no recommendation.</p>`;
+  }
+  if (state !== 'ok' || !summary) {
+    return `${head}<p class="summary-status">Summary unavailable</p>`;
+  }
+  const whyHeading = result.verdict === 'NO_CONSENSUS' ? 'Where the votes fell' : 'Why the majority';
+  return `${head}
+    <h2 class="summary-title">${esc(summary.title)}</h2>
+    <p class="summary-text">${esc(summary.explanation)}</p>
+    <div class="reason-grid">
+      <div class="reason"><h3>${whyHeading}</h3><ul>${(summary.why || []).map((w) => `<li>${esc(w)}</li>`).join('')}</ul></div>
+      <div class="reason"><h3>Dissent</h3><p>${esc(summary.dissent)}</p></div>
+    </div>`;
+}
+
+/**
+ * Second request of the two-step flow (D-311). Resolves to {state, summary}, or
+ * null when the panel was closed or replaced meanwhile. The token lives only in
+ * this call — never in the DOM or browser storage (FR-318).
+ * @param {object} result
+ * @param {Function} fetchImpl - fetchWithAuth in the app
+ * @param {() => boolean} isCurrent
+ * @param {number} [timeoutMs]
+ */
+export async function requestSummary(result, fetchImpl, isCurrent, timeoutMs = SUMMARY_TIMEOUT_MS) {
+  const state = _initialSummaryState(result);
+  if (state !== 'pending') return { state, summary: null };
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  let outcome = { state: 'unavailable', summary: null };
+  try {
+    const resp = await fetchImpl('/api/quorum/summary', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ summary_token: result.summary_token }),
+      signal: controller.signal,
+    });
+    if (resp && resp.ok) {
+      const body = await resp.json();
+      if (body && body.status === 'ok' && body.summary) outcome = { state: 'ok', summary: body.summary };
+    }
+  } catch {
+    // network error or timeout → unavailable
+  } finally {
+    clearTimeout(timer);
+  }
+  return isCurrent() ? outcome : null;
 }
 
 function _errorMessage(status) {
@@ -211,38 +351,122 @@ export function buildQuorumRequest(legs) {
   };
 }
 
-async function _openPanel(anchorRow, id, legs) {
-  if (_openId === id) { closeQuorumPanel(); return; }
-  closeQuorumPanel();
-
-  const panel = _panelShell(_renderLoading());
-  anchorRow.insertAdjacentElement('afterend', panel);
-  _openId = id;
-  const cell = panel.firstElementChild;
+/**
+ * Get advice for one position: the saved session result when there is one,
+ * otherwise a vote request followed by the summary request (FR-306, FR-324).
+ * Rendering goes through `deps.render`, which receives:
+ *   {type: 'result', result, summary: {state, summary}, saved}
+ *   {type: 'summary', summary: {state, summary}}
+ *   {type: 'error', message}
+ * The summary outcome is saved even when the panel has been closed meanwhile.
+ * @param {string} key - quorum_cache.cacheKey(id, legs)
+ * @param {Array<object>} legs
+ * @param {{fetchImpl: Function, cache: {load: Function, save: Function},
+ *          render: Function, isCurrent: () => boolean, timeoutMs?: number}} deps
+ */
+export async function adviceFor(key, legs, deps) {
+  const { fetchImpl, cache, render, isCurrent } = deps;
+  const saved = cache.load(key);
+  if (saved && saved.result) {
+    render({ type: 'result', result: saved.result, summary: saved.summary, saved: true });
+    if (saved.summary?.state === 'pending' && saved.result.summary_token) {
+      await _settleSummary(key, saved.result, deps);
+    }
+    return saved;
+  }
 
   const body = buildQuorumRequest(legs);
   if (!body) {
-    cell.innerHTML = _renderError(STALE_MESSAGE);
-    return;
+    render({ type: 'error', message: STALE_MESSAGE });
+    return null;
   }
 
+  let result;
   try {
-    const resp = await fetchWithAuth('/api/quorum/vote', {
+    const resp = await fetchImpl('/api/quorum/vote', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
-    if (!resp) return; // 401 already handled by fetchWithAuth
-    if (_openId !== id) return; // closed or replaced while waiting
+    if (!resp) return null; // 401 already handled by fetchWithAuth
     if (!resp.ok) {
-      cell.innerHTML = _renderError(_errorMessage(resp.status));
-      return;
+      render({ type: 'error', message: _errorMessage(resp.status) });
+      return null;
     }
-    cell.innerHTML = renderResult(await resp.json());
+    result = await resp.json();
   } catch (err) {
     console.error('quorum_ui: request failed', err);
-    if (_openId === id) cell.innerHTML = _renderError('Quorum request failed — check your connection and try again.');
+    render({ type: 'error', message: 'Quorum request failed — check your connection and try again.' });
+    return null;
   }
+
+  const state = _initialSummaryState(result);
+  const entry = {
+    result: state === 'pending' ? result : { ...result, summary_token: null },
+    summary: { state, summary: null },
+  };
+  cache.save(key, entry);
+  if (isCurrent()) render({ type: 'result', result, summary: entry.summary, saved: false });
+  if (state === 'pending') return _settleSummary(key, result, deps);
+  return entry;
+}
+
+async function _settleSummary(key, result, { fetchImpl, cache, render, isCurrent, timeoutMs }) {
+  const outcome = await requestSummary(result, fetchImpl, () => true, timeoutMs);
+  const entry = { result: { ...result, summary_token: null }, summary: outcome };
+  cache.save(key, entry);
+  if (isCurrent()) render({ type: 'summary', summary: outcome });
+  return entry;
+}
+
+function _clearBusy() {
+  if (_openBtn) _openBtn.removeAttribute('aria-busy');
+}
+
+async function _openPanel(anchorRow, id, legs, btn) {
+  if (_openId === id) { closeQuorumPanel(); return; }
+  closeQuorumPanel();
+  _openBtn = btn || null;
+  if (_openBtn) {
+    _openBtn.setAttribute('aria-expanded', 'true');
+    _openBtn.setAttribute('aria-busy', 'true');
+  }
+
+  const panel = _panelShell(_renderLoading());
+  anchorRow.insertAdjacentElement('afterend', panel);
+  _openId = id;
+  const cell = panel.querySelector('.quorum-panel-inner');
+  _wireResize();
+  _fitPanel();
+
+  let shown = null;
+  const isCurrent = () => _openId === id;
+  await adviceFor(quorumCache.cacheKey(id, legs), legs, {
+    fetchImpl: fetchWithAuth,
+    cache: quorumCache,
+    isCurrent,
+    render: (event) => {
+      if (!isCurrent()) return;
+      _clearBusy();
+      if (event.type === 'error') {
+        cell.innerHTML = _renderError(event.message);
+      } else if (event.type === 'result') {
+        shown = event.result;
+        cell.innerHTML = renderResult(event.result, { saved: event.saved });
+        _wireRing(cell);
+        _updateSummaryArea(cell, event.summary, event.result);
+      } else if (event.type === 'summary' && shown) {
+        _updateSummaryArea(cell, event.summary, shown);
+      }
+    },
+  });
+}
+
+function _updateSummaryArea(cell, summary, result) {
+  const area = cell.querySelector('.summary-area');
+  if (!area || !summary) return;
+  area.dataset.state = summary.state;
+  area.innerHTML = renderSummary(summary.state, summary.summary, result);
 }
 
 /**
@@ -261,25 +485,47 @@ export function initQuorum(container, positionData) {
   const tbody = container.querySelector('tbody');
   if (!tbody) return;
 
+  if (!document.getElementById(WARNING_NOTE_ID)) {
+    container.insertAdjacentHTML('beforeend', adviceWarningNote());
+  }
+
   tbody.addEventListener('click', (e) => {
-    const btn = e.target.closest('[data-quorum-btn]');
-    if (!btn) return;
-    e.stopPropagation();
-    const id = btn.getAttribute('data-quorum-btn');
-    const legs = legsById.get(id);
-    const anchorRow = btn.closest('tr');
-    if (!legs || !anchorRow) return;
-    _openPanel(anchorRow, id, legs);
+    onTableClick(e, (id, btn) => {
+      const legs = legsById.get(id);
+      const anchorRow = btn.closest('tr');
+      if (!legs || !anchorRow) return;
+      _openPanel(anchorRow, id, legs, btn);
+    });
   });
 }
 
 /**
- * HTML for a row's quorum button cell.
+ * Handle a click inside the positions table body. Returns true when it was an
+ * ADVICE(Agentic) button: the event is stopped so the spread toggle and the
+ * payoff graph never react to it (FR-303).
+ * @param {Event} e
+ * @param {(id: string, btn: Element) => void} open
+ */
+export function onTableClick(e, open) {
+  const btn = e.target.closest('[data-quorum-btn]');
+  if (!btn) return false;
+  e.stopPropagation();
+  if (typeof open === 'function') open(btn.getAttribute('data-quorum-btn'), btn);
+  return true;
+}
+
+/**
+ * The ADVICE(Agentic) button placed after a position's name (FR-301, FR-302).
+ * The hazard stripe is its warning label; the shared note gives screen readers
+ * the same warning.
  * @param {string} id - groupId for spreads, symbol for standalone legs
  */
-export function quorumButtonCell(id) {
-  return `<td class="px-2 py-1 text-right">
-      <button data-quorum-btn="${esc(id)}" title="Ask the quorum: close, hold, or roll?"
-        class="bg-gray-800 hover:bg-gray-700 text-gray-300 px-2 py-0.5 uppercase tracking-wider text-xs">Quorum</button>
-    </td>`;
+export function adviceButton(id) {
+  return `<button type="button" class="advice-btn bg-red-900 hover:bg-red-800 text-red-300 tracking-wider text-xs transition-colors" data-quorum-btn="${esc(id)}" aria-expanded="false"
+      aria-describedby="${WARNING_NOTE_ID}" title="Five AI analysts vote close, hold or roll. AI opinion, not financial advice."><span class="hazard" aria-hidden="true"></span><span class="advice-label">ADVICE(Agentic)</span></button>`;
+}
+
+/** Visually hidden description shared by every ADVICE(Agentic) button. */
+export function adviceWarningNote() {
+  return `<span id="${WARNING_NOTE_ID}" class="sr-only">AI opinion. Not financial advice. Option Sentinel never places trades.</span>`;
 }

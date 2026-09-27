@@ -4,6 +4,7 @@
 
 ![Status](https://img.shields.io/badge/status-complete-brightgreen)
 ![Stack](https://img.shields.io/badge/stack-FastAPI%20%2B%20Vanilla%20JS%20%2B%20sessionStorage-informational)
+![AI](https://img.shields.io/badge/AI-Gemini%20on%20Vertex%20AI%20via%20Google%20ADK-8e44ad)
 ![Auth](https://img.shields.io/badge/brokerage-Charles%20Schwab-4a7c59)
 ![License](https://img.shields.io/badge/license-MIT-lightgrey)
 
@@ -17,9 +18,9 @@ Option Sentinel connects to your Charles Schwab account and gives you a **live, 
 |---|---|
 | **Live positions** | On-demand refresh from Schwab — one button, immediate update |
 | **Greeks** | Delta, gamma, theta, vega, IV — sourced from Schwab API, Black-Scholes fallback |
-| **Thesis groups** | Group positions by named thesis — stored in your browser only |
+| **Spread grouping & payoff graphs** | Legs on the same underlying and expiry collapse into one spread row; click a row for its payoff graph at today, +1 week, +2 weeks and expiration |
 | **Covered call screener** | Ranks long stock positions by covered-call income opportunity, using implied volatility relative to 30-day realised volatility (IV/RV) |
-| **Fundamentals-first quorum** | Five Google ADK analyst agents vote CLOSE / HOLD / ROLL on a position: four judge its Greeks, volatility, time decay and strikes; one overlays recent CNBC / Yahoo Finance / Bloomberg news (Gemini on Vertex AI — no identifying data sent). Setup: `specs/017-macro-quorum-agents/quickstart.md`; design: `specs/018-fundamentals-first-quorum/` |
+| **Agentic advice (quorum)** | The **ADVICE(Agentic)** button on any position asks five Google ADK analyst agents to vote CLOSE / HOLD / ROLL: four judge its Greeks, volatility, time decay and strikes; one overlays recent CNBC / Yahoo Finance / Bloomberg news. Results show as a radial vote ring, a model-written summary and a row per analyst, and are kept for your session. Gemini on Vertex AI; no identifying data sent. [Details below](#agentic-advice-the-quorum) |
 | **Mobile-ready** | Visual-first responsive dashboard — readable on your phone mid-session |
 | **Erase All** | One button wipes every piece of your data from the browser instantly |
 
@@ -78,8 +79,7 @@ This section explains exactly where your data lives, how it flows, and how to er
 | Schwab token | Browser `sessionStorage` | Tab/browser closed, Logout, or Erase All |
 | Cached positions (incl. calculated fundamentals and refresh time) | Browser `sessionStorage` | Tab/browser closed, or Erase All |
 | Screener cache | Browser `sessionStorage` | Tab/browser closed, or Erase All |
-| Thesis groups & assignments | Browser `localStorage` | Erase All, or manual browser data clear |
-| Quorum results | Page only (never stored) | Panel closed |
+| Quorum results (verdict, votes, summary) | Browser `sessionStorage` — first result per position | Tab/browser closed, Logout, or Erase All |
 | **Server storage** | **None** | **N/A — nothing is stored server-side** |
 
 The full list of every data use — including exactly what the quorum sends to Google Vertex AI — is in the app at **`/data-use`** (linked from the login page and navigation).
@@ -94,7 +94,7 @@ Cloud Run (the server) sees:
 Cloud Run never sees or stores:
 - Your Schwab credentials
 - Your position data at rest
-- Your thesis groups, spreads, or exit goals
+- Your cached positions or saved quorum results
 - Any data from a previous session
 
 ### Erase All Data
@@ -102,8 +102,8 @@ Cloud Run never sees or stores:
 The **"Erase All Data"** button is available in the navigation on every page. Clicking it (after a confirmation prompt) runs the following in your browser:
 
 ```javascript
-sessionStorage.clear()              // removes Schwab token, cached positions, screener cache
-localStorage.clear()                // removes thesis groups and assignments
+sessionStorage.clear()              // removes Schwab token, cached positions, screener cache, saved quorum results
+localStorage.clear()                // failsafe only — the app stores nothing there
 window.location.replace('/auth/login')       // returns to login screen
 ```
 
@@ -115,9 +115,35 @@ Because all data is browser-local, your data on one device is not available on a
 
 ---
 
-## Fundamentals-First Quorum
+## Agentic advice (the quorum)
 
-Any option position on the dashboard can be sent to a five-member AI advisory quorum. Click the quorum button on a position row (or a spread's summary row) and a panel expands beneath it with the verdict, tally, each seat's reasoning, the headlines the news analyst read, and the time the position data is from. Nothing is persisted — the result lives only in the DOM for that page session.
+Any option position on the dashboard can be sent to a five-member AI advisory quorum. Click the red **ADVICE(Agentic)** button next to a position's name. It is styled like Erase All Data and carries a hazard stripe as a reminder that this is AI opinion. It works on a spread's summary row without expanding it or opening its graph.
+
+![The advice panel for an NVDA position: a HOLD verdict with 3 of 5 analysts agreeing, the radial vote ring, the model-written quorum summary with the majority's reasons and the dissent, and a collapsible row per analyst](docs/images/quorum-advice-panel.webp)
+
+The panel opens beneath the row:
+
+| Part | What it shows |
+|---|---|
+| **Verdict** | The counted result (CLOSE, HOLD, ROLL, NO CONSENSUS or NO QUORUM), how many analysts agree, and when the position data is from |
+| **Warning banner** | AI-generated opinion. Not financial advice. Option Sentinel never places trades |
+| **Vote ring** | One wedge per analyst, filled out to its confidence: slate for hold, blue for roll, hatched orange for close. Every wedge is labelled with its vote, so colour is never the only cue. Hover a wedge to highlight that analyst; click it to open their row |
+| **Quorum summary** | A short model-written explanation: the call, why the majority voted that way, and the dissent |
+| **Quorum members** | A collapsible row per analyst: vote, roll direction, confidence bar, and on expand the full rationale and the figures it relied on. "Expand all" opens every row |
+| **Research brief & headlines** | The news the Macro analyst read, collapsed by default |
+
+**Once per position, per session.** The first result for a position is saved in your browser's `sessionStorage` together with its summary. Clicking the button again shows it instantly, marked "Saved for this session", with no new requests, even after a page reload. Signing out, Erase All Data or closing the tab clears it. A position whose legs change, for example a leg you closed or rolled, gets a fresh quorum. Nothing is stored on the server.
+
+### How the summary stays honest
+
+- **The verdict is counted, not generated.** It's a deterministic 3-of-5 tally. The summariser receives it as a fixed fact and cannot change it. A summary whose title names a different action or roll direction is discarded.
+- **The model never writes numbers.** It refers to figures by name (for example `{captured_pct}`), and the server inserts the real values from its own calculations. Any bullet or sentence containing a number the model typed itself is removed. If one turns up in the title or explanation, the whole summary is replaced by "Summary unavailable".
+- **The summary never delays the verdict.** Votes arrive first; the summary follows in a second request while the panel shows "Writing summary…".
+- **Nothing is stored between the two requests.** The vote response carries an HMAC-signed token (key: `QUORUM_SEAL_KEY`) that the browser returns unchanged. The server checks the signature and a 15-minute age limit, so an edited or replayed-late result never reaches the model.
+
+Design: [`specs/020-advice-panel-redesign/`](specs/020-advice-panel-redesign/).
+
+### The five analysts
 
 Each seat is an independent agent (Gemini on Vertex AI, via Google ADK) that votes **CLOSE / HOLD / ROLL** without seeing any other seat's vote. A seat that errors or times out (40s) simply abstains rather than blocking the quorum. The verdict is a deterministic 3-of-5 tally, never a model decision.
 
@@ -132,7 +158,7 @@ Each seat is an independent agent (Gemini on Vertex AI, via Google ADK) that vot
 ### Where the numbers come from
 
 - **Greeks and IV** come from Schwab's option chain (narrowed to the contracts you hold), with a Black-Scholes fallback when Schwab returns nothing or a placeholder such as −999.
-- **Fundamentals** are calculated in code at every positions refresh (`src/services/fundamentals.py`): realised volatility from ~2 months of Schwab daily closes, IV/RV, moneyness, expected move, probability of finishing in the money, and dollar Greeks. When you click Quorum, the server recalculates them from the legs your browser sends and adds position-level figures: net Greeks, breakevens, max profit/loss, share of max profit captured, daily decay. The model never does the arithmetic; unavailable figures are sent as null.
+- **Fundamentals** are calculated in code at every positions refresh (`src/services/fundamentals.py`): realised volatility from ~2 months of Schwab daily closes, IV/RV, moneyness, expected move, probability of finishing in the money, and dollar Greeks. When you request a quorum, the server recalculates them from the legs your browser sends and adds position-level figures: net Greeks, breakevens, max profit/loss, share of max profit captured, daily decay. The model never does the arithmetic; unavailable figures are sent as null.
 - **The quorum uses your browser's data** from the last refresh, so it does not re-fetch positions from Schwab. The server validates every field strictly, rejects data older than 15 minutes, and confirms your Schwab login with one lightweight call before any model call. No account hash is sent.
 
 ### Where the news comes from
@@ -161,8 +187,15 @@ Browser                          Cloud Run (stateless)          Schwab API
   │                                      │                           │
   │  sessionStorage.setItem(positions)   │                           │
   │  render table from JSON              │                           │
-  │  apply thesis labels from            │                           │
-  │  localStorage                        │                           │
+  │                                      │                           │
+  │  [you click ADVICE(Agentic)]         │                    Vertex AI (Gemini)
+  │  POST /api/quorum/vote {legs}        │                           │
+  ├─────────────────────────────────────►│── 5 analyst seats ───────►│
+  │◄─ verdict + votes + signed token ────┤◄─ votes ──────────────────┤
+  │  POST /api/quorum/summary {token}    │                           │
+  ├─────────────────────────────────────►│── summariser ────────────►│
+  │◄─ summary (server-filled figures) ───┤◄─ draft ──────────────────┤
+  │  sessionStorage.setItem(result)      │                           │
 ```
 
 The server is a thin, stateless forwarder. It holds no data between requests.
@@ -175,7 +208,8 @@ The server is a thin, stateless forwarder. It holds no data between requests.
 |---|---|---|
 | Backend | Python 3.11 + FastAPI | Async, clean, minimal cold start |
 | Frontend | Vanilla JS ES modules | No build pipeline; no framework cold-start cost |
-| Client storage | sessionStorage + localStorage | Token and position/screener caches (sessionStorage, tab-scoped); thesis groups (localStorage, persists across tabs) |
+| Client storage | sessionStorage only | Token, position/screener caches and saved quorum results; tab-scoped and cleared on logout |
+| AI analysis | Google ADK + Gemini on Vertex AI | Five analyst seats, a research agent and a summariser; no identifying data sent |
 | Schwab client | schwab-py + httpx | schwab-py for OAuth exchange; forwarded as Bearer on each request |
 | Greeks fallback | scipy + numpy | Black-Scholes; no third-party BS library needed |
 | Deployment | GCP Cloud Run | Scale-to-zero; min-instances=0; max-instances=1 |
@@ -206,15 +240,16 @@ uvicorn src.api.main:app --reload
 
 ## Project governance
 
-This project has a ratified [constitution](.specify/memory/constitution.md) (v2.0.0) that governs every implementation decision.
+This project has a ratified [constitution](.specify/memory/constitution.md) (v3.3.0) that governs every implementation decision.
 
 | # | Principle | Non-negotiable |
 |---|---|---|
-| I | **Privacy-First Data Handling** | Token and position data never persisted server-side; token only in browser sessionStorage |
-| II | **Spec-Before-Code** | Spec commits precede app commits — always |
-| III | **Test-First** | Tests written and failing before implementation begins |
-| IV | **Simplicity Boundary** | Single user, single account; no scope creep |
-| V | **Visual & Responsive UI** | Visual-first dashboard; fully functional on mobile viewports |
+| I | **Privacy-First Data Handling** | Nothing persisted server-side; all client data in browser sessionStorage only; no identifying data ever sent to Vertex AI |
+| II | **Security-First** | CSP, security headers, rate limiting, strict input validation, no sensitive output in logs |
+| III | **Spec-Before-Code** | Spec commits precede app commits — always |
+| IV | **Test-First** | Tests written and failing before implementation begins |
+| V | **Simplicity Boundary** | Multiple independent traders, each with their own Schwab login; no automated trading, no shared storage |
+| VI | **Visual & Responsive UI** | Visual-first dashboard; fully functional on mobile viewports |
 
 ---
 
@@ -256,7 +291,6 @@ specs/004-stateless-ephemeral-refactor/
 | Phase 3 — OAuth login (sessionStorage token delivery) | ✅ Done |
 | Phase 4 — Positions dashboard (Refresh button, sessionStorage cache) | ✅ Done |
 | Phase 5 — Erase All Data | ✅ Done |
-| Phase 6 — Thesis groups (localStorage) | ✅ Done |
 | Phase 7 — Covered call screener (stateless) | ✅ Done |
 | Phase 8 — Dockerfile + Cloud Run | ✅ Done |
 | Phase 9 — Test cleanup + documentation | ✅ Done |
@@ -272,6 +306,8 @@ Backend runs on GCP Cloud Run (stateless, scale-to-zero). Frontend is served fro
 
 **Required env vars**: `GCP_PROJECT_ID`, `SCHWAB_CLIENT_ID`, `SCHWAB_CLIENT_SECRET`, `SCHWAB_REDIRECT_URI`, `SCHWAB_AUTH_URL`, `SCHWAB_TOKEN_URL`
 
+**Quorum env vars**: `QUORUM_SEAL_KEY` (32+ random characters; signs the summary token; without it the panel shows "Summary unavailable"). Optional: `QUORUM_MODEL` (default `gemini-2.5-flash`), and `GOOGLE_GENAI_USE_VERTEXAI=FALSE` to turn the quorum off.
+
 ```bash
 # One-command deploy (backend + frontend)
 export GCP_PROJECT_ID=your-project-id
@@ -280,6 +316,7 @@ export SCHWAB_CLIENT_SECRET=...
 export SCHWAB_REDIRECT_URI=https://your-project.web.app/auth/callback
 export SCHWAB_AUTH_URL=https://api.schwabapi.com/v1/oauth/authorize
 export SCHWAB_TOKEN_URL=https://api.schwabapi.com/v1/oauth/token
+export QUORUM_SEAL_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(48))')"
 
 bash scripts/deploy.sh
 ```

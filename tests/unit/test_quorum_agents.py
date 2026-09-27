@@ -415,3 +415,74 @@ class TestQuorumLegInContext:
             text = _request_text(r) + str(r.config.system_instruction)
             assert "account_hash" not in text
             assert "_source" not in text
+
+
+class TestSpec020Models:
+    """specs/020 T004 — cited figures and summary token on the result models."""
+
+    def test_ballot_cited_defaults_empty_and_truncates_to_five(self):
+        from src.data.models import AnalystBallot
+
+        assert AnalystBallot(action="HOLD", confidence=0.5, rationale="x").cited == []
+        b = AnalystBallot(action="HOLD", confidence=0.5, rationale="x", cited=[f"n{i}" for i in range(8)])
+        assert b.cited == ["n0", "n1", "n2", "n3", "n4"]
+
+    def test_vote_has_cited_figures(self):
+        from src.data.models import AnalystVote, CitedFigure
+
+        v = AnalystVote(seat="s", lens="l", action="HOLD", confidence=0.5, rationale="r")
+        assert v.cited_figures == []
+        v = AnalystVote(
+            seat="s", lens="l", action="HOLD", confidence=0.5, rationale="r",
+            cited_figures=[CitedFigure(name="dte", label="DTE", display="12 d")],
+        )
+        assert v.model_dump()["cited_figures"] == [{"name": "dte", "label": "DTE", "display": "12 d"}]
+
+    def test_result_has_summary_token_and_keeps_018_fields(self):
+        from src.data.models import QuorumResult
+
+        fields = set(QuorumResult.model_fields)
+        assert "summary_token" in fields
+        assert QuorumResult.model_fields["summary_token"].default is None
+        for f in ("verdict", "quorum_met", "seats", "valid_votes", "tally", "votes", "macro_brief",
+                  "headlines", "underlying_symbol", "model", "generated_at", "as_of", "position_fundamentals"):
+            assert f in fields
+
+
+class TestCitedFigures:
+    """specs/020 T034 — seats cite catalog figures by name; the server supplies values."""
+
+    async def _run(self, replies):
+        fake = _fake(replies)
+        result = await run_quorum(
+            build_position_context([_leg()]), model=fake, headline_fetcher=_fetcher(_HEADLINES)
+        )
+        return fake, result
+
+    async def test_seat_messages_list_figures_inside_data(self):
+        fake, _ = await self._run({sid: _ballot("HOLD") for sid in _SEAT_IDS})
+        reqs = _seat_requests(fake, _SEAT_IDS)
+        for sid in _SEAT_IDS:
+            text = _request_text(reqs[sid])
+            start, end = text.index("DATA START"), text.index("DATA END")
+            figures = text.index("FIGURES", start)
+            assert text.index("FUNDAMENTALS", start) < figures < end
+            assert "leg1_iv_rv" in text[figures:end] and "IV/RV" in text[figures:end]
+
+    def test_instructions_ask_for_cited_names_without_braces(self):
+        for tmpl in (quorum_agents._FUNDAMENTALS_INSTRUCTION, quorum_agents._OVERLAY_INSTRUCTION):
+            lowered = tmpl.lower()
+            assert "cited" in lowered and "figures" in lowered and "up to five" in lowered
+        assert "cite at least one specific figure" in quorum_agents._FUNDAMENTALS_INSTRUCTION.lower()
+
+    async def test_cited_names_resolve_to_catalog_values(self):
+        replies = {sid: _ballot("HOLD") for sid in _SEAT_IDS}
+        replies["volatility_pricing"] = _ballot("HOLD", cited=["leg1_iv_rv", "bogus", "leg1_iv_rv"])
+        replies["greeks_exposure"] = RuntimeError("down")
+        _, result = await self._run(replies)
+        vol = next(v for v in result.votes if v.seat == "volatility_pricing")
+        assert [c.model_dump() for c in vol.cited_figures] == [
+            {"name": "leg1_iv_rv", "label": "IV/RV", "display": "1.50×"}
+        ]
+        greeks = next(v for v in result.votes if v.seat == "greeks_exposure")
+        assert greeks.abstained and greeks.cited_figures == []

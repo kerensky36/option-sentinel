@@ -22,6 +22,9 @@ set -euo pipefail
 #   GOOGLE_CLOUD_PROJECT=$GCP_PROJECT_ID
 #   GOOGLE_CLOUD_LOCATION=$CLOUD_RUN_REGION
 #   QUORUM_MODEL                             (optional; app default gemini-2.5-flash)
+#   QUORUM_SEAL_KEY                          (specs/020: ≥ 32 chars, shared by every instance;
+#                                             signs the summary token. Without it the panel
+#                                             shows "Summary unavailable".)
 # The service account also needs roles/aiplatform.user (one-time, see
 # specs/017-macro-quorum-agents/quickstart.md).
 #
@@ -55,9 +58,13 @@ VERTEX_LOCATION="${GOOGLE_CLOUD_LOCATION:-${REGION}}"
 
 ENV_VARS="SCHWAB_CLIENT_ID=${SCHWAB_CLIENT_ID},SCHWAB_CLIENT_SECRET=${SCHWAB_CLIENT_SECRET},SCHWAB_REDIRECT_URI=${SCHWAB_REDIRECT_URI},SCHWAB_AUTH_URL=${SCHWAB_AUTH_URL},SCHWAB_TOKEN_URL=${SCHWAB_TOKEN_URL},RISK_FREE_RATE=${RATE},HTTPS_ONLY=${HTTPS_ONLY_VAL},DEBUG=${DEBUG_VAL},ALLOWED_ORIGIN=${ALLOWED_ORIGIN_VAL}"
 ENV_VARS="${ENV_VARS},GOOGLE_GENAI_USE_VERTEXAI=${VERTEX_ENABLED},GOOGLE_CLOUD_PROJECT=${VERTEX_PROJECT},GOOGLE_CLOUD_LOCATION=${VERTEX_LOCATION}"
-for var in LOG_PEPPER QUORUM_MODEL; do
+for var in LOG_PEPPER QUORUM_MODEL QUORUM_SEAL_KEY; do
   [[ -n "${!var:-}" ]] && ENV_VARS="${ENV_VARS},${var}=${!var}"
 done
+if [[ -z "${QUORUM_SEAL_KEY:-}" ]]; then
+  echo "WARNING: QUORUM_SEAL_KEY is not set here. Unless the service already has it, the"
+  echo "         quorum panel will show \"Summary unavailable\" (specs/020 D-303)."
+fi
 echo "→ Quorum: Vertex AI=${VERTEX_ENABLED}, project=${VERTEX_PROJECT}, location=${VERTEX_LOCATION}"
 
 # Record which commit this revision was built from (used by backend_changed.sh).
