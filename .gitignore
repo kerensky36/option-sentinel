@@ -222,3 +222,6 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Local Claude Code token usage log (written by .claude/hooks/track_tokens.py)
+token_log.md
