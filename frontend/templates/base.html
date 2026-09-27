@@ -211,6 +211,21 @@
       opacity: 1;
       box-shadow: 0 0 8px rgba(40,90,220,0.7), 0 1px 4px rgba(30,70,200,0.5), inset 0 1px 0 rgba(120,170,255,0.35);
     }
+
+    /* ── ADVICE(Agentic) button (specs/020 FR-301, FR-302) ── */
+    .pos-name { display: inline-block; max-width: 22ch; overflow: hidden; text-overflow: ellipsis; vertical-align: middle; }
+    .advice-btn {
+      display: inline-flex; align-items: stretch; margin-left: 8px; padding: 0; vertical-align: middle;
+      background: #1c1c24; color: #d2d2d8; border: 1px solid #5a4a12; border-radius: 2px; cursor: pointer;
+      font-family: inherit; box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 1px 3px rgba(0,0,0,0.5);
+    }
+    .advice-btn:hover { background: #252532; border-color: #c8a820; }
+    .advice-btn[aria-expanded="true"] { background: #231f0a; border-color: #c8a820; }
+    .advice-btn .hazard { width: 8px; flex: none; background: repeating-linear-gradient(135deg, #c8a820 0 3px, #16140a 3px 6px); }
+    .advice-btn .advice-label { padding: 2px 8px 2px 6px; font-size: 10px; font-weight: 700; letter-spacing: 0.12em; white-space: nowrap; }
+    .advice-btn[aria-busy="true"] .advice-label::after { content: " …"; }
+    .advice-btn:focus-visible, .quorum-panel .wedge:focus-visible, .quorum-panel summary:focus-visible { outline: 1px solid #60a5fa; outline-offset: 2px; }
+    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
   </style>
 </head>
 <body class="bg-gray-950 text-gray-100 min-h-screen flex flex-col">

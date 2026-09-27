@@ -119,3 +119,96 @@ def _run_calls(calls, tmp_path) -> dict:
 
 def _call(tmp_path, module, fn, *args):
     return _run_calls([{"module": module, "fn": fn, "args": list(args)}], tmp_path)["results"][0]
+
+
+# ── US1: ADVICE(Agentic) button and placement (FR-301–FR-303) ──────────────────
+
+def _pos(symbol, strike, qty, option_type="put", expiry="2026-10-09", underlying="SPY"):
+    return {
+        "symbol": symbol, "underlying_symbol": underlying, "option_type": option_type,
+        "strike": strike, "expiry_date": expiry, "days_to_expiry": 12, "quantity": qty,
+        "current_mark": "1.55", "unrealised_pnl": "55.00", "cost": "2.10",
+        "delta": 0.31, "gamma": -0.02, "theta": 0.15, "vega": -0.42, "implied_volatility": 0.162,
+        "delta_source": "schwab", "gamma_source": "schwab", "theta_source": "schwab",
+        "vega_source": "schwab", "iv_source": "schwab", "underlying_price": "572.40",
+    }
+
+
+def test_advice_button_html(tmp_path):
+    html = _call(tmp_path, "quorum_ui", "adviceButton", "SPY-grp")
+    text = re.sub(r"<[^>]+>", "", html).strip()
+    assert text.replace("⚠", "").strip() == "ADVICE(Agentic)"
+    assert 'class="hazard"' in html
+    assert 'data-quorum-btn="SPY-grp"' in html
+    assert 'aria-describedby="advice-warning-note"' in html
+    note = _call(tmp_path, "quorum_ui", "adviceWarningNote")
+    assert 'id="advice-warning-note"' in note
+    assert "AI opinion" in note and "not financial advice" in note.lower()
+
+
+def test_advice_button_escapes_id(tmp_path):
+    html = _call(tmp_path, "quorum_ui", "adviceButton", '<x">')
+    assert "<x" not in html.split("data-quorum-btn=")[1].split(">")[0]
+    assert "&lt;x&quot;&gt;" in html
+
+
+def test_table_has_no_quorum_column_and_fourteen_headers(tmp_path):
+    header = _call(tmp_path, "positions_rows", "tableHeader")
+    ths = re.findall(r"<th[^>]*>(.*?)</th>", header, re.S)
+    assert len(ths) == 14
+    assert not any("Quorum" in t for t in ths)
+
+
+def test_standalone_row_has_one_button_in_first_cell(tmp_path):
+    row = _call(tmp_path, "positions_rows", "standaloneRow", _pos("SPY 261016C590", "590.00", 2, "call"))
+    first_td = re.search(r"<td[^>]*>(.*?)</td>", row, re.S).group(1)
+    assert row.count("ADVICE(Agentic)") == 1
+    assert "ADVICE(Agentic)" in first_td
+    assert first_td.index("SPY 261016C590") < first_td.index("ADVICE(Agentic)")
+    assert len(re.findall(r"<td", row)) == 14
+
+
+def test_spread_rows_button_on_summary_only(tmp_path):
+    group = {
+        "groupId": "SPY%7C2026-10-09", "groupName": "SPY · 2026-10-09", "underlying": "SPY",
+        "expiry": "2026-10-09",
+        "legs": [_pos("SPY 261009P565", "565.00", -1), _pos("SPY 261009P560", "560.00", 1)],
+    }
+    html = _call(tmp_path, "positions_rows", "spreadRows", group)
+    rows = re.findall(r"<tr.*?</tr>", html, re.S)
+    assert len(rows) == 3
+    summary, *legs = rows
+    assert summary.count("ADVICE(Agentic)") == 1
+    first_td = re.search(r"<td[^>]*>(.*?)</td>", summary, re.S).group(1)
+    assert "ADVICE(Agentic)" in first_td
+    assert 'data-quorum-btn="SPY%7C2026-10-09"' in summary
+    for leg in legs:
+        assert "ADVICE(Agentic)" not in leg
+        assert len(re.findall(r"<td", leg)) == 14
+    assert len(re.findall(r"<td", summary)) == 14
+
+
+def test_panel_and_graph_rows_span_fourteen_columns():
+    assert "colspan=\"${COLSPAN}\"" in (JS / "quorum_ui.js").read_text()
+    assert re.search(r"const COLSPAN = 14;", (JS / "quorum_ui.js").read_text())
+    graph = (JS / "payoff_graph.js").read_text()
+    assert 'colspan="14"' in graph and 'colspan="15"' not in graph
+
+
+def test_click_on_advice_button_stops_propagation(tmp_path):
+    out = _call(tmp_path, "quorum_ui", "onTableClick",
+                {"__event__": {"matches": ["[data-quorum-btn]"], "id": "SPY-grp"}}, {"__const__": None})
+    assert out["value"] is True
+    assert out["logs"][0]["stopped"] is True
+
+
+def test_click_elsewhere_is_ignored(tmp_path):
+    out = _call(tmp_path, "quorum_ui", "onTableClick",
+                {"__event__": {"matches": ["[data-spread-toggle]"], "id": "x"}}, {"__const__": None})
+    assert out["value"] is False
+    assert out["logs"][0]["stopped"] is False
+
+
+def test_closing_panels_only_touches_quorum_rows(tmp_path):
+    out = _call(tmp_path, "quorum_ui", "closeQuorumPanel", {"__fake_root__": True})
+    assert out["logs"][0] == [".quorum-panel-row"]

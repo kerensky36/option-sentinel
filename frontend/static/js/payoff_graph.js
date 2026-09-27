@@ -406,7 +406,7 @@ export function initPayoffGraphToggle(container, positionData) {
     graphRow.id = graphId;
     graphRow.className = 'payoff-graph-row';
     graphRow.dataset.checkpoint = 'today';
-    graphRow.innerHTML = `<td colspan="15" class="px-4 py-3 bg-gray-900/60">${buttonsHtml}<div class="payoff-svg-container">${cached.svg}</div></td>`;
+    graphRow.innerHTML = `<td colspan="14" class="px-4 py-3 bg-gray-900/60">${buttonsHtml}<div class="payoff-svg-container">${cached.svg}</div></td>`;
     anchorRow.insertAdjacentElement('afterend', graphRow);
     openGraphId = graphId;
 

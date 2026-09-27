@@ -75,32 +75,32 @@
 
 ### Tests (write first, confirm failing)
 
-- [ ] T007 [P] [US1] In `tests/unit/test_quorum_ui.py`, test `adviceButton("SPY-grp")` HTML:
+- [X] T007 [P] [US1] In `tests/unit/test_quorum_ui.py`, test `adviceButton("SPY-grp")` HTML:
   - visible text is exactly `ADVICE(Agentic)`
   - contains a hazard-stripe element
   - has `data-quorum-btn="SPY-grp"`
   - its `aria-label` or `aria-describedby` text contains "AI opinion" and "not financial advice" (FR-302)
   - the id is HTML-escaped (`<x>` → `&lt;x&gt;`)
-- [ ] T008 [P] [US1] In `tests/unit/test_quorum_ui.py` (via `quorum_ui_harness.mjs`), test the pure row builders in `frontend/static/js/positions_rows.js`: `tableHeader()`, `standaloneRow(p)`, `spreadRows(group, agg)`. The module has no side-effect imports (no `auth.js`, no storage). With one spread (two legs) and one standalone option, assert:
+- [X] T008 [P] [US1] In `tests/unit/test_quorum_ui.py` (via `quorum_ui_harness.mjs`), test the pure row builders in `frontend/static/js/positions_rows.js`: `tableHeader()`, `standaloneRow(p)`, `spreadRows(group, agg)`. The module has no side-effect imports (no `auth.js`, no storage). With one spread (two legs) and one standalone option, assert:
   - no `<th>` has text "Quorum"
   - the header has 14 columns
   - the spread summary row and the standalone row each contain exactly one `ADVICE(Agentic)` button, inside their first `<td>` after the name
   - spread leg rows contain none
   - panel and graph rows use `colspan="14"` (FR-301)
-- [ ] T009 [P] [US1] In `tests/unit/test_quorum_ui.py`, test via the harness's event stub:
+- [X] T009 [P] [US1] In `tests/unit/test_quorum_ui.py`, test via the harness's event stub:
   - the quorum click handler calls `stopPropagation()` and does not match `[data-spread-toggle]` or trigger the graph handler (FR-303)
   - opening a second row's panel removes the first (US1 scenario 3)
   - opening a panel does not remove an open `.payoff-graph-row` (spec edge case)
 
 ### Implementation
 
-- [ ] T010 [US1] In `frontend/static/js/quorum_ui.js`:
+- [X] T010 [US1] In `frontend/static/js/quorum_ui.js`:
   - replace `quorumButtonCell(id)` with `adviceButton(id)`, which returns an inline `<button type="button" data-quorum-btn="…" class="advice-btn" aria-describedby="advice-warning-note">` holding a `<span class="hazard" aria-hidden="true">` and the label `ADVICE(Agentic)`
   - add one visually-hidden `#advice-warning-note` element ("AI opinion. Not financial advice.") rendered once by `initQuorum`
   - set `COLSPAN = 14`
 
   Makes T007 and T009 pass.
-- [ ] T011 [US1] Create `frontend/static/js/positions_rows.js` by moving the header and row template code out of `renderPositions()` in `frontend/static/js/positions_ui.js` (importing only `quorum_ui.js` `adviceButton` and pure formatters, which move with it). Make `positions_ui.js` import it. Then:
+- [X] T011 [US1] Create `frontend/static/js/positions_rows.js` by moving the header and row template code out of `renderPositions()` in `frontend/static/js/positions_ui.js` (importing only `quorum_ui.js` `adviceButton` and pure formatters, which move with it). Make `positions_ui.js` import it. Then:
   - remove the `Quorum` `<th>` and the trailing `quorumButtonCell(...)`/empty `<td>` cells
   - insert `${adviceButton(p.symbol)}` after the symbol in standalone rows and `${adviceButton(group.groupId)}` after the group name in spread summary rows
   - leave leg rows without a button
@@ -108,7 +108,7 @@
   - update the payoff graph row `colspan` in `frontend/static/js/payoff_graph.js` from 15 to 14
 
   Makes T008 pass.
-- [ ] T012 [US1] Add the button styles to `frontend/templates/base.html` inside the existing `<style>`, matching the mock (`specs/020-advice-panel-redesign/mock/advice-panel-mock.html`):
+- [X] T012 [US1] Add the button styles to `frontend/templates/base.html` inside the existing `<style>`, matching the mock (`specs/020-advice-panel-redesign/mock/advice-panel-mock.html`):
   - `.advice-btn`, `.advice-btn .hazard` (repeating 135° amber/black stripe), `.advice-btn[aria-expanded="true"]`, `.advice-btn[aria-busy="true"]`
   - `.pos-name` truncation
   - a visible `:focus-visible` outline

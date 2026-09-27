@@ -14,7 +14,8 @@
 import { fetchWithAuth } from './auth.js';
 
 const PANEL_CLASS = 'quorum-panel-row';
-const COLSPAN = 15;
+const COLSPAN = 14;
+const WARNING_NOTE_ID = 'advice-warning-note';
 
 const VERDICT_STYLE = {
   CLOSE: { label: 'CLOSE', cls: 'bg-red-900 text-red-200' },
@@ -38,6 +39,7 @@ const LEG_FIELDS = [
 ];
 
 let _openId = null;
+let _openBtn = null;
 
 function esc(value) {
   return String(value ?? '')
@@ -61,9 +63,11 @@ function pct(x) {
   return x === null || x === undefined ? '—' : `${Math.round(Number(x) * 100)}%`;
 }
 
-/** Remove any open quorum panel. */
-export function closeQuorumPanel() {
-  document.querySelectorAll(`.${PANEL_CLASS}`).forEach((row) => row.remove());
+/** Remove any open quorum panel. Only quorum panel rows are touched — never the payoff graph. */
+export function closeQuorumPanel(root = globalThis.document) {
+  if (root) root.querySelectorAll(`.${PANEL_CLASS}`).forEach((row) => row.remove());
+  if (_openBtn) _openBtn.setAttribute('aria-expanded', 'false');
+  _openBtn = null;
   _openId = null;
 }
 
@@ -211,9 +215,11 @@ export function buildQuorumRequest(legs) {
   };
 }
 
-async function _openPanel(anchorRow, id, legs) {
+async function _openPanel(anchorRow, id, legs, btn) {
   if (_openId === id) { closeQuorumPanel(); return; }
   closeQuorumPanel();
+  _openBtn = btn || null;
+  if (_openBtn) _openBtn.setAttribute('aria-expanded', 'true');
 
   const panel = _panelShell(_renderLoading());
   anchorRow.insertAdjacentElement('afterend', panel);
@@ -261,25 +267,47 @@ export function initQuorum(container, positionData) {
   const tbody = container.querySelector('tbody');
   if (!tbody) return;
 
+  if (!document.getElementById(WARNING_NOTE_ID)) {
+    container.insertAdjacentHTML('beforeend', adviceWarningNote());
+  }
+
   tbody.addEventListener('click', (e) => {
-    const btn = e.target.closest('[data-quorum-btn]');
-    if (!btn) return;
-    e.stopPropagation();
-    const id = btn.getAttribute('data-quorum-btn');
-    const legs = legsById.get(id);
-    const anchorRow = btn.closest('tr');
-    if (!legs || !anchorRow) return;
-    _openPanel(anchorRow, id, legs);
+    onTableClick(e, (id, btn) => {
+      const legs = legsById.get(id);
+      const anchorRow = btn.closest('tr');
+      if (!legs || !anchorRow) return;
+      _openPanel(anchorRow, id, legs, btn);
+    });
   });
 }
 
 /**
- * HTML for a row's quorum button cell.
+ * Handle a click inside the positions table body. Returns true when it was an
+ * ADVICE(Agentic) button: the event is stopped so the spread toggle and the
+ * payoff graph never react to it (FR-303).
+ * @param {Event} e
+ * @param {(id: string, btn: Element) => void} open
+ */
+export function onTableClick(e, open) {
+  const btn = e.target.closest('[data-quorum-btn]');
+  if (!btn) return false;
+  e.stopPropagation();
+  if (typeof open === 'function') open(btn.getAttribute('data-quorum-btn'), btn);
+  return true;
+}
+
+/**
+ * The ADVICE(Agentic) button placed after a position's name (FR-301, FR-302).
+ * The hazard stripe is its warning label; the shared note gives screen readers
+ * the same warning.
  * @param {string} id - groupId for spreads, symbol for standalone legs
  */
-export function quorumButtonCell(id) {
-  return `<td class="px-2 py-1 text-right">
-      <button data-quorum-btn="${esc(id)}" title="Ask the quorum: close, hold, or roll?"
-        class="bg-gray-800 hover:bg-gray-700 text-gray-300 px-2 py-0.5 uppercase tracking-wider text-xs">Quorum</button>
-    </td>`;
+export function adviceButton(id) {
+  return `<button type="button" class="advice-btn" data-quorum-btn="${esc(id)}" aria-expanded="false"
+      aria-describedby="${WARNING_NOTE_ID}" title="Five AI analysts vote close, hold or roll. AI opinion, not financial advice."><span class="hazard" aria-hidden="true"></span><span class="advice-label">ADVICE(Agentic)</span></button>`;
+}
+
+/** Visually hidden description shared by every ADVICE(Agentic) button. */
+export function adviceWarningNote() {
+  return `<span id="${WARNING_NOTE_ID}" class="sr-only">AI opinion. Not financial advice. Option Sentinel never places trades.</span>`;
 }
