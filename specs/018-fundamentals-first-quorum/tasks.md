@@ -327,15 +327,15 @@
 
 ## Phase 8: Polish & Cross-Cutting
 
-- [ ] T040 [P] In `tests/contract/test_data_use_page.py`, check that the Vertex AI row lists the new fundamentals fields, that the positions/Schwab row mentions daily price history for realised volatility, and that the page no longer says the account identifier is sent with a quorum (FR-120). Write first and confirm failing.
-- [ ] T041 In `frontend/templates/data_use.html`, update the rows per T040 (makes T040 pass). Constitution I (Data Use Disclosure) requires this in the same change.
-- [ ] T042 [P] In `README.md`, rewrite the Quorum capability description to the fundamentals-first seats, and update the privacy table (no account hash sent with quorum; price history fetched for realised vol).
-- [ ] T043 Run the full `pytest -q` and `node --check` on every changed JS file (`quorum_ui.js`, `screener_ui.js`, `demo_data.js`); both must be green.
-- [ ] T044 Re-read the diff adversarially against Constitution II:
+- [X] T040 [P] In `tests/contract/test_data_use_page.py`, check that the Vertex AI row lists the new fundamentals fields, that the positions/Schwab row mentions daily price history for realised volatility, and that the page no longer says the account identifier is sent with a quorum (FR-120). Write first and confirm failing.
+- [X] T041 In `frontend/templates/data_use.html`, update the rows per T040 (makes T040 pass). Constitution I (Data Use Disclosure) requires this in the same change.
+- [X] T042 [P] In `README.md`, rewrite the Quorum capability description to the fundamentals-first seats, and update the privacy table (no account hash sent with quorum; price history fetched for realised vol).
+- [X] T043 Run the full `pytest -q` and `node --check` on every changed JS file (`quorum_ui.js`, `screener_ui.js`, `demo_data.js`); both must be green.
+- [X] T044 Re-read the diff adversarially against Constitution II:
   - no position values in any log line or 4xx body
   - no module-level mutable state added
   - the CSP is unchanged
-- [ ] T045 Update the PR #6 description with the implemented scope. Add quickstart.md browser scenarios 1–12 as a manual checklist, since they need a live Schwab + Vertex AI deployment, including the SC-101 timing comparison (scenario 8) and the SC-105 10-quorum rationale review (scenario 9).
+- [X] T045 Update the PR #6 description with the implemented scope. Add quickstart.md browser scenarios 1–12 as a manual checklist, since they need a live Schwab + Vertex AI deployment, including the SC-101 timing comparison (scenario 8) and the SC-105 10-quorum rationale review (scenario 9).
 
 ---
 

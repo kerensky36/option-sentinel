@@ -18,8 +18,8 @@ Option Sentinel connects to your Charles Schwab account and gives you a **live, 
 | **Live positions** | On-demand refresh from Schwab — one button, immediate update |
 | **Greeks** | Delta, gamma, theta, vega, IV — sourced from Schwab API, Black-Scholes fallback |
 | **Thesis groups** | Group positions by named thesis — stored in your browser only |
-| **Covered call screener** | Ranks long stock positions by covered-call income opportunity |
-| **Macro news quorum** | Five Google ADK analyst agents read CNBC / Yahoo Finance / Bloomberg news and vote CLOSE / HOLD / ROLL on a position (Gemini on Vertex AI — no identifying data sent). Setup: `specs/017-macro-quorum-agents/quickstart.md` |
+| **Covered call screener** | Ranks long stock positions by covered-call income opportunity, using implied volatility relative to 30-day realised volatility (IV/RV) |
+| **Fundamentals-first quorum** | Five Google ADK analyst agents vote CLOSE / HOLD / ROLL on a position: four judge its Greeks, volatility, time decay and strikes; one overlays recent CNBC / Yahoo Finance / Bloomberg news (Gemini on Vertex AI — no identifying data sent). Setup: `specs/017-macro-quorum-agents/quickstart.md`; design: `specs/018-fundamentals-first-quorum/` |
 | **Mobile-ready** | Visual-first responsive dashboard — readable on your phone mid-session |
 | **Erase All** | One button wipes every piece of your data from the browser instantly |
 
@@ -76,7 +76,7 @@ This section explains exactly where your data lives, how it flows, and how to er
 | Data | Location | Cleared when |
 |---|---|---|
 | Schwab token | Browser `sessionStorage` | Tab/browser closed, Logout, or Erase All |
-| Cached positions | Browser `sessionStorage` | Tab/browser closed, or Erase All |
+| Cached positions (incl. calculated fundamentals and refresh time) | Browser `sessionStorage` | Tab/browser closed, or Erase All |
 | Screener cache | Browser `sessionStorage` | Tab/browser closed, or Erase All |
 | Thesis groups & assignments | Browser `localStorage` | Erase All, or manual browser data clear |
 | Quorum results | Page only (never stored) | Panel closed |
@@ -115,31 +115,32 @@ Because all data is browser-local, your data on one device is not available on a
 
 ---
 
-## Macro News Quorum
+## Fundamentals-First Quorum
 
-Any option position on the dashboard can be sent to a five-member AI advisory quorum. Click the quorum button on a position row (or a spread's summary row) and a panel expands beneath it with the verdict, tally, each seat's reasoning, and the headlines used. Nothing is persisted — the result lives only in the DOM for that page session (FR-015).
+Any option position on the dashboard can be sent to a five-member AI advisory quorum. Click the quorum button on a position row (or a spread's summary row) and a panel expands beneath it with the verdict, tally, each seat's reasoning, the headlines the news analyst read, and the time the position data is from. Nothing is persisted — the result lives only in the DOM for that page session.
 
-Each seat is an independent agent (Gemini on Vertex AI, via Google ADK) that votes **CLOSE / HOLD / ROLL** without seeing any other seat's vote. A seat that errors or times out (40s) simply abstains rather than blocking the quorum.
+Each seat is an independent agent (Gemini on Vertex AI, via Google ADK) that votes **CLOSE / HOLD / ROLL** without seeing any other seat's vote. A seat that errors or times out (40s) simply abstains rather than blocking the quorum. The verdict is a deterministic 3-of-5 tally, never a model decision.
 
-| Seat ID | Lens | Focus |
-|---|---|---|
-| `rates_fed` | **Rates & Fed** | Federal Reserve policy, rate expectations, Treasury yields and the yield curve, and how they shift the value and risk of this option position |
-| `volatility` | **Volatility Regime** | VIX level and trend, event risk ahead of expiry, and whether the position's implied volatility is rich or cheap given the news |
-| `growth_inflation` | **Growth & Inflation** | Growth and inflation data (CPI, PCE, jobs, GDP, PMIs), earnings-season tone, and whether the macro backdrop supports the position's directional exposure |
-| `underlying_news` | **Underlying & Sector News** | News specific to the underlying and its sector: company or ETF headlines, catalysts, and sector rotation that could move the underlying before expiry |
-| `position_risk` | **Position Risk** | The position's own risk: Greeks, days to expiry, distance of strikes from the underlying price, profit captured versus remaining, and assignment or gamma risk, weighed against the macro backdrop |
+| Seat ID | Lens | Reads | Focus |
+|---|---|---|---|
+| `greeks_exposure` | **Greeks & Exposure** | Fundamentals | Net and dollar delta, gamma and vega; directional and gamma risk near expiry |
+| `volatility_pricing` | **Volatility & Pricing** | Fundamentals | Implied vs realised volatility (IV/RV), rich or cheap, expected move vs breakevens |
+| `time_decay_pnl` | **Time Decay & P&L** | Fundamentals | Daily theta, days to expiry, share of max profit captured, reward left vs risk held |
+| `strike_assignment` | **Strike & Assignment** | Fundamentals | Moneyness, probability of finishing in the money, early-assignment and pin risk |
+| `macro_news_overlay` | **Macro & News Overlay** | Fundamentals + news | Whether recent news, events before expiry and the macro backdrop confirm or override the numbers |
 
-### Where the macro data comes from
+### Where the numbers come from
 
-Before the 5 seats vote, a separate `macro_researcher` agent writes a shared brief that all seats read:
+- **Greeks and IV** come from Schwab's option chain (narrowed to the contracts you hold), with a Black-Scholes fallback when Schwab returns nothing or a placeholder such as −999.
+- **Fundamentals** are calculated in code at every positions refresh (`src/services/fundamentals.py`): realised volatility from ~2 months of Schwab daily closes, IV/RV, moneyness, expected move, probability of finishing in the money, and dollar Greeks. When you click Quorum, the server recalculates them from the legs your browser sends and adds position-level figures: net Greeks, breakevens, max profit/loss, share of max profit captured, daily decay. The model never does the arithmetic; unavailable figures are sent as null.
+- **The quorum uses your browser's data** from the last refresh, so it does not re-fetch positions from Schwab. The server validates every field strictly, rejects data older than 15 minutes, and confirms your Schwab login with one lightweight call before any model call. No account hash is sent.
 
-- **Live web grounding** — the researcher uses Google Search grounding (ADK's `google_search` tool) to pull current market context.
-- **RSS headlines**, fetched fresh at vote time (never cached or stored):
-  - CNBC — Top News, Markets
-  - Yahoo Finance — headline index, plus a ticker-specific feed for the position's underlying
-  - Bloomberg — Markets
+### Where the news comes from
 
-Each seat also receives an allow-listed `PositionContext` (Greeks, DTE, strikes, P&L) built from the position's legs — never the account hash or Schwab token (Constitution v3.3.0, Principle I: only public headlines and position fields reach the model).
+Only the Macro & News Overlay seat reads news, so the four fundamentals seats start immediately while it is gathered:
+
+- **Research brief** — a `macro_researcher` agent uses Google Search grounding to summarise news and scheduled events for the underlying before the position's expiry (earnings, ex-dividend dates, economic releases).
+- **RSS headlines**, fetched fresh at vote time (never cached or stored): CNBC Top News and Markets, the Yahoo Finance headline index plus a ticker-specific feed, and Bloomberg Markets. At most 12 headlines, up to 5 about the underlying, none older than 48 hours.
 
 Full spec and setup (Vertex AI IAM, env vars): [`specs/017-macro-quorum-agents/quickstart.md`](specs/017-macro-quorum-agents/quickstart.md)
 

@@ -66,3 +66,32 @@ class TestDataUseLinks:
     @pytest.mark.parametrize("path", ["/", "/screener"])
     def test_app_pages_link_to_disclosure(self, client, path):
         assert 'href="/data-use"' in client.get(path).text
+
+
+class TestDataUseFundamentalsFirstQuorum:
+    """specs/018 FR-120 — disclosure reflects the fundamentals-first quorum."""
+
+    @pytest.mark.parametrize(
+        "phrase",
+        [
+            "realised volatility",
+            "breakevens",
+            "probability of finishing in the money",
+            "time when your positions were last refreshed",
+        ],
+    )
+    def test_vertex_row_lists_new_fields(self, client, phrase):
+        html = client.get("/data-use").text
+        vertex_row = html.split("Quorum — Google Vertex AI", 1)[1].split("</tr>", 1)[0]
+        assert phrase in vertex_row
+
+    def test_positions_row_mentions_price_history_for_realised_vol(self, client):
+        html = client.get("/data-use").text
+        positions_row = html.split("<td>Positions</td>", 1)[1].split("</tr>", 1)[0]
+        assert "daily closing prices" in positions_row
+        assert "realised volatility" in positions_row
+
+    def test_quorum_request_sends_no_account_hash(self, client):
+        html = client.get("/data-use").text
+        vertex_row = html.split("Quorum — Google Vertex AI", 1)[1].split("</tr>", 1)[0]
+        assert "Your account hash is not sent with a quorum request" in vertex_row

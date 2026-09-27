@@ -21,6 +21,8 @@ QUORUM_TIMEOUT_SECONDS = 60.0
 MAX_BODY_BYTES = 16 * 1024
 MAX_DATA_AGE = timedelta(minutes=15)
 MAX_CLOCK_SKEW = timedelta(minutes=2)
+MAX_FIELDS = 20  # unknown keys are caller-chosen text: bound what is reflected back
+MAX_FIELD_CHARS = 64
 
 
 def _invalid(fields: list[str] | None = None) -> JSONResponse:
@@ -50,7 +52,8 @@ async def quorum_vote(request: Request, schwab_client=Depends(get_schwab_client)
     try:
         body = QuorumRequest.model_validate_json(raw)
     except ValidationError as exc:
-        return _invalid([".".join(str(p) for p in err["loc"]) for err in exc.errors()])
+        locations = [".".join(str(p) for p in err["loc"])[:MAX_FIELD_CHARS] for err in exc.errors()]
+        return _invalid(locations[:MAX_FIELDS])
 
     now = datetime.now(timezone.utc)
     if not now - MAX_DATA_AGE <= body.as_of <= now + MAX_CLOCK_SKEW:

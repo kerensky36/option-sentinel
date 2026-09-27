@@ -239,6 +239,14 @@ class TestValidation:
         run.assert_not_awaited()
         assert schwab.calls == []
 
+    def test_422_reflected_field_names_are_bounded(self, client, run):
+        body = _body()
+        for i in range(50):
+            body[f"k{i}_" + "x" * 200] = 1
+        data = _post(client, body).json()
+        assert len(data["fields"]) <= 20
+        assert all(len(f) <= 64 for f in data["fields"])
+
     def test_422_fields_name_the_failing_location(self, client, run):
         resp = _post(client, _body([_leg(delta=1.5)]))
         assert "legs.0.delta" in resp.json()["fields"]
