@@ -8,6 +8,42 @@ from typing import Annotated, Literal
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 
+class LegFundamentals(BaseModel):
+    """Per-leg calculated figures (specs/018 FR-101, research D-103).
+
+    None always means unavailable — never substituted with zero (FR-105).
+    """
+
+    realised_volatility: float | None = None
+    iv_rv_ratio: float | None = None
+    moneyness_pct: float | None = None
+    expected_move: float | None = None
+    prob_itm: float | None = None
+    position_delta: float | None = None
+    dollar_delta: float | None = None
+    position_gamma: float | None = None
+    dollar_theta: float | None = None
+    dollar_vega: float | None = None
+
+
+class PositionFundamentals(BaseModel):
+    """Position-level figures calculated from the legs at quorum time (specs/018 FR-104, D-104)."""
+
+    net_position_delta: float | None = None
+    net_dollar_delta: float | None = None
+    net_position_gamma: float | None = None
+    net_dollar_theta: float | None = None
+    net_dollar_vega: float | None = None
+    breakevens: list[float] = []
+    max_profit: float | None = None
+    max_loss: float | None = None
+    max_profit_unbounded: bool = False
+    max_loss_unbounded: bool = False
+    pct_max_profit_captured: float | None = None
+    theta_pct_of_remaining: float | None = None
+    single_expiry: bool = True
+
+
 class PositionView(BaseModel):
     """A single open options position enriched with computed Greeks.
 
@@ -37,6 +73,9 @@ class PositionView(BaseModel):
     theta_source: Literal["api", "calculated"] | None = None
     vega_source: Literal["api", "calculated"] | None = None
     iv_source: Literal["api", "calculated"] | None = None
+
+    as_of: datetime | None = None
+    fundamentals: LegFundamentals = LegFundamentals()
 
 
 class ScreenerResultView(BaseModel):

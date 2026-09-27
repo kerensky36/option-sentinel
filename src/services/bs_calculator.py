@@ -86,6 +86,25 @@ def implied_volatility(
         return None
 
 
+def prob_itm(
+    S: float,
+    K: float,
+    T: float,
+    r: float,
+    sigma: float,
+    option_type: str,
+) -> float | None:
+    """
+    Risk-neutral probability of finishing in the money: N(d2) for a call,
+    N(-d2) for a put. Returns None for degenerate inputs.
+    """
+    if T <= 0 or sigma <= 0 or S <= 0 or K <= 0:
+        return None
+    d1 = (math.log(S / K) + (r + 0.5 * sigma**2) * T) / (sigma * math.sqrt(T))
+    d2 = d1 - sigma * math.sqrt(T)
+    return float(norm.cdf(d2) if option_type == "call" else norm.cdf(-d2))
+
+
 def _bs_price(S: float, K: float, T: float, r: float, sigma: float, option_type: str) -> float:
     d1 = (math.log(S / K) + (r + 0.5 * sigma**2) * T) / (sigma * math.sqrt(T))
     d2 = d1 - sigma * math.sqrt(T)

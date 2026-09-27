@@ -18,7 +18,7 @@
 
 ## Phase 1: Setup
 
-- [ ] T001 Confirm the baseline: run `pytest -q` on the branch before any change and record the pass count in the PR checklist. No new dependencies are needed (plan: schwab-py 1.5.1 already has `get_price_history_every_day`, `get_option_chain(from_date, to_date, strike)`, `get_account_numbers`).
+- [X] T001 Confirm the baseline: run `pytest -q` on the branch before any change and record the pass count in the PR checklist. No new dependencies are needed (plan: schwab-py 1.5.1 already has `get_price_history_every_day`, `get_option_chain(from_date, to_date, strike)`, `get_account_numbers`).
 
 ---
 
@@ -28,12 +28,12 @@
 
 ### Tests (write first, confirm failing)
 
-- [ ] T002 [P] Create `tests/unit/test_fundamentals.py` for `realised_volatility`:
+- [X] T002 [P] Create `tests/unit/test_fundamentals.py` for `realised_volatility`:
   - 31 synthetic closes with a known log-return stdev → sample stdev × √252 within 1e-9
   - fewer than 20 returns → `None`
   - any close ≤ 0 → `None`
   - only the last 31 closes are used when more are given (D-102)
-- [ ] T003 [P] In `tests/unit/test_fundamentals.py`, add `leg_fundamentals` reference cases (D-103):
+- [X] T003 [P] In `tests/unit/test_fundamentals.py`, add `leg_fundamentals` reference cases (D-103):
   - Call cases:
     - `moneyness_pct` is `(S−K)/S×100`
     - `prob_itm` is `N(d2)`
@@ -54,7 +54,7 @@
     - missing `S` → moneyness, expected move, prob ITM and dollar delta are all `None`
     - missing σ → expected move and prob ITM are `None`
   - `dte = 0` does not divide by zero
-- [ ] T004 [P] In `tests/unit/test_fundamentals.py`, add `position_fundamentals` reference cases (D-104). Each case checks breakevens, max profit/loss, the unbounded flags and `pct_max_profit_captured` against hand-worked values:
+- [X] T004 [P] In `tests/unit/test_fundamentals.py`, add `position_fundamentals` reference cases (D-104). Each case checks breakevens, max profit/loss, the unbounded flags and `pct_max_profit_captured` against hand-worked values:
   - long call: max profit unbounded, one breakeven at K+cost
   - short put
   - bull call vertical
@@ -63,38 +63,38 @@
   - two-expiry calendar: `single_expiry=False`, all payoff figures `None`
   - net Greeks when one leg's Greek is missing → `None`, not partial
   - `theta_pct_of_remaining` → `None` when the remaining premium is 0
-- [ ] T005 [P] In `tests/unit/test_bs_calculator.py`, add `prob_itm(S,K,T,r,sigma,option_type)`:
+- [X] T005 [P] In `tests/unit/test_bs_calculator.py`, add `prob_itm(S,K,T,r,sigma,option_type)`:
   - call equals `norm.cdf(d2)`
   - put equals `norm.cdf(-d2)`
   - `T<=0` or `sigma<=0` returns `None`
-- [ ] T006 [P] In `tests/unit/test_schwab_client.py`, add `fetch_realised_vols` tests with a fake client whose `get_price_history_every_day` returns candle JSON:
+- [X] T006 [P] In `tests/unit/test_schwab_client.py`, add `fetch_realised_vols` tests with a fake client whose `get_price_history_every_day` returns candle JSON:
   - one call per distinct underlying
   - `start_datetime` ≈ now−60 days
   - index map: `SPX`/`SPXW`→`$SPX`, `NDX`→`$NDX`, `RUT`→`$RUT`, `VIX`→`$VIX`
   - error or empty candles → `None` for that underlying without raising
   - a Schwab 4xx/5xx or transport error logs `SECURITY schwab_api_error source=price_history status=<code>` on the `security` logger, and the log line contains no symbol (Constitution II; check with `caplog`)
-- [ ] T007 [P] In `tests/unit/test_schwab_client.py`, test `fetch_positions_and_greeks`:
+- [X] T007 [P] In `tests/unit/test_schwab_client.py`, test `fetch_positions_and_greeks`:
   - every `PositionView` has the same tz-aware UTC `as_of`
   - every `PositionView` has a populated `fundamentals` object
   - price history runs concurrently with the chain fetch (both awaited via one `gather`)
-- [ ] T008 [P] In `tests/contract/test_positions_api.py`, check that `GET /api/positions/refresh` items include `as_of` and a `fundamentals` object with every LegFundamentals key (data-model.md), and that the response is still a JSON array (D-114).
+- [X] T008 [P] In `tests/contract/test_positions_api.py`, check that `GET /api/positions/refresh` items include `as_of` and a `fundamentals` object with every LegFundamentals key (data-model.md), and that the response is still a JSON array (D-114).
 
 ### Implementation
 
-- [ ] T009 In `src/data/models.py`, add `LegFundamentals` exactly as in data-model.md:
+- [X] T009 In `src/data/models.py`, add `LegFundamentals` exactly as in data-model.md:
   - float-or-null fields: `realised_volatility`, `iv_rv_ratio`, `moneyness_pct`, `expected_move`, `prob_itm`, `position_delta`, `dollar_delta`, `position_gamma`, `dollar_theta`, `dollar_vega`, all default `None`
   - add `PositionFundamentals` with these fields:
     - float-or-null: `net_position_delta`, `net_dollar_delta`, `net_position_gamma`, `net_dollar_theta`, `net_dollar_vega`, `max_profit`, `max_loss`, `pct_max_profit_captured`, `theta_pct_of_remaining`
     - `breakevens: list[float] = []`
     - bools: `max_profit_unbounded`, `max_loss_unbounded`, `single_expiry`
   - `PositionView` gains `as_of: datetime | None = None` and `fundamentals: LegFundamentals = LegFundamentals()`
-- [ ] T010 In `src/services/bs_calculator.py`, add `prob_itm()` using the same d1/d2 as `bs_greeks` (makes T005 pass).
-- [ ] T011 Create `src/services/fundamentals.py` as pure functions with no I/O:
+- [X] T010 In `src/services/bs_calculator.py`, add `prob_itm()` using the same d1/d2 as `bs_greeks` (makes T005 pass).
+- [X] T011 Create `src/services/fundamentals.py` as pure functions with no I/O:
   - `realised_volatility(closes, *, window=30)`
   - `leg_fundamentals(leg, realised_vol, *, r)`: `leg` is any object exposing the PositionLegContext fields; reuse `prob_itm`
   - `position_fundamentals(legs, net_unrealised_pnl)`: piecewise-linear payoff evaluated at P=0 and at each strike, with the tail slope from `Σq·100` over calls (D-104)
   - makes T002–T004 pass
-- [ ] T012 In `src/services/schwab_client.py`, add `fetch_realised_vols(client, underlyings)` with the `$` index map (D-102). Update `fetch_positions_and_greeks` to:
+- [X] T012 In `src/services/schwab_client.py`, add `fetch_realised_vols(client, underlyings)` with the `$` index map (D-102). Update `fetch_positions_and_greeks` to:
   - `gather` the chain and price-history fetches
   - stamp one `as_of = datetime.now(timezone.utc)`
   - attach `fundamentals=leg_fundamentals(view, rv[underlying], r=RISK_FREE_RATE)`

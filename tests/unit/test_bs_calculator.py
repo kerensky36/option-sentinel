@@ -89,3 +89,32 @@ def test_implied_volatility_zero_price_returns_none():
 def test_implied_volatility_zero_dte_returns_none():
     iv = implied_volatility(S=100, K=100, T=0, r=0.05, option_price=5.0, option_type="call")
     assert iv is None
+
+
+# ---------------------------------------------------------------------------
+# specs/018 T005 — prob_itm (research D-103)
+# ---------------------------------------------------------------------------
+
+def _d2(S, K, T, r, sigma):
+    d1 = (math.log(S / K) + (r + 0.5 * sigma**2) * T) / (sigma * math.sqrt(T))
+    return d1 - sigma * math.sqrt(T)
+
+
+def test_prob_itm_call_is_n_d2():
+    from scipy.stats import norm
+    from src.services.bs_calculator import prob_itm
+    p = prob_itm(S=100, K=105, T=30 / 365, r=0.045, sigma=0.25, option_type="call")
+    assert p == pytest.approx(norm.cdf(_d2(100, 105, 30 / 365, 0.045, 0.25)), rel=1e-9)
+
+
+def test_prob_itm_put_is_n_minus_d2():
+    from scipy.stats import norm
+    from src.services.bs_calculator import prob_itm
+    p = prob_itm(S=100, K=95, T=30 / 365, r=0.045, sigma=0.25, option_type="put")
+    assert p == pytest.approx(norm.cdf(-_d2(100, 95, 30 / 365, 0.045, 0.25)), rel=1e-9)
+
+
+def test_prob_itm_degenerate_inputs_return_none():
+    from src.services.bs_calculator import prob_itm
+    assert prob_itm(S=100, K=95, T=0, r=0.045, sigma=0.25, option_type="put") is None
+    assert prob_itm(S=100, K=95, T=0.1, r=0.045, sigma=0, option_type="put") is None
