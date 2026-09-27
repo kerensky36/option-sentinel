@@ -5,12 +5,12 @@ NEVER amend `.specify/memory/constitution.md` without asking the user first and 
 
 <!-- SPECKIT START -->
 For context on technologies, project structure, and implementation approach,
-read the current plan at `specs/017-macro-quorum-agents/plan.md`. Supporting artifacts:
-- `specs/017-macro-quorum-agents/research.md` — decisions D-001–D-008 (ADK per-seat runners, Vertex AI, RSS + search grounding, deterministic tally)
-- `specs/017-macro-quorum-agents/data-model.md` — PositionContext, Headline, AnalystBallot/Vote, QuorumResult shapes
-- `specs/017-macro-quorum-agents/contracts/quorum-api-contract.md` — POST /api/quorum/vote contract and service APIs
-- `specs/017-macro-quorum-agents/quickstart.md` — GCP setup and browser verification protocol
-- `specs/017-macro-quorum-agents/spec.md` — feature specification (source of truth)
-- `specs/016-t0-payoff-overlay/plan.md` — prior feature (T+0 payoff overlay)
+read the current plan at `specs/018-fundamentals-first-quorum/plan.md`. Supporting artifacts:
+- `specs/018-fundamentals-first-quorum/research.md` — decisions D-101–D-114 (fundamentals module, realised vol, strict quorum request, seat recast, headline selection, screener IV/RV)
+- `specs/018-fundamentals-first-quorum/data-model.md` — LegFundamentals, PositionFundamentals, QuorumLegIn/QuorumRequest v2
+- `specs/018-fundamentals-first-quorum/contracts/quorum-api-contract.md` — POST /api/quorum/vote v2 contract and service APIs
+- `specs/018-fundamentals-first-quorum/quickstart.md` — test commands and browser verification
+- `specs/018-fundamentals-first-quorum/spec.md` — feature specification (source of truth; amends spec 017)
+- `specs/017-macro-quorum-agents/plan.md` — prior feature (macro news voting quorum)
 - `.specify/memory/constitution.md` — project constitution v3.3.0
 <!-- SPECKIT END -->

@@ -19,6 +19,8 @@
 - Q: Must the server re-fetch the position from Schwab when the quorum is requested? → A: No. The browser sends the position and fundamentals it already holds from the last positions refresh. The trader accepts that tampered input yields a meaningless vote; the app must still be accurate in good faith (fresh data, strictly validated, no identifying data).
 - Q: Does this need a constitution change? → A: No. Client data is held in sessionStorage as the constitution already requires, and the server keeps nothing between requests.
 - Q: How much news? → A: At most 12 headlines (up to 5 reserved for the position's own ticker), only from the last 48 hours, and only the news-overlay analyst reads them.
+- Q (plan refinement): Which fundamentals does the browser send? → A: Only realised volatility; the server re-derives the other leg fundamentals from the leg fields with the same code, so figures cannot drift from the legs and fewer values need validating.
+- Q (plan refinement): Do the fundamentals seats see the research summary? → A: No. They start immediately and judge the numbers alone; the summary and headlines go only to the Macro & News Overlay seat, which is the seat that weighs events such as earnings before expiry.
 - Q: Should the new fundamentals be displayed on the dashboard rows? → A: Out of scope for this feature (possible follow-up). They are fetched with positions and used by the quorum only.
 
 ## User Scenarios & Testing *(mandatory)*
@@ -34,7 +36,7 @@ A trader clicks Quorum on an option position or spread. Four of the five analyst
 **Acceptance Scenarios**:
 
 1. **Given** a completed quorum, **When** the panel renders, **Then** the five analyst cards show the lenses Greeks & Exposure, Volatility & Pricing, Time Decay & P&L, Strike & Assignment, and Macro & News Overlay.
-2. **Given** a quorum request, **When** the four fundamentals analysts vote, **Then** each has been given the position's calculated fundamentals and the macro research summary, but no headlines.
+2. **Given** a quorum request, **When** the four fundamentals analysts vote, **Then** each has been given the position's calculated fundamentals, but no headlines and no research summary.
 3. **Given** a quorum request, **When** the news-overlay analyst votes, **Then** it has been given the position's fundamentals, the headlines, and the macro research summary.
 4. **Given** a grouped spread, **When** the trader clicks Quorum on the spread summary row, **Then** the fundamentals describe the spread as a whole (net Greeks, combined breakevens, combined maximum profit), not each leg separately.
 5. **Given** a figure the app could not calculate (e.g. realised volatility unavailable), **When** analysts vote, **Then** that figure is marked unavailable to them rather than guessed, and they vote on the rest.
@@ -115,7 +117,7 @@ A positions refresh asks Schwab only for the option contracts the trader actuall
 - The request carries values that are internally inconsistent (e.g. a modified mark): the quorum runs on them as given; the result reflects that input. Only shape and range are validated (tampering is the sender's problem, per clarification).
 - Demo mode: the canned result uses the new five lenses and includes a "Data as of" timestamp; no server request is made (017 FR-018 unchanged).
 - Headline feeds return only items older than 48 hours: the overlay analyst is told no recent headlines were found and relies on the research summary.
-- The research step fails: fundamentals analysts vote without the summary; the overlay analyst votes on headlines alone (017 behaviour preserved).
+- The research step fails: the overlay analyst votes on headlines alone (017 behaviour preserved); the fundamentals analysts are unaffected because they never receive the summary.
 - All other 017 edge cases (not configured, rate limit, timeout, prompt injection, one open panel at a time) are unchanged — except "symbol no longer in the account", which no longer applies because the server does not re-fetch the account; the stale-data rule covers it instead.
 
 ## Requirements *(mandatory)*
@@ -142,13 +144,13 @@ A positions refresh asks Schwab only for the option contracts the trader actuall
 
 #### Quorum request (replaces 017 FR-002, FR-003)
 
-- **FR-110** *(replaces 017 FR-002)*: Requesting a quorum MUST send the position's legs and their fundamentals, as held by the browser from the last positions refresh, together with that refresh's "as of" time. The server MUST NOT re-fetch the position, option chain, or price history from Schwab for a quorum request. The server MUST confirm the caller's login token is valid with a single lightweight Schwab request before any model call. The account identifier MUST NOT be sent.
-- **FR-111** *(replaces 017 FR-003)*: The server MUST reject as invalid input any quorum request that: has zero or more than four legs; has legs on more than one underlying; contains any field not on the FR-113 list; contains a value outside its permitted type or range (numbers bounded to plausible market ranges, dates bounded, option type and seat-facing enumerations fixed, underlying symbol matching a ticker pattern of at most 10 letters, digits, dots, hyphens, slashes or carets, OCC leg symbol matching the OCC format); or whose "as of" time is more than 15 minutes old or in the future beyond a small clock-skew allowance (rejected as stale).
+- **FR-110** *(replaces 017 FR-002)*: Requesting a quorum MUST send the position's legs, as held by the browser from the last positions refresh, together with the one fundamental that cannot be derived from the leg fields (the underlying's realised volatility) and that refresh's "as of" time. The server MUST re-derive every other FR-101 leg fundamental from the received leg fields using the same calculation as the refresh, so the analysts see figures consistent with the legs. The server MUST NOT re-fetch the position, option chain, or price history from Schwab for a quorum request. The server MUST confirm the caller's login token is valid with a single lightweight Schwab request before any model call. The account identifier MUST NOT be sent.
+- **FR-111** *(replaces 017 FR-003)*: The server MUST reject as invalid input any quorum request that: has zero or more than four legs; has legs on more than one underlying; contains any field not on the FR-113 list; contains a value outside its permitted type or range (numbers bounded to plausible market ranges, dates bounded, option type and seat-facing enumerations fixed, underlying symbol matching a ticker pattern of at most 10 letters, digits, dots, hyphens, slashes, carets or a leading dollar sign); or whose "as of" time is more than 15 minutes old or in the future beyond a small clock-skew allowance (rejected as stale).
 - **FR-112**: The quorum result MUST include the "as of" time of the data it was based on, and the panel MUST show it ("Data as of HH:MM").
 
 #### Data sent to the model (replaces 017 FR-011)
 
-- **FR-113** *(replaces 017 FR-011)*: The data sent to Vertex AI MUST be limited to: underlying symbol, option type, strike, expiry, days to expiry, signed quantity, cost basis per contract, current mark, unrealised P&L, Greeks, implied volatility, underlying price, the FR-101 per-leg fundamentals, the FR-104 position-level fundamentals, the data "as of" time, the macro research summary, and — for the news-overlay analyst only — the gathered headlines. User-identifiable or pedigree data (Constitution v3.3.0, Principle I) MUST NOT be sent — including names, emails, addresses, phone numbers, dates of birth, government/tax IDs, account numbers, account hashes, tokens, and IP addresses. Free-text fields supplied by the browser MUST NOT be accepted.
+- **FR-113** *(replaces 017 FR-011)*: The data sent to Vertex AI MUST be limited to: underlying symbol, option type, strike, expiry, days to expiry, signed quantity, cost basis per contract, current mark, unrealised P&L, Greeks, implied volatility, underlying price, the FR-101 per-leg fundamentals, the FR-104 position-level fundamentals, the data "as of" time, and — for the news-overlay analyst only — the macro research summary and the gathered headlines. User-identifiable or pedigree data (Constitution v3.3.0, Principle I) MUST NOT be sent — including names, emails, addresses, phone numbers, dates of birth, government/tax IDs, account numbers, account hashes, tokens, and IP addresses. Free-text fields supplied by the browser MUST NOT be accepted.
 
 #### Analyst seats (replaces 017 FR-004)
 
@@ -163,9 +165,9 @@ A positions refresh asks Schwab only for the option contracts the trader actuall
 #### News and research (replaces 017 FR-009, FR-010, FR-012)
 
 - **FR-116** *(replaces 017 FR-009)*: News MUST be gathered at request time from the same CNBC, Yahoo Finance, and Bloomberg public feeds plus the Yahoo Finance feed for the position's underlying. Only headlines published within the last 48 hours are kept (headlines with no publication time are dropped). After de-duplication by title, at most 12 headlines are passed to the news-overlay analyst and returned in the result: up to 5 from the underlying's own feed (newest first), with the remaining places filled by the newest general headlines.
-- **FR-117** *(replaces 017 FR-010)*: A research agent MUST summarise, using Google Search grounding focused on the same three publishers, news and scheduled events relevant to the position's underlying before the position's expiry (e.g. earnings, ex-dividend dates, scheduled economic releases), plus a brief note on the macro backdrop. Its summary is shared read-only with all five seats. If research fails, seats proceed without it.
+- **FR-117** *(replaces 017 FR-010)*: A research agent MUST summarise, using Google Search grounding focused on the same three publishers, news and scheduled events relevant to the position's underlying before the position's expiry (e.g. earnings, ex-dividend dates, scheduled economic releases), plus a brief note on the macro backdrop. Its summary is given read-only to seat 5 (Macro & News Overlay) only. If research fails, seat 5 proceeds on headlines alone.
 - **FR-118** *(replaces 017 FR-012)*: The whole quorum MUST complete or fail within 60 seconds; individual feed fetches MUST time out after 3 seconds.
-- **FR-119**: The news gathering, the research agent, and seats 1–4 MUST start at the same time; only seat 5 waits for the headlines and research summary. Seats 1–4 receive the research summary only if it is ready when they start; otherwise they vote without it.
+- **FR-119**: The news gathering, the research agent, and seats 1–4 MUST start at the same time; only seat 5 waits for the headlines and research summary. Seats 1–4 never wait on news or research.
 
 #### Disclosure
 
@@ -175,7 +177,7 @@ A positions refresh asks Schwab only for the option contracts the trader actuall
 
 - **Leg Fundamentals**: Per-leg calculated figures attached to each position at refresh time — realised volatility of the underlying, IV relative to realised volatility, moneyness, expected move to expiry, probability of finishing in the money, dollar Greeks — each possibly unavailable.
 - **Position Fundamentals**: Position-level figures calculated at quorum time from the legs — net and dollar Greeks, breakevens, maximum profit and loss where defined, percent of maximum profit captured, daily time decay as percent of remaining premium.
-- **Quorum Request**: The legs (FR-113 fields plus leg fundamentals) and the data "as of" time; no account identifier.
+- **Quorum Request**: The legs (FR-113 leg fields plus realised volatility) and the data "as of" time; no account identifier and no leg symbol.
 - **Quorum Result** *(extends 017)*: Adds the data "as of" time and the position fundamentals the analysts were given; seats use the FR-114 lenses; headlines are the at-most-12 given to the overlay seat.
 
 ## Success Criteria *(mandatory)*
