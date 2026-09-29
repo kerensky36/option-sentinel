@@ -168,6 +168,13 @@
             <td data-label="Kept for">Until you sign out, use Erase All Data, or close the tab. A position whose legs change gets a fresh quorum.</td>
           </tr>
           <tr>
+            <td>Demo mode</td>
+            <td data-label="Data">Simulated demo accounts and positions built into the page, plus your demo selections (account, screener profile, cached results). Your Schwab token, if you connected one, stays stored while demo mode is on so the Demo | Live switch can bring your live view back without signing in again.</td>
+            <td data-label="Sent to">Nowhere. Demo data never leaves your browser, and no demo request carries your Schwab token. Demo state is kept in sessionStorage under separate keys and is never shown in live mode.</td>
+            <td data-label="Why">So you can switch between demo and live data and find each exactly as you left it.</td>
+            <td data-label="Kept for">Until you sign out, use Erase All Data, or close the tab — for both modes.</td>
+          </tr>
+          <tr>
             <td>Quorum — news feeds</td>
             <td data-label="Data">Only the underlying ticker symbol (for Yahoo Finance's per-ticker feed). The other feeds receive no data about you.</td>
             <td data-label="Sent to">CNBC, Yahoo Finance, and Bloomberg public RSS feeds, requested by our server.</td>

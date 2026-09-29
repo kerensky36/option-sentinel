@@ -9,7 +9,11 @@
  *
  * When sessionStorage throws (private mode, quota), an in-memory Map keeps
  * results for the page's lifetime instead.
+ *
+ * Stored keys are mode-scoped (specs/021): a demo result is never shown live.
  */
+
+import { scopedKey } from './auth.js';
 
 const PREFIX = 'quorum:v1:';
 const _memory = new Map();
@@ -28,19 +32,21 @@ export function cacheKey(id, legs) {
 /** Saved entry for a key, or null. */
 export function load(key) {
   try {
-    const raw = globalThis.sessionStorage?.getItem(key);
+    const raw = globalThis.sessionStorage?.getItem(scopedKey(key));
     if (raw) return JSON.parse(raw);
   } catch {
     // storage blocked or corrupt entry → fall back to memory
   }
-  return _memory.has(key) ? _memory.get(key) : null;
+  const k = scopedKey(key);
+  return _memory.has(k) ? _memory.get(k) : null;
 }
 
 /** Save an entry ({result, summary}) for the rest of the session. */
 export function save(key, entry) {
-  _memory.set(key, entry);
+  const k = scopedKey(key);
+  _memory.set(k, entry);
   try {
-    globalThis.sessionStorage?.setItem(key, JSON.stringify(entry));
+    globalThis.sessionStorage?.setItem(k, JSON.stringify(entry));
   } catch {
     // quota exceeded or storage blocked → the in-memory copy still serves this page
   }

@@ -15,7 +15,49 @@ const DEMO_MODE_KEY = 'demo_mode';
  * @returns {boolean}
  */
 export function isDemoMode() {
-  return sessionStorage.getItem(DEMO_MODE_KEY) === 'true';
+  try {
+    return globalThis.sessionStorage?.getItem(DEMO_MODE_KEY) === 'true';
+  } catch {
+    return false; // storage blocked
+  }
+}
+
+/**
+ * sessionStorage key for the current mode (specs/021 FR-406). Demo keys carry a
+ * `demo:` prefix so demo and live state never overwrite or leak into each other;
+ * live keys keep their original names.
+ * @param {string} key
+ * @returns {string}
+ */
+export function scopedKey(key) {
+  return isDemoMode() ? `demo:${key}` : key;
+}
+
+/**
+ * True when a Schwab access token is stored (it is kept while demo mode is on).
+ * @returns {boolean}
+ */
+export function hasLiveToken() {
+  return !!getAccessToken();
+}
+
+/**
+ * Switch between demo and live mode, keeping each mode's saved state
+ * (specs/021 FR-402–FR-404). Reloads the current page in the new mode; going
+ * live with no stored token starts the Schwab OAuth flow instead.
+ * @param {'demo'|'live'} target
+ * @param {Location} [loc]
+ */
+export function switchMode(target, loc = window.location) {
+  if (target === 'demo') {
+    sessionStorage.setItem(DEMO_MODE_KEY, 'true');
+    loc.reload();
+  } else if (hasLiveToken()) {
+    sessionStorage.removeItem(DEMO_MODE_KEY);
+    loc.reload();
+  } else {
+    loc.assign('/auth/start');
+  }
 }
 
 /**
@@ -23,7 +65,7 @@ export function isDemoMode() {
  * @returns {string|null}
  */
 export function getAccessToken() {
-  return sessionStorage.getItem(ACCESS_TOKEN_KEY) || null;
+  return globalThis.sessionStorage?.getItem(ACCESS_TOKEN_KEY) || null;
 }
 
 /**

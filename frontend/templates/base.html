@@ -303,6 +303,17 @@
     .quorum-panel details.extra > summary { cursor: pointer; padding: 6px 10px; color: #626270; font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase; display: flex; gap: 8px; }
     .quorum-panel .extra-body { padding: 0 10px 10px; display: grid; gap: 8px; color: #90909c; }
     .quorum-panel .extra-body p { margin: 0; line-height: 1.6; }
+
+    /* ── Demo | Live switch (specs/021) ── */
+    .mode-switch { display: inline-flex; border: 1px solid #22222e; border-radius: 1px; }
+    .mode-switch button {
+      background: #1c1c24; color: #626270; padding: 2px 8px; font-family: inherit;
+      font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; cursor: pointer;
+    }
+    .mode-switch button:hover { color: #b0b0bc; }
+    .mode-switch button + button { border-left: 1px solid #22222e; }
+    .mode-switch #mode-switch-demo[aria-pressed="true"] { background: #c8a820; color: #0c0c10; font-weight: 700; cursor: default; }
+    .mode-switch #mode-switch-live[aria-pressed="true"] { background: #1f3a2a; color: #7fd49a; font-weight: 700; cursor: default; }
   </style>
 </head>
 <body class="bg-gray-950 text-gray-100 min-h-screen flex flex-col">
@@ -327,6 +338,13 @@
       <span class="text-sm font-semibold tracking-widest uppercase text-gray-200">Option Sentinel</span>
     </div>
     <div class="flex items-center gap-4 text-gray-400 text-xs">
+      <!-- Demo | Live switch (specs/021): each mode keeps its own state -->
+      <div id="mode-switch" class="mode-switch" role="group" aria-label="Data mode">
+        <button type="button" id="mode-switch-demo" data-mode="demo" aria-pressed="false"
+                title="Show simulated demo accounts (your Schwab connection is kept)">Demo</button>
+        <button type="button" id="mode-switch-live" data-mode="live" aria-pressed="false"
+                title="Show your live Schwab accounts">Live</button>
+      </div>
       <select
         id="account-picker"
         title="Select active Schwab account"
@@ -341,12 +359,25 @@
       </button>
       <form method="post" action="/auth/logout" style="display:inline">
         <button type="submit"
-          class="flex items-center gap-1 bg-gray-800 hover:bg-gray-700 text-gray-300 px-2 py-1 transition-colors uppercase tracking-wider text-xs"
+          class="flex items-center gap-1 bg-gray-800 hover:bg-gray-700 text-gray-300 px-2 py-1 transition-colors uppercase tracking-wider text-xs">
           Disconnect
         </button>
       </form>
     </div>
   </nav>
+
+  <script nonce="{{ csp_nonce }}">
+    (function () {
+      var demo = sessionStorage.getItem('demo_mode') === 'true';
+      var active = document.getElementById(demo ? 'mode-switch-demo' : 'mode-switch-live');
+      active.setAttribute('aria-pressed', 'true');
+      if (!demo) return;
+      var live = document.getElementById('mode-switch-live');
+      if (!sessionStorage.getItem('schwab_access_token')) {
+        live.title = 'Connect your Schwab account to see live data (demo state is kept)';
+      }
+    })();
+  </script>
 
   <!-- Mobile nav strip (visible below md) -->
   <div class="flex md:hidden border-b border-gray-800" style="background:#12121e">
@@ -407,16 +438,22 @@
   <!-- Account picker (loads on every authenticated page) -->
   <script type="module" src="/static/js/account_picker.js"></script>
 
-  <!-- Erase All Data handler -->
+  <!-- Erase All Data + Demo | Live switch handlers -->
   <script type="module" nonce="{{ csp_nonce }}">
-    import { eraseAll } from '/static/js/auth.js';
+    import { eraseAll, isDemoMode, switchMode } from '/static/js/auth.js';
+    for (const b of document.querySelectorAll('#mode-switch button')) {
+      b.addEventListener('click', () => {
+        const target = b.dataset.mode;
+        if ((target === 'demo') !== isDemoMode()) switchMode(target);
+      });
+    }
     const btn = document.getElementById('erase-all-btn');
     if (btn) {
       btn.addEventListener('click', async () => {
         const confirmed = window.confirm(
           'Erase All Data?\n\nThis will clear:\n' +
           '• Your Schwab token (sessionStorage)\n' +
-          '• Position cache (IndexedDB)\n\n' +
+          '• Position, screener and advice caches — live and demo (sessionStorage)\n\n' +
           'You will need to reconnect your Schwab account.'
         );
         if (confirmed) {
