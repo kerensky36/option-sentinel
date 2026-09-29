@@ -63,3 +63,47 @@ class TestDemoLoginEndpoint:
         for h in demo_hashes:
             assert h.startswith("demo-"), f"Demo hash '{h}' must start with 'demo-'"
             assert not h.isalnum(), f"Demo hash '{h}' must not be a plain alphanumeric Schwab-style hash"
+
+
+class TestModeSwitch:
+    """specs/021 FR-401, FR-405."""
+
+    def test_demo_login_keeps_live_token(self, client):
+        resp = client.get("/auth/demo-login")
+        assert "removeItem('schwab_access_token')" not in resp.text
+        assert "sessionStorage.clear()" not in resp.text
+
+    def test_dev_login_clears_demo_flag(self, client, tmp_path, monkeypatch):
+        import src.auth.router as router
+        token = tmp_path / "schwab_token.json"
+        token.write_text('{"access_token": "abc"}')
+        monkeypatch.setattr(router, "_TOKEN_FILE", str(token))
+        resp = client.get("/auth/dev-login")
+        assert "sessionStorage.removeItem('demo_mode')" in resp.text
+
+    def test_callback_clears_demo_flag(self, client, monkeypatch):
+        import time
+        import httpx
+        import src.auth.router as router
+
+        router._pkce_store["st"] = {"code_verifier": "v", "created_at": time.time()}
+
+        class _Resp:
+            is_success = True
+            def json(self):
+                return {"access_token": "abc"}
+
+        async def _post(self, *a, **k):
+            return _Resp()
+
+        monkeypatch.setattr(httpx.AsyncClient, "post", _post)
+        resp = client.get("/auth/callback?code=c&state=st")
+        assert resp.status_code == 200
+        assert "sessionStorage.removeItem('demo_mode')" in resp.text
+
+    def test_base_template_has_mode_switch(self):
+        from pathlib import Path
+        html = (Path(__file__).resolve().parents[2] / "frontend" / "templates" / "base.html").read_text()
+        assert 'id="mode-switch-demo"' in html
+        assert 'id="mode-switch-live"' in html
+        assert "switchMode" in html
