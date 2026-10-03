@@ -5,7 +5,7 @@ NEVER amend `.specify/memory/constitution.md` without asking the user first and 
 
 <!-- SPECKIT START -->
 For context on technologies, project structure, and implementation approach,
-read the current plan at `specs/022-ai-cost-guard-hardening/plan.md` (spec: `specs/022-ai-cost-guard-hardening/spec.md`). Prior feature artifacts:
+read the current plan at `specs/023-self-hosted-assets-strict-csp/plan.md` (spec: `specs/023-self-hosted-assets-strict-csp/spec.md`). Prior feature artifacts:
 - `specs/020-advice-panel-redesign/research.md` — decisions D-301–D-312 (two-step summary, signed summary token, figure catalog, summariser guard, vote ring, button placement)
 - `specs/020-advice-panel-redesign/data-model.md` — FigureCatalog, CitedFigure, SummaryToken, SummaryDraft, QuorumSummary
 - `specs/020-advice-panel-redesign/contracts/quorum-api-contract.md` — POST /api/quorum/vote v3 additions and POST /api/quorum/summary

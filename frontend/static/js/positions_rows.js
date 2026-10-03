@@ -142,7 +142,7 @@ export function tableHeader() {
 /** One standalone option row with its ADVICE(Agentic) button after the name. */
 export function standaloneRow(p) {
   return `
-    <tr class="border-b border-gray-800 hover:bg-gray-900\/40 transition-colors cursor-pointer"
+    <tr class="border-b border-gray-800 hover:bg-gray-900/40 transition-colors cursor-pointer"
         data-position-id="${escapeHtml(p.symbol)}">
       <td class="px-2 py-1 text-gray-200 font-mono whitespace-nowrap"><span class="pos-name">${escapeHtml(p.symbol)}</span>${adviceButton(p.symbol)}</td>${legBodyCells(p)}
     </tr>`;
@@ -157,7 +157,7 @@ export function spreadRows(group) {
     : '—');
 
   const summaryRow = `
-    <tr class="border-b border-gray-700 bg-gray-800\/60 font-medium hover:bg-gray-700\/60 transition-colors cursor-pointer" data-spread-id="${escapeHtml(group.groupId)}">
+    <tr class="border-b border-gray-700 bg-gray-800/60 font-medium hover:bg-gray-700/60 transition-colors cursor-pointer" data-spread-id="${escapeHtml(group.groupId)}">
       <td class="px-2 py-1 text-gray-200 font-mono whitespace-nowrap">
         <button data-spread-toggle="${escapeHtml(group.groupId)}" class="mr-1 text-gray-400 hover:text-gray-200 transition-colors text-xs leading-none cursor-pointer">▶</button><span class="pos-name">${escapeHtml(group.groupName)}</span>${adviceButton(group.groupId)}</td>
       <td class="px-2 py-1 text-gray-300">${escapeHtml(group.underlying)}</td>
@@ -176,7 +176,7 @@ export function spreadRows(group) {
     </tr>`;
 
   const legRows = group.legs.map((p) => `
-    <tr class="border-b border-gray-800 hover:bg-gray-900\/40 transition-colors hidden" data-spread-leg="${escapeHtml(group.groupId)}">
+    <tr class="border-b border-gray-800 hover:bg-gray-900/40 transition-colors hidden" data-spread-leg="${escapeHtml(group.groupId)}">
       <td class="pl-5 pr-2 py-1 text-gray-400 font-mono text-xs">${escapeHtml(p.symbol)}</td>${legBodyCells(p)}
     </tr>`).join('');
 

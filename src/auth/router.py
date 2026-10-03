@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import html
 import json
 import os
 import secrets
@@ -33,6 +34,23 @@ def _evict_expired() -> None:
 
 def _env(name: str) -> str:
     return os.environ.get(name, "")
+
+
+def _handoff_page(title: str, handoff: str, noscript: str, token: str | None = None) -> HTMLResponse:
+    """A page that runs /static/js/auth_handoff.js and moves on (specs/023: no inline scripts).
+
+    Firebase sends its own nonce-free CSP on the /auth/** pages it proxies, so these
+    pages cannot use an inline script even with Cloud Run's nonce.
+    """
+    token_attr = f' data-token="{html.escape(token)}"' if token is not None else ""
+    return HTMLResponse(content=f"""<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><title>{title}</title></head>
+<body data-handoff="{handoff}"{token_attr}>
+<noscript><p>{noscript}</p></noscript>
+<script src="/static/js/auth_handoff.js"></script>
+</body>
+</html>""", status_code=200)
 
 
 @router.get("/login", response_class=HTMLResponse)
@@ -106,49 +124,15 @@ async def auth_callback(request: Request):
         return RedirectResponse(url="/auth/login?error=token_exchange_failed", status_code=302)
 
     data = resp.json()
-    access_token = json.dumps(data.get("access_token", ""))
-    nonce = getattr(request.state, "csp_nonce", "")
-
-    html = f"""<!DOCTYPE html>
-<html>
-<head><meta charset="UTF-8"><title>Connecting…</title></head>
-<body>
-<script nonce="{nonce}">
-  try {{
-    sessionStorage.removeItem('demo_mode');
-    sessionStorage.setItem('schwab_access_token', {access_token});
-  }} catch (e) {{
-    console.error('Failed to store token:', e);
-  }}
-  window.location.replace('/');
-</script>
-<noscript><p>JavaScript is required. <a href="/">Continue</a></p></noscript>
-</body>
-</html>"""
-    return HTMLResponse(content=html, status_code=200)
+    return _handoff_page("Connecting…", "live", 'JavaScript is required. <a href="/">Continue</a>',
+                         token=data.get("access_token", ""))
 
 
 @router.get("/demo-login", response_class=HTMLResponse)
 @limiter.limit("30/minute")
 async def demo_login(request: Request):
     """Enter demo mode: sets demo_mode flag in sessionStorage, no Schwab OAuth required."""
-    nonce = getattr(request.state, "csp_nonce", "")
-    html = f"""<!DOCTYPE html>
-<html>
-<head><meta charset="UTF-8"><title>Demo Mode…</title></head>
-<body>
-<script nonce="{nonce}">
-  try {{
-    sessionStorage.setItem('demo_mode', 'true');
-  }} catch (e) {{
-    console.error('Failed to set demo mode:', e);
-  }}
-  window.location.replace('/');
-</script>
-<noscript><p>JavaScript is required. <a href="/">Continue</a></p></noscript>
-</body>
-</html>"""
-    return HTMLResponse(content=html, status_code=200)
+    return _handoff_page("Demo Mode…", "demo", 'JavaScript is required. <a href="/">Continue</a>')
 
 
 @router.get("/dev-login", response_class=HTMLResponse)
@@ -161,54 +145,11 @@ async def dev_login(request: Request):
         data = json.load(f)
 
     inner = data.get("token", data)
-    access_token = json.dumps(inner.get("access_token", ""))
-    nonce = getattr(request.state, "csp_nonce", "")
-
-    html = f"""<!DOCTYPE html>
-<html>
-<head><meta charset="UTF-8"><title>Dev Login…</title></head>
-<body>
-<script nonce="{nonce}">
-  try {{
-    sessionStorage.removeItem('demo_mode');
-    sessionStorage.setItem('schwab_access_token', {access_token});
-  }} catch (e) {{
-    console.error('Failed to store token:', e);
-  }}
-  window.location.replace('/');
-</script>
-<noscript><p>JavaScript is required. <a href="/">Continue</a></p></noscript>
-</body>
-</html>"""
-    return HTMLResponse(content=html, status_code=200)
+    return _handoff_page("Dev Login…", "live", 'JavaScript is required. <a href="/">Continue</a>',
+                         token=inner.get("access_token", ""))
 
 
 @router.post("/logout", response_class=HTMLResponse)
 async def logout(request: Request):
     """Render a page that clears all browser storage and redirects to login."""
-    nonce = getattr(request.state, "csp_nonce", "")
-    html = f"""<!DOCTYPE html>
-<html>
-<head><meta charset="UTF-8"><title>Signing out…</title></head>
-<body>
-<script nonce="{nonce}">
-  (async function() {{
-    sessionStorage.clear();
-    localStorage.clear();
-    try {{
-      await new Promise((resolve, reject) => {{
-        const req = indexedDB.deleteDatabase('option-sentinel');
-        req.onsuccess = resolve;
-        req.onerror = reject;
-        req.onblocked = resolve;
-      }});
-    }} catch (e) {{
-      console.warn('IndexedDB clear failed:', e);
-    }}
-    window.location.replace('/auth/login');
-  }})();
-</script>
-<noscript><p>Signed out. <a href="/auth/login">Return to login</a></p></noscript>
-</body>
-</html>"""
-    return HTMLResponse(content=html, status_code=200)
+    return _handoff_page("Signing out…", "logout", 'Signed out. <a href="/auth/login">Return to login</a>')

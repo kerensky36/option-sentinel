@@ -47,7 +47,7 @@ def log_security_event(event: str, request: Request) -> None:
 
 _CSP = (
     "default-src 'self'; "
-    "script-src 'self' https://cdn.tailwindcss.com 'nonce-{nonce}'; "
+    "script-src 'self' 'nonce-{nonce}'; "  # no third-party scripts (specs/023); nonce for /auth hand-off pages
     "style-src 'self' https://fonts.googleapis.com 'unsafe-inline'; "
     "font-src 'self' https://fonts.gstatic.com; "
     "img-src 'self' data:; "

@@ -8,28 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script nonce="{{ csp_nonce }}">
-    tailwind.config = {
-      theme: {
-        extend: {
-          fontFamily: {
-            sans: ['"JetBrains Mono"', 'Consolas', 'ui-monospace', 'monospace'],
-            mono: ['"JetBrains Mono"', 'Consolas', 'ui-monospace', 'monospace'],
-          },
-          fontSize: {
-            'xs':   ['9px',  { lineHeight: '1.4' }],
-            'sm':   ['11px', { lineHeight: '1.4' }],
-            'base': ['12px', { lineHeight: '1.5' }],
-            'lg':   ['13px', { lineHeight: '1.4' }],
-            'xl':   ['14px', { lineHeight: '1.4' }],
-            '2xl':  ['16px', { lineHeight: '1.3' }],
-            '3xl':  ['18px', { lineHeight: '1.3' }],
-          }
-        }
-      }
-    }
-  </script>
+  <link rel="stylesheet" href="/static/css/app.css">
   <style>
     /* ── ThinkorSwim-inspired theme ─────────────────────────────────────── */
 
@@ -325,11 +304,6 @@
               font-family:'JetBrains Mono',monospace; flex-shrink:0;">
     DEMO MODE — data is simulated and does not reflect real account balances
   </div>
-  <script nonce="{{ csp_nonce }}">
-    if (sessionStorage.getItem('demo_mode') === 'true') {
-      document.getElementById('demo-banner').style.display = 'block';
-    }
-  </script>
 
   <!-- Top nav -->
   <nav class="bg-gray-900 border-b border-gray-800 px-4 py-1.5 flex items-center justify-between flex-shrink-0">
@@ -366,18 +340,8 @@
     </div>
   </nav>
 
-  <script nonce="{{ csp_nonce }}">
-    (function () {
-      var demo = sessionStorage.getItem('demo_mode') === 'true';
-      var active = document.getElementById(demo ? 'mode-switch-demo' : 'mode-switch-live');
-      active.setAttribute('aria-pressed', 'true');
-      if (!demo) return;
-      var live = document.getElementById('mode-switch-live');
-      if (!sessionStorage.getItem('schwab_access_token')) {
-        live.title = 'Connect your Schwab account to see live data (demo state is kept)';
-      }
-    })();
-  </script>
+  <!-- Demo banner and active Demo | Live segment, before first paint (specs/023: no inline scripts) -->
+  <script src="/static/js/shell.js"></script>
 
   <!-- Mobile nav strip (visible below md) -->
   <div class="flex md:hidden border-b border-gray-800" style="background:#12121e">
@@ -439,29 +403,7 @@
   <script type="module" src="/static/js/account_picker.js"></script>
 
   <!-- Erase All Data + Demo | Live switch handlers -->
-  <script type="module" nonce="{{ csp_nonce }}">
-    import { eraseAll, isDemoMode, switchMode } from '/static/js/auth.js';
-    for (const b of document.querySelectorAll('#mode-switch button')) {
-      b.addEventListener('click', () => {
-        const target = b.dataset.mode;
-        if ((target === 'demo') !== isDemoMode()) switchMode(target);
-      });
-    }
-    const btn = document.getElementById('erase-all-btn');
-    if (btn) {
-      btn.addEventListener('click', async () => {
-        const confirmed = window.confirm(
-          'Erase All Data?\n\nThis will clear:\n' +
-          '• Your Schwab token (sessionStorage)\n' +
-          '• Position, screener and advice caches — live and demo (sessionStorage)\n\n' +
-          'You will need to reconnect your Schwab account.'
-        );
-        if (confirmed) {
-          await eraseAll();
-        }
-      });
-    }
-  </script>
+  <script type="module" src="/static/js/shell_actions.js"></script>
 
 </body>
 </html>
