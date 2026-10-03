@@ -5,8 +5,13 @@ set -euo pipefail
 # Usage: bash scripts/deploy_backend.sh
 #
 # Required env vars:
-#   GCP_PROJECT_ID, SCHWAB_CLIENT_ID, SCHWAB_CLIENT_SECRET,
-#   SCHWAB_REDIRECT_URI, SCHWAB_AUTH_URL, SCHWAB_TOKEN_URL
+#   GCP_PROJECT_ID, SCHWAB_CLIENT_ID, SCHWAB_REDIRECT_URI, SCHWAB_AUTH_URL, SCHWAB_TOKEN_URL
+#   CLOUD_RUN_SERVICE_ACCOUNT  (specs/022: dedicated least-privilege runtime account,
+#                               created by scripts/setup_gcp_security.sh)
+#
+# Secrets (specs/022 FR-507) are mounted from Secret Manager, never passed as values:
+#   SCHWAB_CLIENT_SECRET <- schwab-client-secret, QUORUM_SEAL_KEY <- quorum-seal-key,
+#   LOG_PEPPER <- log-pepper. Create them once with scripts/setup_gcp_security.sh.
 #
 # Optional env vars (defaults shown):
 #   CLOUD_RUN_SERVICE=option-sentinel
@@ -15,18 +20,16 @@ set -euo pipefail
 #   HTTPS_ONLY=true     (set HSTS header; default true in prod)
 #   DEBUG=false         (suppress stack traces; default false in prod)
 #   ALLOWED_ORIGIN      (CORS allowed origin; defaults to Firebase hosting URL)
-#   LOG_PEPPER          (HMAC pepper for IP hashing in audit log)
+#   QUORUM_DAILY_CAP    (specs/022: AI analyses per day for the whole service; app
+#                        default 300; 0 pauses all AI routes)
 #
 # Macro news quorum (specs/017) — Gemini on Vertex AI. Always passed, with defaults:
 #   GOOGLE_GENAI_USE_VERTEXAI=TRUE           (set FALSE to disable the quorum)
 #   GOOGLE_CLOUD_PROJECT=$GCP_PROJECT_ID
 #   GOOGLE_CLOUD_LOCATION=$CLOUD_RUN_REGION
 #   QUORUM_MODEL                             (optional; app default gemini-2.5-flash)
-#   QUORUM_SEAL_KEY                          (specs/020: ≥ 32 chars, shared by every instance;
-#                                             signs the summary token. Without it the panel
-#                                             shows "Summary unavailable".)
-# The service account also needs roles/aiplatform.user (one-time, see
-# specs/017-macro-quorum-agents/quickstart.md).
+#
+# --max-instances stays 1: the daily AI cap is counted in that one instance's memory.
 #
 # Env vars are applied with --update-env-vars, so values set on the service
 # outside this script are kept rather than wiped.
@@ -42,7 +45,7 @@ FIREBASE_PROJ="${FIREBASE_PROJECT:-${GCP_PROJECT_ID:-}}"
 ALLOWED_ORIGIN_VAL="${ALLOWED_ORIGIN:-https://${FIREBASE_PROJ}.web.app}"
 
 missing=()
-for var in GCP_PROJECT_ID SCHWAB_CLIENT_ID SCHWAB_CLIENT_SECRET SCHWAB_REDIRECT_URI SCHWAB_AUTH_URL SCHWAB_TOKEN_URL; do
+for var in GCP_PROJECT_ID SCHWAB_CLIENT_ID SCHWAB_REDIRECT_URI SCHWAB_AUTH_URL SCHWAB_TOKEN_URL; do
   [[ -z "${!var:-}" ]] && missing+=("$var")
 done
 
@@ -52,19 +55,23 @@ if [[ ${#missing[@]} -gt 0 ]]; then
   exit 1
 fi
 
+if [[ -z "${CLOUD_RUN_SERVICE_ACCOUNT:-}" ]]; then
+  echo "ERROR: CLOUD_RUN_SERVICE_ACCOUNT is not set."
+  echo "       Run 'bash scripts/setup_gcp_security.sh' once to create the least-privilege"
+  echo "       runtime account and the Secret Manager secrets, then add the account to .env."
+  exit 1
+fi
+
 VERTEX_ENABLED="${GOOGLE_GENAI_USE_VERTEXAI:-TRUE}"
 VERTEX_PROJECT="${GOOGLE_CLOUD_PROJECT:-${GCP_PROJECT_ID}}"
 VERTEX_LOCATION="${GOOGLE_CLOUD_LOCATION:-${REGION}}"
 
-ENV_VARS="SCHWAB_CLIENT_ID=${SCHWAB_CLIENT_ID},SCHWAB_CLIENT_SECRET=${SCHWAB_CLIENT_SECRET},SCHWAB_REDIRECT_URI=${SCHWAB_REDIRECT_URI},SCHWAB_AUTH_URL=${SCHWAB_AUTH_URL},SCHWAB_TOKEN_URL=${SCHWAB_TOKEN_URL},RISK_FREE_RATE=${RATE},HTTPS_ONLY=${HTTPS_ONLY_VAL},DEBUG=${DEBUG_VAL},ALLOWED_ORIGIN=${ALLOWED_ORIGIN_VAL}"
+ENV_VARS="SCHWAB_CLIENT_ID=${SCHWAB_CLIENT_ID},SCHWAB_REDIRECT_URI=${SCHWAB_REDIRECT_URI},SCHWAB_AUTH_URL=${SCHWAB_AUTH_URL},SCHWAB_TOKEN_URL=${SCHWAB_TOKEN_URL},RISK_FREE_RATE=${RATE},HTTPS_ONLY=${HTTPS_ONLY_VAL},DEBUG=${DEBUG_VAL},ALLOWED_ORIGIN=${ALLOWED_ORIGIN_VAL}"
 ENV_VARS="${ENV_VARS},GOOGLE_GENAI_USE_VERTEXAI=${VERTEX_ENABLED},GOOGLE_CLOUD_PROJECT=${VERTEX_PROJECT},GOOGLE_CLOUD_LOCATION=${VERTEX_LOCATION}"
-for var in LOG_PEPPER QUORUM_MODEL QUORUM_SEAL_KEY; do
+for var in QUORUM_MODEL QUORUM_DAILY_CAP; do
   [[ -n "${!var:-}" ]] && ENV_VARS="${ENV_VARS},${var}=${!var}"
 done
-if [[ -z "${QUORUM_SEAL_KEY:-}" ]]; then
-  echo "WARNING: QUORUM_SEAL_KEY is not set here. Unless the service already has it, the"
-  echo "         quorum panel will show \"Summary unavailable\" (specs/020 D-303)."
-fi
+SECRETS="SCHWAB_CLIENT_SECRET=schwab-client-secret:latest,QUORUM_SEAL_KEY=quorum-seal-key:latest,LOG_PEPPER=log-pepper:latest"
 echo "→ Quorum: Vertex AI=${VERTEX_ENABLED}, project=${VERTEX_PROJECT}, location=${VERTEX_LOCATION}"
 
 # Record which commit this revision was built from (used by backend_changed.sh).
@@ -85,9 +92,11 @@ gcloud run deploy "$SERVICE" \
   --min-instances 0 \
   --max-instances 1 \
   --allow-unauthenticated \
+  --service-account "$CLOUD_RUN_SERVICE_ACCOUNT" \
   --project "$GCP_PROJECT_ID" \
   --update-labels "commit-sha=${COMMIT_SHA}" \
-  --update-env-vars "${ENV_VARS}"
+  --update-env-vars "${ENV_VARS}" \
+  --update-secrets "${SECRETS}"
 
 SERVICE_URL=$(gcloud run services describe "$SERVICE" \
   --region "$REGION" \

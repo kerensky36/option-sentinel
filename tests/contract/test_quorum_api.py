@@ -508,8 +508,8 @@ class TestQuorumSummary:
         summariser.assert_not_awaited()
 
     def test_429_after_five(self, client, summariser):
-        token = _token()
-        codes = [_post_summary(client, {"summary_token": token}).status_code for _ in range(6)]
+        # Fresh token per request: tokens are single use since specs/022 FR-505.
+        codes = [_post_summary(client, {"summary_token": _token()}).status_code for _ in range(6)]
         assert codes[:5] == [200] * 5 and codes[5] == 429
 
 

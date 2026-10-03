@@ -40,8 +40,8 @@ No `alembic upgrade head` step — there is no database.
 
 | Variable | Description | Example |
 |----------|-------------|---------|
-| `SCHWAB_CLIENT_ID` | Schwab developer app key | `2wtAiqo9NW3h...` |
-| `SCHWAB_CLIENT_SECRET` | Schwab developer app secret | `pDdxXHbCJPCX...` |
+| `SCHWAB_CLIENT_ID` | Schwab developer app key | `<your-app-key>` |
+| `SCHWAB_CLIENT_SECRET` | Schwab developer app secret | `<your-app-secret>` |
 | `SCHWAB_REDIRECT_URI` | OAuth callback URL — must match Schwab app config | `https://127.0.0.1/auth/callback` |
 | `SCHWAB_AUTH_URL` | Schwab OAuth authorise endpoint | `https://api.schwabapi.com/v1/oauth/authorize` |
 | `SCHWAB_TOKEN_URL` | Schwab token endpoint | `https://api.schwabapi.com/v1/oauth/token` |

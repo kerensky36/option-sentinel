@@ -11,10 +11,10 @@ from pydantic import ValidationError
 from src.api.deps import get_schwab_client
 from src.api.main import limiter, log_security_event
 from src.data.models import QuorumRequest, QuorumSummary, SummaryRequest
-from src.services import quorum_agents
+from src.services import ai_budget, quorum_agents
 from src.services.quorum_agents import build_position_context, quorum_configured, run_quorum
 from src.services.quorum_summary import TokenRejected as SummaryTokenRejected
-from src.services.quorum_summary import seal_key, summarise, unseal
+from src.services.quorum_summary import MAX_SKEW, MAX_TOKEN_AGE, seal_key, summarise, unseal
 from src.services.schwab_client import TokenCheckFailed, TokenRejected, verify_token
 
 router = APIRouter(prefix="/api")
@@ -27,6 +27,13 @@ MAX_DATA_AGE = timedelta(minutes=15)
 MAX_CLOCK_SKEW = timedelta(minutes=2)
 MAX_FIELDS = 20  # unknown keys are caller-chosen text: bound what is reflected back
 MAX_FIELD_CHARS = 64
+
+
+def _paused() -> JSONResponse:
+    """QUORUM_DAILY_CAP=0: every AI route is switched off (specs/022 FR-504)."""
+    return JSONResponse(
+        status_code=503, content={"detail": "AI analysis is paused on this server", "reason": "paused"}
+    )
 
 
 def _invalid(fields: list[str] | None = None) -> JSONResponse:
@@ -49,6 +56,8 @@ async def quorum_vote(request: Request, schwab_client=Depends(get_schwab_client)
     """
     if not quorum_configured():
         raise HTTPException(status_code=503, detail="Quorum is not configured on this server")
+    if ai_budget.paused():
+        return _paused()
 
     raw = await request.body()
     if len(raw) > MAX_BODY_BYTES:
@@ -79,6 +88,18 @@ async def quorum_vote(request: Request, schwab_client=Depends(get_schwab_client)
     except ValueError:
         return _invalid()
 
+    # Count only requests that will reach the model (specs/022 FR-502, FR-503).
+    if not ai_budget.try_start(now):
+        log_security_event("quorum_daily_cap_reached", request)
+        return JSONResponse(
+            status_code=429,
+            content={
+                "detail": "Today's AI analysis limit has been reached",
+                "reason": "daily_cap",
+            },
+            headers={"Retry-After": str(ai_budget.seconds_until_reset(now))},
+        )
+
     try:
         result = await asyncio.wait_for(
             run_quorum(ctx, model=quorum_agents.default_model()), QUORUM_TIMEOUT_SECONDS
@@ -87,6 +108,11 @@ async def quorum_vote(request: Request, schwab_client=Depends(get_schwab_client)
         raise HTTPException(status_code=504, detail="Quorum timed out") from exc
 
     return JSONResponse(content=result.model_dump(mode="json"))
+
+
+def _summary_rejected() -> JSONResponse:
+    # One body for every failure: never say which check failed.
+    return JSONResponse(status_code=403, content={"detail": "Summary request rejected"})
 
 
 @router.post("/quorum/summary")
@@ -101,6 +127,8 @@ async def quorum_summary(request: Request, schwab_client=Depends(get_schwab_clie
     key = seal_key()
     if not quorum_configured() or key is None:
         raise HTTPException(status_code=503, detail="Quorum summary is not configured on this server")
+    if ai_budget.paused():
+        return _paused()
 
     raw = await request.body()
     if len(raw) > MAX_SUMMARY_BODY_BYTES:
@@ -123,11 +151,16 @@ async def quorum_summary(request: Request, schwab_client=Depends(get_schwab_clie
         log_security_event("schwab_api_error", request)
         raise HTTPException(status_code=502, detail="Could not verify Schwab login") from None
 
+    now = datetime.now(timezone.utc)
     try:
-        payload = unseal(body.summary_token, key=key, now=datetime.now(timezone.utc))
+        payload = unseal(body.summary_token, key=key, now=now)
     except SummaryTokenRejected:
-        # One body for every failure: never say which check failed.
-        return JSONResponse(status_code=403, content={"detail": "Summary request rejected"})
+        return _summary_rejected()
+    # Single use (specs/022 FR-505): a replay gets the same rejection as a forgery.
+    token_id = body.summary_token.rsplit(".", 1)[-1]
+    if not ai_budget.claim_token(token_id, now + MAX_TOKEN_AGE + MAX_SKEW, now):
+        log_security_event("quorum_summary_replay", request)
+        return _summary_rejected()
 
     try:
         summary = await asyncio.wait_for(

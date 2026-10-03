@@ -25,7 +25,8 @@ STATIC_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "frontend", "st
 templates = Jinja2Templates(directory=TEMPLATES_DIR)
 
 _security_log = logging.getLogger("security")
-_log_pepper = os.getenv("LOG_PEPPER", "sentinel-pepper")
+_DEFAULT_PEPPER = "sentinel-pepper"  # public, so dev only (specs/022 FR-509)
+_log_pepper = os.getenv("LOG_PEPPER", _DEFAULT_PEPPER)
 
 limiter = Limiter(key_func=get_remote_address)
 
@@ -113,6 +114,10 @@ def create_app() -> FastAPI:
     if missing:
         raise RuntimeError(
             f"Option Sentinel: missing required environment variables: {', '.join(missing)}"
+        )
+    if os.getenv("HTTPS_ONLY", "false").lower() == "true" and os.getenv("LOG_PEPPER", "") in ("", _DEFAULT_PEPPER):
+        raise RuntimeError(
+            "Option Sentinel: LOG_PEPPER must be set to a private value in production (HTTPS_ONLY=true)"
         )
 
     app = FastAPI(title="Option Sentinel")

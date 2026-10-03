@@ -1,5 +1,8 @@
 FROM python:3.13-slim
 
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
 WORKDIR /app
 
 # Install dependencies first (layer cache)
@@ -9,6 +12,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application source
 COPY src/ ./src/
 COPY frontend/ ./frontend/
+
+# Run as an unprivileged user (specs/022 FR-511); the app only reads its files.
+RUN useradd --system --no-create-home --uid 10001 app
+USER app
 
 # Expose Cloud Run port
 EXPOSE 8080
