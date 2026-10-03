@@ -106,9 +106,6 @@
   <span class="text-gray-500 text-sm">Click <strong>Refresh</strong> to fetch live screener data.</span>
 </div>
 
-<script type="module" nonce="{{ csp_nonce }}">
-  import '/static/js/auth.js';
-  import '/static/js/screener_ui.js';
-</script>
+<script type="module" src="/static/js/screener_ui.js"></script>
 
 {% endblock %}

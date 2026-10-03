@@ -106,4 +106,7 @@ class TestModeSwitch:
         html = (Path(__file__).resolve().parents[2] / "frontend" / "templates" / "base.html").read_text()
         assert 'id="mode-switch-demo"' in html
         assert 'id="mode-switch-live"' in html
-        assert "switchMode" in html
+        # handlers live in a file since specs/023 (no inline scripts)
+        assert '<script type="module" src="/static/js/shell_actions.js"></script>' in html
+        actions = (Path(__file__).resolve().parents[2] / "frontend" / "static" / "js" / "shell_actions.js").read_text()
+        assert "switchMode" in actions

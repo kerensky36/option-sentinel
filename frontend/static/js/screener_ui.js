@@ -169,7 +169,7 @@ export function renderScreener(results) {
   }
 
   const rows = results.map((r) => `
-    <tr class="border-b border-gray-800 hover:bg-gray-900\/40 transition-colors ${r.recommendation_status === 'suppressed' ? 'opacity-60' : ''}">
+    <tr class="border-b border-gray-800 hover:bg-gray-900/40 transition-colors ${r.recommendation_status === 'suppressed' ? 'opacity-60' : ''}">
       <td class="px-2 py-1 text-gray-200 font-mono">${r.ticker}</td>
       <td class="px-2 py-1 text-right text-gray-300">${r.shares.toLocaleString()}</td>
       <td class="px-2 py-1 text-right text-gray-200">$${fmt(r.stock_price)}</td>

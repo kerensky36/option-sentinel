@@ -32,3 +32,8 @@ jobs:
 
       - name: Dependency audit
         run: bash scripts/audit.sh
+
+      - name: Stylesheet is up to date (specs/023)
+        run: |
+          bash scripts/build_css.sh
+          git diff --exit-code frontend/static/css/app.css
