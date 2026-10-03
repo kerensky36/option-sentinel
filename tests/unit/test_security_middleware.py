@@ -207,3 +207,30 @@ class TestGenericErrorHandler:
         with TestClient(app, raise_server_exceptions=False) as c:
             resp = c.get("/boom")
         assert resp.status_code == 500
+
+
+# ── specs/022 FR-509: production refuses the public default IP-hash pepper ──────
+
+class TestLogPepperRequiredInProduction:
+    @pytest.mark.parametrize("pepper", [None, "", "sentinel-pepper"])
+    def test_https_only_without_real_pepper_fails(self, monkeypatch, pepper):
+        from src.api.main import create_app
+        monkeypatch.setenv("HTTPS_ONLY", "true")
+        if pepper is None:
+            monkeypatch.delenv("LOG_PEPPER", raising=False)
+        else:
+            monkeypatch.setenv("LOG_PEPPER", pepper)
+        with pytest.raises(RuntimeError, match="LOG_PEPPER"):
+            create_app()
+
+    def test_https_only_with_pepper_starts(self, monkeypatch):
+        from src.api.main import create_app
+        monkeypatch.setenv("HTTPS_ONLY", "true")
+        monkeypatch.setenv("LOG_PEPPER", "p" * 32)
+        assert create_app() is not None
+
+    def test_dev_without_pepper_starts(self, monkeypatch):
+        from src.api.main import create_app
+        monkeypatch.delenv("HTTPS_ONLY", raising=False)
+        monkeypatch.delenv("LOG_PEPPER", raising=False)
+        assert create_app() is not None
