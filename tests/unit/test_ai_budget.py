@@ -20,8 +20,8 @@ def _fresh(monkeypatch):
 
 
 class TestDailyCap:
-    def test_default_cap_is_300(self):
-        assert ai_budget.daily_cap() == 300
+    def test_default_cap_is_50(self):
+        assert ai_budget.daily_cap() == 50
 
     def test_cap_from_env(self, monkeypatch):
         monkeypatch.setenv("QUORUM_DAILY_CAP", "25")
@@ -30,7 +30,7 @@ class TestDailyCap:
     @pytest.mark.parametrize("bad", ["abc", "-1", "1.5", ""])
     def test_invalid_cap_falls_back_to_default(self, monkeypatch, bad):
         monkeypatch.setenv("QUORUM_DAILY_CAP", bad)
-        assert ai_budget.daily_cap() == 300
+        assert ai_budget.daily_cap() == 50
 
     def test_zero_means_paused(self, monkeypatch):
         monkeypatch.setenv("QUORUM_DAILY_CAP", "0")

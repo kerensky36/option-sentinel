@@ -131,6 +131,19 @@ def test_dedicated_service_account_and_single_instance(fake_gcloud):
     assert args[args.index("--max-instances") + 1] == "1"
 
 
+def test_concurrency_and_timeout_bounded(fake_gcloud):
+    """FR-514: at most 10 requests at once, none longer than 90 s."""
+    args = _deploy_args(fake_gcloud)
+    assert args[args.index("--concurrency") + 1] == "10"
+    assert args[args.index("--timeout") + 1] == "90"
+
+
+def test_concurrency_and_timeout_overridable(fake_gcloud):
+    args = _deploy_args(fake_gcloud, CLOUD_RUN_CONCURRENCY="4", CLOUD_RUN_TIMEOUT="120")
+    assert args[args.index("--concurrency") + 1] == "4"
+    assert args[args.index("--timeout") + 1] == "120"
+
+
 def test_daily_cap_passed_through(fake_gcloud):
     assert _deploy_env_vars(fake_gcloud, QUORUM_DAILY_CAP="50")["QUORUM_DAILY_CAP"] == "50"
     assert "QUORUM_DAILY_CAP" not in _deploy_env_vars(fake_gcloud)
