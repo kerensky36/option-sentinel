@@ -4,12 +4,15 @@
  * Positions are stored in sessionStorage so they survive page navigation
  * within a tab but are automatically cleared when the tab or browser closes.
  * The cache is also cleared by auth.eraseAll() on logout.
+ * Keys are mode-scoped (specs/021): demo positions never share a key with live ones.
  */
+
+import { scopedKey } from './auth.js';
 
 const CACHE_PREFIX = 'positions';
 
 function _key(accountHash) {
-  return accountHash ? `${CACHE_PREFIX}_${accountHash}` : CACHE_PREFIX;
+  return scopedKey(accountHash ? `${CACHE_PREFIX}_${accountHash}` : CACHE_PREFIX);
 }
 
 /**

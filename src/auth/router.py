@@ -115,6 +115,7 @@ async def auth_callback(request: Request):
 <body>
 <script nonce="{nonce}">
   try {{
+    sessionStorage.removeItem('demo_mode');
     sessionStorage.setItem('schwab_access_token', {access_token});
   }} catch (e) {{
     console.error('Failed to store token:', e);
@@ -169,6 +170,7 @@ async def dev_login(request: Request):
 <body>
 <script nonce="{nonce}">
   try {{
+    sessionStorage.removeItem('demo_mode');
     sessionStorage.setItem('schwab_access_token', {access_token});
   }} catch (e) {{
     console.error('Failed to store token:', e);

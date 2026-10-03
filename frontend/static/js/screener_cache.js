@@ -1,7 +1,9 @@
+import { scopedKey } from './auth.js';
+
 const CACHE_PREFIX = 'screener_results';
 
 function _key(accountHash) {
-  return accountHash ? `${CACHE_PREFIX}_${accountHash}` : CACHE_PREFIX;
+  return scopedKey(accountHash ? `${CACHE_PREFIX}_${accountHash}` : CACHE_PREFIX);
 }
 
 export function saveScreenerResults(results, accountHash) {
@@ -23,9 +25,9 @@ export function clearScreenerResults(accountHash) {
 }
 
 export function saveScreenerProfile(name) {
-  sessionStorage.setItem('screener_profile', name);
+  sessionStorage.setItem(scopedKey('screener_profile'), name);
 }
 
 export function loadScreenerProfile() {
-  return sessionStorage.getItem('screener_profile') || 'balanced';
+  return sessionStorage.getItem(scopedKey('screener_profile')) || 'balanced';
 }

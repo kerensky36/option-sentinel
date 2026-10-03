@@ -7,9 +7,10 @@
  * US1: picker visible, account_hash sent on API calls
  * US2: sessionStorage persistence across page nav and refresh
  * US3: single-account auto-select, non-interactive
+ * specs/021: the stored selection is mode-scoped, so demo and live each keep their own
  */
 
-import { fetchWithAuth } from './auth.js';
+import { fetchWithAuth, scopedKey } from './auth.js';
 
 const ACCOUNT_HASH_KEY = 'schwab_selected_account';
 const PICKER_ID = 'account-picker';
@@ -37,7 +38,7 @@ export function withAccountHash(url) {
 
 function _setSelection(hash) {
   _selectedHash = hash;
-  sessionStorage.setItem(ACCOUNT_HASH_KEY, hash);
+  sessionStorage.setItem(scopedKey(ACCOUNT_HASH_KEY), hash);
   document.dispatchEvent(new CustomEvent('accountchange', { detail: { accountHash: hash } }));
 }
 
@@ -65,7 +66,7 @@ async function init() {
   }
 
   // Restore stored selection; discard stale hash (FR-008)
-  const stored = sessionStorage.getItem(ACCOUNT_HASH_KEY);
+  const stored = sessionStorage.getItem(scopedKey(ACCOUNT_HASH_KEY));
   const validHashes = new Set(accounts.map(a => a.hashValue));
   const initialHash = (stored && validHashes.has(stored)) ? stored : accounts[0].hashValue;
 
