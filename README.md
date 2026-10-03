@@ -139,7 +139,8 @@ The panel opens beneath the row:
 - **The verdict is counted, not generated.** It's a deterministic 3-of-5 tally. The summariser receives it as a fixed fact and cannot change it. A summary whose title names a different action or roll direction is discarded.
 - **The model never writes numbers.** It refers to figures by name (for example `{captured_pct}`), and the server inserts the real values from its own calculations. Any bullet or sentence containing a number the model typed itself is removed. If one turns up in the title or explanation, the whole summary is replaced by "Summary unavailable".
 - **The summary never delays the verdict.** Votes arrive first; the summary follows in a second request while the panel shows "Writing summary…".
-- **Nothing is stored between the two requests.** The vote response carries an HMAC-signed token (key: `QUORUM_SEAL_KEY`) that the browser returns unchanged. The server checks the signature and a 15-minute age limit, so an edited or replayed-late result never reaches the model.
+- **Nothing is stored between the two requests.** The vote response carries an HMAC-signed token (key: `QUORUM_SEAL_KEY`) that the browser returns unchanged. The server checks the signature and a 15-minute age limit and accepts each token once, so an edited or replayed result never reaches the model.
+- **AI spend has a hard daily ceiling.** One counter for the whole service (`QUORUM_DAILY_CAP`, default 50 analyses per New York day) stops new analyses once reached; `0` pauses every AI route. It holds no user data. Design: [`specs/022-ai-cost-guard-hardening/`](specs/022-ai-cost-guard-hardening/).
 
 Design: [`specs/020-advice-panel-redesign/`](specs/020-advice-panel-redesign/).
 
@@ -304,20 +305,18 @@ specs/004-stateless-ephemeral-refactor/
 
 Backend runs on GCP Cloud Run (stateless, scale-to-zero). Frontend is served from Firebase Hosting CDN, with `/api/**` and `/auth/**` proxied to Cloud Run.
 
-**Required env vars**: `GCP_PROJECT_ID`, `SCHWAB_CLIENT_ID`, `SCHWAB_CLIENT_SECRET`, `SCHWAB_REDIRECT_URI`, `SCHWAB_AUTH_URL`, `SCHWAB_TOKEN_URL`
+**One-time security setup** (specs/022): creates a least-privilege runtime service account and moves `SCHWAB_CLIENT_SECRET`, `QUORUM_SEAL_KEY` and `LOG_PEPPER` into Secret Manager. See [`specs/022-ai-cost-guard-hardening/quickstart.md`](specs/022-ai-cost-guard-hardening/quickstart.md) for the full owner checklist (budget stop, Vertex quota, secret rotation).
 
-**Quorum env vars**: `QUORUM_SEAL_KEY` (32+ random characters; signs the summary token; without it the panel shows "Summary unavailable"). Optional: `QUORUM_MODEL` (default `gemini-2.5-flash`), and `GOOGLE_GENAI_USE_VERTEXAI=FALSE` to turn the quorum off.
+```bash
+bash scripts/setup_gcp_security.sh
+```
+
+**Required env vars** (in `.env`): `GCP_PROJECT_ID`, `CLOUD_RUN_SERVICE_ACCOUNT`, `SCHWAB_CLIENT_ID`, `SCHWAB_REDIRECT_URI`, `SCHWAB_AUTH_URL`, `SCHWAB_TOKEN_URL`. Secrets come from Secret Manager, never from the command line.
+
+**Quorum env vars** (optional): `QUORUM_DAILY_CAP` (default 50; 0 pauses AI), `CLOUD_RUN_CONCURRENCY` (default 10), `CLOUD_RUN_TIMEOUT` (default 90 s), `QUORUM_MODEL` (default `gemini-2.5-flash`), and `GOOGLE_GENAI_USE_VERTEXAI=FALSE` to turn the quorum off.
 
 ```bash
 # One-command deploy (backend + frontend)
-export GCP_PROJECT_ID=your-project-id
-export SCHWAB_CLIENT_ID=...
-export SCHWAB_CLIENT_SECRET=...
-export SCHWAB_REDIRECT_URI=https://your-project.web.app/auth/callback
-export SCHWAB_AUTH_URL=https://api.schwabapi.com/v1/oauth/authorize
-export SCHWAB_TOKEN_URL=https://api.schwabapi.com/v1/oauth/token
-export QUORUM_SEAL_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(48))')"
-
 bash scripts/deploy.sh
 ```
 

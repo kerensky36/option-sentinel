@@ -589,3 +589,17 @@ def test_saved_badge_only_on_saved_results(tmp_path):
     assert "Saved for this session" in saved
     assert saved.index("Data as of") < saved.index("Saved for this session") < saved.index("AI-generated opinion")
     assert "Saved for this session" not in _panel(tmp_path, RESULT_MAJORITY)
+
+
+# ── specs/022 FR-506: daily cap and pause messages ─────────────────────────────
+
+@pytest.mark.parametrize("status,reason,text", [
+    (429, "daily_cap", "Today's AI analysis limit has been reached — it resets at midnight ET."),
+    (503, "paused", "AI analysis is paused on this server."),
+    (429, None, "Too many quorum requests — try again in a minute."),
+])
+def test_cap_and_pause_messages(tmp_path, status, reason, text):
+    body = {"detail": "x", "reason": reason} if reason else {"detail": "x"}
+    out = _run_calls([_advice("cap", [{"status": status, "body": body}])], tmp_path)
+    event = out["results"][0]["logs"][0][0]
+    assert event == {"type": "error", "message": text}

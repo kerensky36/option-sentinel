@@ -14,7 +14,7 @@ _security_log = logging.getLogger("security")
 
 
 def _hash_ip(ip: str) -> str:
-    pepper = os.getenv("LOG_PEPPER", "sentinel-pepper")
+    pepper = os.getenv("LOG_PEPPER", "sentinel-pepper")  # production requires a real one (create_app)
     return hmac.new(pepper.encode(), ip.encode(), hashlib.sha256).hexdigest()[:16]
 
 

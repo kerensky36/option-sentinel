@@ -115,7 +115,10 @@ def client(monkeypatch):
     monkeypatch.setenv("GOOGLE_GENAI_USE_VERTEXAI", "TRUE")
     monkeypatch.setenv("GOOGLE_CLOUD_PROJECT", "test-project")
     from src.api.main import create_app, limiter
+    from src.services import ai_budget
     limiter.reset()
+    ai_budget.reset()
+    monkeypatch.delenv("QUORUM_DAILY_CAP", raising=False)
     return TestClient(create_app(), raise_server_exceptions=True)
 
 
@@ -505,6 +508,61 @@ class TestQuorumSummary:
         summariser.assert_not_awaited()
 
     def test_429_after_five(self, client, summariser):
-        token = _token()
-        codes = [_post_summary(client, {"summary_token": token}).status_code for _ in range(6)]
+        # Fresh token per request: tokens are single use since specs/022 FR-505.
+        codes = [_post_summary(client, {"summary_token": _token()}).status_code for _ in range(6)]
         assert codes[:5] == [200] * 5 and codes[5] == 429
+
+
+# ── specs/022: global daily AI cap, pause switch, single-use summary tokens ──────
+
+class TestDailyCap:
+    def test_429_after_cap_without_model_call(self, client, run, monkeypatch):
+        monkeypatch.setenv("QUORUM_DAILY_CAP", "2")
+        assert _post(client, _body()).status_code == 200
+        assert _post(client, _body()).status_code == 200
+        resp = _post(client, _body())
+        assert resp.status_code == 429
+        assert resp.json()["reason"] == "daily_cap"
+        assert int(resp.headers["Retry-After"]) > 0
+        assert run.await_count == 2
+
+    def test_cap_reached_logs_security_event(self, client, run, monkeypatch, caplog):
+        monkeypatch.setenv("QUORUM_DAILY_CAP", "1")
+        _post(client, _body())
+        with caplog.at_level(logging.WARNING, logger="security"):
+            _post(client, _body())
+        assert "quorum_daily_cap_reached" in caplog.text
+
+    def test_rejected_requests_do_not_count(self, client, run, schwab, monkeypatch):
+        monkeypatch.setenv("QUORUM_DAILY_CAP", "1")
+        assert _post(client, {"legs": []}).status_code == 422
+        assert _post(client, _body(as_of=_now_iso(-timedelta(hours=1)))).status_code == 409
+        schwab.status = 401
+        assert _post(client, _body()).status_code == 401
+        schwab.status = 200
+        assert _post(client, _body()).status_code == 200
+        assert run.await_count == 1
+
+    def test_zero_cap_pauses_vote(self, client, run, monkeypatch):
+        monkeypatch.setenv("QUORUM_DAILY_CAP", "0")
+        resp = _post(client, _body())
+        assert resp.status_code == 503
+        assert resp.json()["reason"] == "paused"
+        run.assert_not_awaited()
+
+
+class TestSummaryHardening:
+    def test_replayed_token_rejected_and_not_summarised_twice(self, client, summariser):
+        token = _token()
+        assert _post_summary(client, {"summary_token": token}).status_code == 200
+        replay = _post_summary(client, {"summary_token": token})
+        assert replay.status_code == 403
+        assert replay.json() == {"detail": "Summary request rejected"}
+        assert summariser.await_count == 1
+
+    def test_zero_cap_pauses_summary(self, client, summariser, monkeypatch):
+        monkeypatch.setenv("QUORUM_DAILY_CAP", "0")
+        resp = _post_summary(client, {"summary_token": _token()})
+        assert resp.status_code == 503
+        assert resp.json()["reason"] == "paused"
+        summariser.assert_not_awaited()

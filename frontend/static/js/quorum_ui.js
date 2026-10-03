@@ -320,7 +320,9 @@ export async function requestSummary(result, fetchImpl, isCurrent, timeoutMs = S
   return isCurrent() ? outcome : null;
 }
 
-function _errorMessage(status) {
+function _errorMessage(status, reason) {
+  if (reason === 'daily_cap') return "Today's AI analysis limit has been reached — it resets at midnight ET.";
+  if (reason === 'paused') return 'AI analysis is paused on this server.';
   switch (status) {
     case 409: return STALE_MESSAGE;
     case 422: return 'Quorum request was rejected — refresh positions and try again.';
@@ -390,7 +392,11 @@ export async function adviceFor(key, legs, deps) {
     });
     if (!resp) return null; // 401 already handled by fetchWithAuth
     if (!resp.ok) {
-      render({ type: 'error', message: _errorMessage(resp.status) });
+      let reason = null;
+      if (resp.status === 429 || resp.status === 503) {
+        try { reason = (await resp.json())?.reason ?? null; } catch { /* non-JSON error body */ }
+      }
+      render({ type: 'error', message: _errorMessage(resp.status, reason) });
       return null;
     }
     result = await resp.json();
