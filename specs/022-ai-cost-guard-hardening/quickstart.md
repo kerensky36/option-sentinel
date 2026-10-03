@@ -54,10 +54,14 @@ bash scripts/audit.sh          # pip-audit: expect "No known vulnerabilities fou
 
 | Env var | Default | Effect |
 |---|---|---|
-| `QUORUM_DAILY_CAP` | 300 | AI analyses per America/New_York day for the whole service. 0 pauses every AI route (503 `paused`). |
+| `QUORUM_DAILY_CAP` | 50 | AI analyses per America/New_York day for the whole service. 0 pauses every AI route (503 `paused`). |
+| `CLOUD_RUN_CONCURRENCY` | 10 | Requests the single instance handles at once. |
+| `CLOUD_RUN_TIMEOUT` | 90 | Seconds before Cloud Run ends a request. |
 
-At ~4¢ per analysis (list prices, mostly Google Search grounding), 300/day ≈ $12/day
-worst case per instance-day. A restart resets the count, so keep the budget stop (step 4).
+One analysis = one ADVICE(Agentic) click without a saved result (5 votes + research + summary,
+about 7 Gemini calls). At ~2.5¢ per analysis on Gemini 2.5 Flash, 50/day ≈ $1.25/day worst
+case per instance-day. A restart resets the count, so keep the budget stop (step 4) and the
+Vertex AI quota (step 5, ~30 requests/minute).
 
 ## Browser check
 

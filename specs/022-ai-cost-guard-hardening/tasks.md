@@ -21,5 +21,5 @@
 
 ## Amendment (2026-10-03): default cap 50, Cloud Run concurrency/timeout
 
-- [ ] T012 Tests: default cap 50 in `test_ai_budget.py`; `--concurrency 10`, `--timeout 90` and their overrides in `test_deploy_backend.py`.
-- [ ] T013 `ai_budget.DEFAULT_DAILY_CAP = 50`; deploy flags; docs (quickstart, README, .env.example).
+- [X] T012 Tests: default cap 50 in `test_ai_budget.py`; `--concurrency 10`, `--timeout 90` and their overrides in `test_deploy_backend.py`.
+- [X] T013 `ai_budget.DEFAULT_DAILY_CAP = 50`; deploy flags; docs (quickstart, README, .env.example).

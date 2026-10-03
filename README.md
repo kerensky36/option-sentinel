@@ -140,7 +140,7 @@ The panel opens beneath the row:
 - **The model never writes numbers.** It refers to figures by name (for example `{captured_pct}`), and the server inserts the real values from its own calculations. Any bullet or sentence containing a number the model typed itself is removed. If one turns up in the title or explanation, the whole summary is replaced by "Summary unavailable".
 - **The summary never delays the verdict.** Votes arrive first; the summary follows in a second request while the panel shows "Writing summary…".
 - **Nothing is stored between the two requests.** The vote response carries an HMAC-signed token (key: `QUORUM_SEAL_KEY`) that the browser returns unchanged. The server checks the signature and a 15-minute age limit and accepts each token once, so an edited or replayed result never reaches the model.
-- **AI spend has a hard daily ceiling.** One counter for the whole service (`QUORUM_DAILY_CAP`, default 300 analyses per New York day) stops new analyses once reached; `0` pauses every AI route. It holds no user data. Design: [`specs/022-ai-cost-guard-hardening/`](specs/022-ai-cost-guard-hardening/).
+- **AI spend has a hard daily ceiling.** One counter for the whole service (`QUORUM_DAILY_CAP`, default 50 analyses per New York day) stops new analyses once reached; `0` pauses every AI route. It holds no user data. Design: [`specs/022-ai-cost-guard-hardening/`](specs/022-ai-cost-guard-hardening/).
 
 Design: [`specs/020-advice-panel-redesign/`](specs/020-advice-panel-redesign/).
 
@@ -313,7 +313,7 @@ bash scripts/setup_gcp_security.sh
 
 **Required env vars** (in `.env`): `GCP_PROJECT_ID`, `CLOUD_RUN_SERVICE_ACCOUNT`, `SCHWAB_CLIENT_ID`, `SCHWAB_REDIRECT_URI`, `SCHWAB_AUTH_URL`, `SCHWAB_TOKEN_URL`. Secrets come from Secret Manager, never from the command line.
 
-**Quorum env vars** (optional): `QUORUM_DAILY_CAP` (default 300; 0 pauses AI), `QUORUM_MODEL` (default `gemini-2.5-flash`), and `GOOGLE_GENAI_USE_VERTEXAI=FALSE` to turn the quorum off.
+**Quorum env vars** (optional): `QUORUM_DAILY_CAP` (default 50; 0 pauses AI), `CLOUD_RUN_CONCURRENCY` (default 10), `CLOUD_RUN_TIMEOUT` (default 90 s), `QUORUM_MODEL` (default `gemini-2.5-flash`), and `GOOGLE_GENAI_USE_VERTEXAI=FALSE` to turn the quorum off.
 
 ```bash
 # One-command deploy (backend + frontend)

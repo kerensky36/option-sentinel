@@ -21,7 +21,9 @@ set -euo pipefail
 #   DEBUG=false         (suppress stack traces; default false in prod)
 #   ALLOWED_ORIGIN      (CORS allowed origin; defaults to Firebase hosting URL)
 #   QUORUM_DAILY_CAP    (specs/022: AI analyses per day for the whole service; app
-#                        default 300; 0 pauses all AI routes)
+#                        default 50; 0 pauses all AI routes)
+#   CLOUD_RUN_CONCURRENCY=10  (specs/022 FR-514: requests handled at once)
+#   CLOUD_RUN_TIMEOUT=90      (seconds; the AI routes stop at 60 s and 15 s)
 #
 # Macro news quorum (specs/017) — Gemini on Vertex AI. Always passed, with defaults:
 #   GOOGLE_GENAI_USE_VERTEXAI=TRUE           (set FALSE to disable the quorum)
@@ -37,6 +39,8 @@ set -euo pipefail
 SERVICE="${CLOUD_RUN_SERVICE:-option-sentinel}"
 REGION="${CLOUD_RUN_REGION:-us-central1}"
 RATE="${RISK_FREE_RATE:-0.045}"
+CONCURRENCY="${CLOUD_RUN_CONCURRENCY:-10}"
+TIMEOUT="${CLOUD_RUN_TIMEOUT:-90}"
 # Prefer the prod redirect URI when deploying; fall back to SCHWAB_REDIRECT_URI
 SCHWAB_REDIRECT_URI="${SCHWAB_REDIRECT_URI_PROD:-${SCHWAB_REDIRECT_URI:-}}"
 HTTPS_ONLY_VAL="${HTTPS_ONLY:-true}"
@@ -91,6 +95,8 @@ gcloud run deploy "$SERVICE" \
   --platform managed \
   --min-instances 0 \
   --max-instances 1 \
+  --concurrency "$CONCURRENCY" \
+  --timeout "$TIMEOUT" \
   --allow-unauthenticated \
   --service-account "$CLOUD_RUN_SERVICE_ACCOUNT" \
   --project "$GCP_PROJECT_ID" \

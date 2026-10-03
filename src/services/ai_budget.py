@@ -16,7 +16,7 @@ from zoneinfo import ZoneInfo
 
 _log = logging.getLogger(__name__)
 
-DEFAULT_DAILY_CAP = 300
+DEFAULT_DAILY_CAP = 50
 DAY_ZONE = ZoneInfo("America/New_York")
 
 _lock = threading.Lock()
