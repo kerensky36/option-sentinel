@@ -41,6 +41,27 @@ class TestTemplates:
         assert not _INLINE_SCRIPT.search(template.read_text())
 
 
+@pytest.fixture
+def client():
+    from fastapi.testclient import TestClient
+    from src.api.main import create_app
+    return TestClient(create_app())
+
+
+def test_auth_handoff_pages_have_no_inline_script(client, tmp_path, monkeypatch):
+    """FR-603: Firebase adds its nonce-free CSP to the /auth/** pages it proxies."""
+    import src.auth.router as router
+    token = tmp_path / "schwab_token.json"
+    token.write_text('{"access_token": "a\\"<b"}')
+    monkeypatch.setattr(router, "_TOKEN_FILE", str(token))
+    pages = [client.get("/auth/demo-login"), client.get("/auth/dev-login"), client.post("/auth/logout")]
+    for resp in pages:
+        assert resp.status_code == 200
+        assert not _INLINE_SCRIPT.search(resp.text), resp.text
+        assert '<script src="/static/js/auth_handoff.js"></script>' in resp.text
+    assert 'data-token="a&quot;&lt;b"' in pages[1].text
+
+
 @pytest.mark.parametrize("name", ["base.html", "login.html", "data_use.html"])
 def test_full_pages_link_self_hosted_css(name):
     assert '<link rel="stylesheet" href="/static/css/app.css">' in (_REPO / "frontend" / "templates" / name).read_text()

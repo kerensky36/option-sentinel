@@ -27,8 +27,8 @@ def build(out_dir: Path | None = None) -> None:
     env = Environment(loader=FileSystemLoader(str(templates_dir)), autoescape=True)
 
     # dashboard.html → dist/index.html
-    # csp_nonce is empty for static builds — Firebase Hosting does not send CSP
-    # headers, so nonce enforcement is not active for pre-rendered pages.
+    # csp_nonce is empty for static builds — Firebase Hosting sends a nonce-free
+    # script-src 'self' (firebase.json), so pages may only load /static/js files.
     html = env.get_template("dashboard.html").render(
         current_page="thesis_monitor",
         csp_nonce="",

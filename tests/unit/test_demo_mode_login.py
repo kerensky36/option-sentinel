@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import os
 import re
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -16,6 +17,9 @@ _ENV = {
 }
 for _k, _v in _ENV.items():
     os.environ.setdefault(_k, _v)
+
+
+_HANDOFF_JS = (Path(__file__).resolve().parents[2] / "frontend" / "static" / "js" / "auth_handoff.js").read_text()
 
 
 @pytest.fixture
@@ -35,18 +39,17 @@ class TestDemoLoginEndpoint:
 
     def test_sets_demo_mode_in_session_storage(self, client):
         resp = client.get("/auth/demo-login")
-        assert "sessionStorage.setItem('demo_mode'" in resp.text or \
-               'sessionStorage.setItem("demo_mode"' in resp.text
+        assert 'data-handoff="demo"' in resp.text
+        assert "sessionStorage.setItem('demo_mode', 'true')" in _HANDOFF_JS
 
-    def test_redirects_to_root(self, client):
-        resp = client.get("/auth/demo-login")
-        assert "window.location.replace('/')" in resp.text or \
-               'window.location.replace("/")' in resp.text
+    def test_redirects_to_root(self):
+        assert "window.location.replace('/')" in _HANDOFF_JS
 
-    def test_script_has_csp_nonce(self, client):
+    def test_script_is_self_hosted_not_inline(self, client):
+        """specs/023: Firebase's CSP has no nonce, so hand-off pages load a file."""
         resp = client.get("/auth/demo-login")
-        assert re.search(r'<script\s+nonce="[^"]{10,}"', resp.text), \
-            "Expected <script nonce='...'> in demo-login response"
+        assert '<script src="/static/js/auth_handoff.js"></script>' in resp.text
+        assert not re.search(r"<script(?![^>]*\bsrc=)[^>]*>\s*\S", resp.text)
 
     def test_has_noscript_fallback(self, client):
         resp = client.get("/auth/demo-login")
@@ -70,8 +73,10 @@ class TestModeSwitch:
 
     def test_demo_login_keeps_live_token(self, client):
         resp = client.get("/auth/demo-login")
-        assert "removeItem('schwab_access_token')" not in resp.text
-        assert "sessionStorage.clear()" not in resp.text
+        assert 'data-token=' not in resp.text
+        demo = _HANDOFF_JS.split("handoff === 'demo'")[1].split("} else")[0]
+        assert "schwab_access_token" not in demo
+        assert "sessionStorage.clear()" not in demo
 
     def test_dev_login_clears_demo_flag(self, client, tmp_path, monkeypatch):
         import src.auth.router as router
@@ -79,7 +84,8 @@ class TestModeSwitch:
         token.write_text('{"access_token": "abc"}')
         monkeypatch.setattr(router, "_TOKEN_FILE", str(token))
         resp = client.get("/auth/dev-login")
-        assert "sessionStorage.removeItem('demo_mode')" in resp.text
+        assert 'data-handoff="live"' in resp.text and 'data-token="abc"' in resp.text
+        assert "sessionStorage.removeItem('demo_mode')" in _HANDOFF_JS
 
     def test_callback_clears_demo_flag(self, client, monkeypatch):
         import time
@@ -99,7 +105,7 @@ class TestModeSwitch:
         monkeypatch.setattr(httpx.AsyncClient, "post", _post)
         resp = client.get("/auth/callback?code=c&state=st")
         assert resp.status_code == 200
-        assert "sessionStorage.removeItem('demo_mode')" in resp.text
+        assert 'data-handoff="live"' in resp.text and 'data-token="abc"' in resp.text
 
     def test_base_template_has_mode_switch(self):
         from pathlib import Path
