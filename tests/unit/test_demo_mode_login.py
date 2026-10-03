@@ -49,7 +49,7 @@ class TestDemoLoginEndpoint:
         """specs/023: Firebase's CSP has no nonce, so hand-off pages load a file."""
         resp = client.get("/auth/demo-login")
         assert '<script src="/static/js/auth_handoff.js"></script>' in resp.text
-        assert not re.search(r"<script(?![^>]*\bsrc=)[^>]*>\s*\S", resp.text)
+        assert not re.search(r"<script(?![^>]*\bsrc=)[^>]*>\s*\S", resp.text, re.IGNORECASE)
 
     def test_has_noscript_fallback(self, client):
         resp = client.get("/auth/demo-login")
