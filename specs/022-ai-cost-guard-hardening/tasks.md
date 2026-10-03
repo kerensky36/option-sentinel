@@ -18,3 +18,8 @@
 - [X] T009 [US3] `deploy_backend.sh`, `setup_gcp_security.sh`, `.env.example`.
 - [X] T010 [US4] Dockerfile, requirements, audit.sh, CI workflows, 004 redaction.
 - [X] T011 Quickstart owner checklist; full `pytest -q`; `pip-audit`; `bash -n` on scripts.
+
+## Amendment (2026-10-03): default cap 50, Cloud Run concurrency/timeout
+
+- [ ] T012 Tests: default cap 50 in `test_ai_budget.py`; `--concurrency 10`, `--timeout 90` and their overrides in `test_deploy_backend.py`.
+- [ ] T013 `ai_budget.DEFAULT_DAILY_CAP = 50`; deploy flags; docs (quickstart, README, .env.example).

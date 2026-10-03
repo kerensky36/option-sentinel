@@ -3,6 +3,7 @@
 **Feature Branch**: `022-ai-cost-guard-hardening`
 **Created**: 2026-10-03
 **Status**: Draft
+**Amended**: 2026-10-03 — default cap 300 → 50; FR-514 (Cloud Run concurrency/timeout).
 **Input**: Security scan (2026-10-03) of data security, the GCP build, and AI cost exposure. User decision: a **global** daily cap on AI analyses (no per-user state, consistent with constitution Principle I); AI stays available outside market hours.
 
 ## Context
@@ -67,13 +68,13 @@ The owner sets a maximum number of AI analyses per day for the whole service. On
 
 - Cold start or redeploy resets the in-memory count. The spend ceiling per day is therefore `QUORUM_DAILY_CAP × (restarts + 1)`; the billing budget (quickstart) is the backstop outside the app.
 - A request that passes the cap check and then times out still counts: its model calls were made.
-- Invalid `QUORUM_DAILY_CAP` (non-integer or negative) → the default (300) is used and a warning is logged.
+- Invalid `QUORUM_DAILY_CAP` (non-integer or negative) → the default (50) is used and a warning is logged.
 
 ## Requirements *(mandatory)*
 
 - **FR-501**: The server MUST keep a single, service-wide count of AI analyses started in the current America/New_York day, held in memory only, with no user identifier.
 - **FR-502**: `POST /api/quorum/vote` MUST check and increment the count only after body validation, freshness, Schwab token verification and context building succeed, and before any model call.
-- **FR-503**: When the count has reached `QUORUM_DAILY_CAP` (default 300), the vote route MUST return 429 with `reason: "daily_cap"` and `Retry-After`, and log a `quorum_daily_cap_reached` security event.
+- **FR-503**: When the count has reached `QUORUM_DAILY_CAP` (default 50), the vote route MUST return 429 with `reason: "daily_cap"` and `Retry-After`, and log a `quorum_daily_cap_reached` security event.
 - **FR-504**: `QUORUM_DAILY_CAP=0` MUST pause AI: vote and summary return 503 with `reason: "paused"`.
 - **FR-505**: A summary token MUST be accepted at most once; replays return the existing 403 rejection. Used-token records MUST expire with the token.
 - **FR-506**: The advice panel MUST show a specific message for `daily_cap` and `paused`.
@@ -84,10 +85,11 @@ The owner sets a maximum number of AI analyses per day for the whole service. On
 - **FR-511**: The container MUST run as a non-root user.
 - **FR-512**: The partial Schwab key/secret values in `specs/004-stateless-ephemeral-refactor/quickstart.md` MUST be replaced with placeholders. (History still holds them; the owner rotates the Schwab app secret.)
 - **FR-513**: No data-use disclosure change: the cap stores no user data.
+- **FR-514**: The backend deploy MUST set `--concurrency 10` and `--timeout 90` so at most 10 requests run at once and none holds the instance longer than 90 s (the AI routes already stop at 60 s and 15 s). Both are overridable with `CLOUD_RUN_CONCURRENCY` and `CLOUD_RUN_TIMEOUT`.
 
 ## Success Criteria
 
-- **SC-501**: With the default cap, worst-case AI analyses per instance-day are bounded at 300 (about $12/day at ~4¢ per analysis at list prices).
+- **SC-501**: With the default cap, worst-case AI analyses per instance-day are bounded at 50 (about $1.25/day at ~2.5¢ per analysis; owner decision 2026-10-03).
 - **SC-502**: Replaying a summary token never causes a second model call (automated test).
 - **SC-503**: `pip-audit -r requirements.txt` reports zero known vulnerabilities.
 - **SC-504**: No secret value appears in the deploy command line or in `gcloud run services describe` env vars after migration.
